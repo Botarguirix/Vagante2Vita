@@ -4,6 +4,8 @@ Investigación técnica e ingeniería inversa reproducible para un posible port 
 
 **Estado:** no es un port jugable ni una decompilación recompilable. El ejecutable local es Windows x86 de 32 bits, con C++/SFML, OpenGL, OpenAL y Steamworks. Se encontró un PDB coincidente que permite recuperar nombres y tipos. La reconstrucción de la lógica y la adaptación a ARM siguen pendientes.
 
+Se generó localmente pseudocódigo de **30 568 funciones**, incluidos código del juego y bibliotecas/runtime, con dos fallos por timeout después de reintentar. También se compiló un VPK de diagnóstico. Estos resultados no representan un porcentaje de reconstrucción ni prueban rendimiento del juego en Vita.
+
 - [Viabilidad técnica y evidencia](docs/FEASIBILITY.md)
 - [Proyectos relacionados](docs/REFERENCES.md)
 - [Plan de reconstrucción](docs/ROADMAP.md)
@@ -13,7 +15,7 @@ Investigación técnica e ingeniería inversa reproducible para un posible port 
 
 ## Herramientas
 
-Python 3.10 o posterior; los inspectores no requieren paquetes externos.
+Python 3.11 o posterior; las herramientas Python no requieren paquetes externos.
 
 ```powershell
 python tools/inspect_game.py 'C:\Program Files (x86)\Steam\steamapps\common\vagante'

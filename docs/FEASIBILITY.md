@@ -42,6 +42,8 @@ PS Vita requiere código ARM y sus propias APIs. El port de GTA SA demuestra la 
 - **ABI:** rehacer convenciones `thiscall`, RTTI, excepciones, contenedores MSVC y layouts de clases; usar tipos explícitos cuando haga falta.
 - **Memoria y rendimiento:** no cargar todos los PNG decodificados. Los 119 MiB del archivo descomprimido no representan el coste RAM/GPU. Medir atlas, texturas, buffers, audio y entidades en consola real.
 
+La suma calculada de ancho × alto × 4 para los 2 395 PNG extraídos es 98 343 724 bytes (aprox. 93,8 MiB), antes de alineación, mipmaps, copias CPU/GPU y otros recursos. Es una estimación RGBA8 de los archivos, no una medición de memoria del juego. Las imágenes mayores observadas son de 1 024 × 1 024. La política de carga y residencia necesita validación.
+
 La estética 2D por sí sola no demuestra rendimiento suficiente. No hay mediciones de FPS ni RAM de Vagante en Vita. El objetivo inicial de 30 FPS es un criterio de prueba, no una promesa; 60 FPS se evaluará después.
 
 ## Criterios para avanzar o detener la ruta

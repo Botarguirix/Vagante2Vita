@@ -14,5 +14,6 @@ Búsqueda en GitHub y web el 10 de octubre de 2026. No se encontró un port/deco
 | [vitasdk/samples](https://github.com/vitasdk/samples) | Referencia de toolchain y aplicaciones homebrew para validar ARM/VPK. |
 | [SFML/SFML](https://github.com/SFML/SFML) | Biblioteca identificada por símbolos; reconstruir lógica comercial no implica decompilar bibliotecas cuyo código ya está disponible. |
 | [NationalSecurityAgency/ghidra](https://github.com/NationalSecurityAgency/ghidra) | Decompilador y analizador PDB usado para las salidas locales. |
+| [Vagante en Steam](https://store.steampowered.com/app/323220/Vagante/) y [Nintendo Switch](https://www.nintendo.com/es-mx/store/products/vagante-switch/) | Distribución oficial del juego. La existencia de ports oficiales no aporta su código fuente ni demuestra rendimiento en Vita. |
 
-También se revisaron los proyectos locales `ShotKVita` y `Vita_Touhou75` como antecedentes de trabajo; sus fuentes no se incorporaron. La carpeta inicial `VaganteVita` estaba vacía. Se encontró el juego en la biblioteca Steam estándar y se analizó sin modificar su instalación.
+También se localizaron los proyectos locales `ShotKVita` y `Vita_Touhou75` como antecedentes de trabajo; sus fuentes no se incorporaron. La carpeta inicial `VaganteVita` estaba vacía. Se encontró el juego en la biblioteca Steam estándar y se analizó sin modificar su instalación.
