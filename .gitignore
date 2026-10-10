@@ -1,0 +1,16 @@
+/_local/
+/build*/
+__pycache__/
+*.pyc
+*.exe
+*.dll
+*.pdb
+*.vra
+*.sav
+*.vpk
+*.velf
+*.elf
+*.self
+*.zip
+*.gpr
+*.rep/
