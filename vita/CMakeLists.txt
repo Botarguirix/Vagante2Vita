@@ -48,26 +48,7 @@ target_compile_definitions(vagante2vita PRIVATE
   VAGANTE_ITERATION="${VAGANTE_ITERATION}" VAGANTE_VERSION="${VITA_VERSION}")
 target_link_libraries(vagante2vita resources SceDisplay_stub SceCtrl_stub SceSysmem_stub SceLibKernel_stub)
 vita_create_self(eboot.bin vagante2vita UNSAFE)
-# Optional private local data. Public builds keep requiring user-supplied files.
-set(WORLD_BUNDLE_DIR "" CACHE PATH "Private prepared world bundle for local testing")
-set(WORLD_VPK_FILES)
-if(WORLD_BUNDLE_DIR)
-  get_filename_component(WORLD_BUNDLE_DIR "${WORLD_BUNDLE_DIR}" ABSOLUTE)
-  set(WORLD_REQUIRED intro-world.vwi intro-terrain.png)
-  foreach(class knight rogue mage)
-    foreach(animation stand walk jump fall duck climb lookup)
-      list(APPEND WORLD_REQUIRED "${class}/${animation}.png")
-    endforeach()
-  endforeach()
-  foreach(resource IN LISTS WORLD_REQUIRED)
-    if(NOT EXISTS "${WORLD_BUNDLE_DIR}/${resource}")
-      message(FATAL_ERROR "Missing private world resource: ${resource}")
-    endif()
-    list(APPEND WORLD_VPK_FILES FILE "${WORLD_BUNDLE_DIR}/${resource}" "world/${resource}")
-  endforeach()
-endif()
 vita_create_vpk(Vagante2Vita-iteration${VAGANTE_ITERATION}.vpk ${VITA_TITLEID} eboot.bin VERSION ${VITA_VERSION} NAME "${VITA_APP_NAME}"
-  ${WORLD_VPK_FILES}
   FILE sce_sys/icon0.png sce_sys/icon0.png
   FILE sce_sys/pic0.png sce_sys/pic0.png
   FILE sce_sys/livearea/contents/bg0.png sce_sys/livearea/contents/bg0.png

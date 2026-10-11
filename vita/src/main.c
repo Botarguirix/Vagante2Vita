@@ -111,34 +111,37 @@ int main(void){
  else if(log)fprintf(log,"SOURCE archive=menu-only.vra scope=menu_only origin_not_rehashed_on_vita\n");
  if(log){fprintf(log,"LOAD complete=%d load_us=%llu\n",loaded,(unsigned long long)(sceKernelGetSystemTimeWide()-start));fflush(log);}
  Menu menu={0};log_state(log,&menu,0);
- unsigned previous=0;int buffer_index=0,stats=0,display_error=0,reduction=2,lightweight=1;
+ unsigned previous=0;int buffer_index=0,paused=0,display_error=0,reduction=2,lightweight=1;
  const char *labels[]={"NEW GAME","PLAY ONLINE","OPTIONS","EXIT GAME"};
- uint64_t last_tick=sceKernelGetSystemTimeWide(),last_draw=0,next_draw=last_tick,accumulator=0;
- uint64_t window_start=last_tick,cpu_sum=0,cpu_max=0,compose_sum=0,scale_sum=0,upload_sum=0;unsigned draws=0,logic_steps=0,uploaded_rows=0;uint64_t logic_us=0,interval_max=0;float fps=0;
+ uint64_t last_tick=sceKernelGetSystemTimeWide(),next_draw=last_tick,accumulator=0;
+ uint64_t state_log_time=last_tick;
  sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
  for(;;){
   SceCtrlData pad;memset(&pad,0,sizeof(pad));sceCtrlPeekBufferPositive(0,&pad,1);
   unsigned pressed=pad.buttons&~previous;previous=pad.buttons;
   if((pad.buttons&(SCE_CTRL_START|SCE_CTRL_SELECT))==(SCE_CTRL_START|SCE_CTRL_SELECT))break;
   if(!loaded&&(pressed&SCE_CTRL_START))break;
-  if(pressed&SCE_CTRL_SELECT)stats=!stats;
-  if(menu.screen!=MENU_WORLD&&(pressed&SCE_CTRL_LTRIGGER)){reduction=reduction==2?1:2;window_start=sceKernelGetSystemTimeWide();draws=0;cpu_sum=cpu_max=compose_sum=scale_sum=0;if(log){fprintf(log,"PROFILE logical_width=%d logical_height=%d\n",640/reduction,360/reduction);fflush(log);}}
+  if(menu.screen==MENU_WORLD&&(pressed&SCE_CTRL_START)){
+   paused=!paused;accumulator=0;player.previous=player_buttons(&pad);
+   if(log){fprintf(log,"PAUSE active=%d tick=%u\n",paused,player.ticks);fflush(log);}
+  }
+  if(menu.screen!=MENU_WORLD&&(pressed&SCE_CTRL_LTRIGGER)){reduction=reduction==2?1:2;if(log){fprintf(log,"PROFILE logical_width=%d logical_height=%d\n",640/reduction,360/reduction);fflush(log);}}
   if(menu.screen!=MENU_WORLD&&(pressed&SCE_CTRL_RTRIGGER)){lightweight=!lightweight;scene_invalidate_cache();if(log){fprintf(log,"QUALITY lightweight=%d scenery_cached=%d particles=%d\n",lightweight,lightweight,!lightweight);fflush(log);}}
   MenuScreen old_screen=menu.screen;int old_cursor=menu.cursor,old_class=menu.player_class;
   if(loaded){
    if(menu.screen==MENU_TITLE&&menu.cursor==3&&(pressed&SCE_CTRL_CROSS))break;
    if(menu.screen==MENU_WORLD){
-    if(pressed&SCE_CTRL_CIRCLE){
+    if(!paused&&(pressed&SCE_CTRL_CIRCLE)){
      int reset=player_spawn(&player,&world,menu.player_class);player.previous=player_buttons(&pad);
      if(log)fprintf(log,"PLAYER_RESET complete=%d class=%d\n",reset,menu.player_class);
     }
-    if(pressed&SCE_CTRL_TRIANGLE)menu.screen=MENU_CLASS;
+    if(pressed&SCE_CTRL_TRIANGLE){menu.screen=MENU_CLASS;paused=0;}
    }else menu_input(&menu,mapped_buttons(pad.buttons));
    if(old_screen==MENU_CLASS&&menu.screen==MENU_BLOCKED){
     uint64_t world_start=sceKernelGetSystemTimeWide();
-    const char *directories[]={"ux0:data/Vagante2Vita/world","app0:world"};
+    const char *directories[]={"ux0:data/Vagante2Vita/world"};
     int world_ready=0;
-    for(unsigned source=0;source<2&&!world_ready;source++){
+    for(unsigned source=0;source<1&&!world_ready;source++){
      char packet[128];snprintf(packet,sizeof(packet),"%s/intro-world.vwi",directories[source]);
      world_ready=world_load(&world,packet,log)&&load_world_visuals(directories[source],menu.player_class,log)&&player_spawn(&player,&world,menu.player_class);
      if(log)fprintf(log,"WORLD_SOURCE directory=%s ready=%d\n",directories[source],world_ready);
@@ -155,25 +158,21 @@ int main(void){
   if(delta>250000){if(log)fprintf(log,"WARN slow_loop_us=%llu\n",(unsigned long long)delta);delta=250000;}
   accumulator+=delta;
   PlayerMotion old_motion=player.motion;unsigned old_input=player.previous;
-  uint64_t logic_start=sceKernelGetSystemTimeWide();
-  while(accumulator>=16667){if(loaded){menu_tick(&menu);if(menu.screen==MENU_WORLD){player_step(&player,&world,player_buttons(&pad));logic_steps++;}}accumulator-=16667;}
-  logic_us+=sceKernelGetSystemTimeWide()-logic_start;
+  while(accumulator>=16667){if(loaded){menu_tick(&menu);if(menu.screen==MENU_WORLD&&!paused)player_step(&player,&world,player_buttons(&pad));}accumulator-=16667;}
   if(log&&menu.screen==MENU_WORLD&&(old_motion!=player.motion||old_input!=player.previous)){
    fprintf(log,"PLAYER_EVENT tick=%u motion=%s input=%u x=%.3f y=%.3f vx=%.3f vy=%.3f contacts=%u\n",player.ticks,player_motion_name(player.motion),player.previous,player.x,player.y,player.vx,player.vy,player.contacts);
   }
   if(old_screen!=menu.screen||old_cursor!=menu.cursor||old_class!=menu.player_class)log_state(log,&menu,pad.buttons);
   if(now>=next_draw){
-   if(last_draw&&now-last_draw>interval_max)interval_max=now-last_draw;
-   last_draw=now;do{next_draw+=16667;}while(next_draw<=now);start=sceKernelGetSystemTimeWide();buffer_index^=1;frame=buffers+buffer_index*(bytes/4);
+   do{next_draw+=16667;}while(next_draw<=now);buffer_index^=1;frame=buffers+buffer_index*(bytes/4);
    if(loaded){
     if(menu.screen==MENU_WORLD)draw_world(background,&world,&player,reduction);
     else draw_scene_profile(background,&menu,reduction,lightweight);
-    uint64_t compose_end=sceKernelGetSystemTimeWide();compose_sum+=compose_end-start;
-    present_background(reduction);scale_sum+=sceKernelGetSystemTimeWide()-compose_end;
+    present_background(reduction);
     if(menu.screen==MENU_WORLD){
      char info[64];snprintf(info,sizeof(info),"HP %d OF %d  STR %d DEX %d VIT %d",player.hp,player.max_hp,player.stats.strength,player.stats.dexterity,player.stats.vitality);text(18,42,info,0xff80ddff);
      snprintf(info,sizeof(info),"SPD %d STA %d INT %d LUK %d",player.stats.speed,player.stats.stamina,player.stats.intelligence,player.stats.luck);text(18,75,info,0xffffffff);
-     text(18,475,"X JUMP DOWN DUCK UP CLIMB",0xffffffff);
+     text(18,475,paused?"PAUSED START TO RESUME":"X JUMP DOWN DUCK UP CLIMB",0xffffffff);
      text(18,515,"O RESET TRIANGLE RETURN " VAGANTE_ITERATION,0xffaaaaaa);
     }
     if(menu.screen==MENU_TITLE)for(int i=0;i<4;i++)text(360,290+38*i,labels[i],i==menu.cursor?0xff80ddff:0xffdddddd);
@@ -181,25 +180,21 @@ int main(void){
     if(menu.screen==MENU_BLOCKED||menu.screen==MENU_NOTICE){
      for(int y=260;y<485;y++)for(int x=65;x<895;x++)frame[y*1024+x]=0xff20170f;
      text(95,285,menu.screen==MENU_BLOCKED?"CLASS SELECTED":menu.notice==1?"ONLINE PLAY PENDING":"OPTIONS RECOVERY PENDING",0xff80ddff);
-     if(menu.screen==MENU_BLOCKED){text(95,337,"WORLD DATA OR SPAWN FAILED",0xff80b0ff);text(95,379,"BLOCKER RECORDED IN LOG",0xffffffff);}
+     if(menu.screen==MENU_BLOCKED){text(95,337,"CHECK UX0 DATA VAGANTE2VITA WORLD",0xff80b0ff);text(95,379,"BLOCKER RECORDED IN LOG",0xffffffff);}
      text(95,435,"CIRCLE TO RETURN",0xffffffff);
     }
     if(menu.screen!=MENU_WORLD)text(18,515,log?"ITERATION " VAGANTE_ITERATION "  GAMEPLAY PENDING":"ERROR LOG FILE COULD NOT OPEN",log?0xffaaaaaa:0xff8080ff);
-    if(stats){char info[48];snprintf(info,sizeof(info),"DRAW FPS %u  CPU US %u",(unsigned)fps,(unsigned)cpu_max);text(18,12,info,0xff80ff80);}
    }else{
     memset(frame,0,bytes);text(48,100,"ARCHIVE LOAD FAILED",0xff8080ff);
     text(48,180,"CHECK DATA VRA AND RUNTIME LOG",0xffffffff);text(48,260,"PRESS START TO EXIT",0xffffffff);
    }
-   uint64_t cpu=sceKernelGetSystemTimeWide()-start;cpu_sum+=cpu;if(cpu>cpu_max)cpu_max=cpu;draws++;
    fb.base=frame;int status=sceDisplaySetFrameBuf(&fb,SCE_DISPLAY_SETBUF_NEXTFRAME);
    if(status<0){display_error=status;if(log)fprintf(log,"ERROR display code=%d\n",status);break;}
   }
   now=sceKernelGetSystemTimeWide();
-  if(now-window_start>=2000000){
-   fps=(float)draws*1000000.0f/(float)(now-window_start);
-   if(log){fprintf(log,"PERF time_us=%llu screen=%s draw_fps=%.2f cpu_avg_us=%llu cpu_max_us=%llu frames=%u tick=%llu caravan_frame=%u logical_width=%d logical_height=%d compose_avg_us=%llu scale_avg_us=%llu lightweight=%d cache_rebuilds=%u frame_interval_max_us=%llu logic_steps=%u logic_total_us=%llu upload_rows=%u upload_avg_us=%llu\n",(unsigned long long)now,menu_screen_name(menu.screen),fps,(unsigned long long)(draws?cpu_sum/draws:0),(unsigned long long)cpu_max,draws,(unsigned long long)menu.total_ticks,(unsigned)(menu.total_ticks/7)%8,640/reduction,360/reduction,(unsigned long long)(draws?compose_sum/draws:0),(unsigned long long)(draws?scale_sum/draws:0),lightweight,scene_cache_rebuilds(),(unsigned long long)interval_max,logic_steps,(unsigned long long)logic_us,uploaded_rows,(unsigned long long)(draws?upload_sum/draws:0));fflush(log);}
+  if(now-state_log_time>=2000000){
    if(log&&menu.screen==MENU_WORLD){fprintf(log,"PLAYER time_us=%llu class=%d motion=%s x=%.3f y=%.3f vx=%.3f vy=%.3f ground=%d ladder=%d duck=%d contacts=%u hp=%d max_hp=%d input=%u ticks=%u\n",(unsigned long long)now,player.player_class,player_motion_name(player.motion),player.x,player.y,player.vx,player.vy,player.on_ground,player.on_ladder,player.ducking,player.contacts,player.hp,player.max_hp,player.previous,player.ticks);fflush(log);}
-   window_start=now;draws=0;cpu_sum=0;cpu_max=0;compose_sum=0;scale_sum=0;interval_max=0;logic_steps=0;logic_us=0;uploaded_rows=0;upload_sum=0;
+   state_log_time=now;
   }
   sceDisplayWaitVblankStart();
  }

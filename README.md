@@ -47,3 +47,6 @@ La entrega actual 013 conserva la misma aplicación y separa entregas/logs: [ins
 
 
 Última entrega local: **015**, con mundo inicial incluido en el VPK privado y fallback `app0:world`. [Instalación, controles y alcance](docs/ITERATION15.md). Los recursos comerciales no forman parte del repositorio; builds públicos requieren preparar la copia del usuario.
+
+
+**Entrega vigente: 016.** VPK sin recursos comerciales, mundo externo, pausa START y corrección de aterrizajes. Sin métricas integradas. [Detalles](docs/ITERATION16.md).

@@ -19,6 +19,7 @@ int main(int argc,char **argv){
  for(int i=0;i<200;i++)player_step(&p,&w,PLAYER_RIGHT);assert(p.x+p.w<=320.001f&&!player_overlaps_solid(&p,&w));
  w=flat();for(int tx=0;tx<40;tx++){w.tiles[21*40+tx].type=6;w.tiles[23*40+tx].type=1;}world_collision_flags(&w);
  assert(player_spawn(&p,&w,2));for(int i=0;i<5;i++)player_step(&p,&w,0);assert(p.on_ground&&p.hp==60);
+ for(int i=0;i<180;i++){player_step(&p,&w,0);assert(p.on_ground);assert(fabsf(p.y+p.h-336.0f)<0.001f);}
  player_step(&p,&w,PLAYER_DOWN|PLAYER_JUMP);for(int i=0;i<60;i++)player_step(&p,&w,0);assert(p.on_ground&&p.y>340);
  w=flat();w.tiles[19*40+14].type=3;w.tiles[20*40+14].type=3;world_collision_flags(&w);
  assert(player_spawn(&p,&w,0));for(int i=0;i<5;i++)player_step(&p,&w,0);y=p.y;

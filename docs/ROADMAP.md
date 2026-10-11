@@ -1,3 +1,10 @@
+# Estado vigente: iteración 016
+
+015 confirma recorrido físico del mundo con Knight/Rogue y ~58–59 FPS.
+016 corrige aterrizajes, añade pausa START y retira métricas internas.
+VPK sin recursos del juego; world y caché se entregan aparte.
+[Instalación y pendientes](ITERATION16.md).
+
 # Estado vigente: iteración 015
 
 La prueba física 014 no entró al mundo: faltaba intro-world.vwi. La entrega local

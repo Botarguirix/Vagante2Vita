@@ -31,7 +31,18 @@ static void axis_move(NativePlayer *p,const World *w,float distance,int vertical
   float before=vertical?p->y:p->x,old_bottom=p->y+p->h;
   if(vertical)p->y+=step;else p->x+=step;
   if(player_overlaps_solid(p,w)||(vertical&&step>0&&platform_crossed(p,w,old_bottom))){
-   if(vertical){p->y=before;p->vy=0;if(step>0){p->on_ground=1;p->contacts|=WORLD_DOWN;}else p->contacts|=WORLD_UP;}
+   if(vertical){
+    p->y=before;p->vy=0;
+    if(step>0){
+     /* Snap feet to the crossed top instead of leaving a fractional gap.
+        Validate the candidate because walls/ceilings can also overlap. */
+     float snapped=floorf((old_bottom+step-0.001f)/16.0f)*16.0f-p->h;
+     if(snapped>=before-0.251f&&snapped<=before+step+0.001f){
+      p->y=snapped;if(player_overlaps_solid(p,w))p->y=before;
+     }
+     p->on_ground=1;p->contacts|=WORLD_DOWN;
+    }else p->contacts|=WORLD_UP;
+   }
    else {p->x=before;p->vx=0;p->contacts|=step>0?WORLD_RIGHT:WORLD_LEFT;}
    return;
   }

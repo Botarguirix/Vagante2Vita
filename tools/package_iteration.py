@@ -26,6 +26,13 @@ def main():
     args=p.parse_args()
     if len(args.iteration)!=3 or not args.iteration.isdigit():p.error('Use three digits')
     root=pathlib.Path(__file__).resolve().parent.parent
+    # Local original-game data must remain separate, even in private deliveries.
+    allowed={'eboot.bin','sce_sys/param.sfo','sce_sys/icon0.png','sce_sys/pic0.png',
+             'sce_sys/livearea/contents/bg0.png','sce_sys/livearea/contents/startup.png',
+             'sce_sys/livearea/contents/template.xml'}
+    with zipfile.ZipFile(args.vpk) as archive:
+        unexpected={name for name in archive.namelist() if not name.endswith('/')} - allowed
+        if unexpected:raise ValueError(f'VPK contains unapproved resources: {sorted(unexpected)}')
     identity=vpk_identity(args.vpk)
     if identity['TITLE_ID']!='VAGV00006' or identity['TITLE']!='Vagante2Vita':
         raise ValueError('Future iterations must update the standard VAGV00006 / Vagante2Vita application')
