@@ -44,7 +44,7 @@ int world_load(World *w,const char *path,FILE *log){
  if(fgetc(f)!=EOF||ferror(f))goto invalid;
  fclose(f);next.entrance_x=14;next.entrance_y=20;next.goal_x=18;next.goal_y=20;
  /* generateIntro changes the goal after generateIntermissionLevel flags. */
- world_collision_flags(&next);next.tiles[next.goal_y*next.width+next.goal_x].type=11;
+ world_collision_flags(&next);world_auto_tiles(&next);next.tiles[next.goal_y*next.width+next.goal_x].type=11;
  next.ready=1;*w=next;
  if(log)fprintf(log,"WORLD ready=1 width=40 height=24 group=4 entrance=14,20 goal=18,20 tile_fields=6 entities_pending=1\n");
  return 1;
@@ -55,4 +55,49 @@ int starting_stats(int player_class,StartingStats *stats){
  if(player_class<0||player_class>=3||!stats)return 0;
  const int *v=base[player_class];
  *stats=(StartingStats){v[0],v[1],v[2],v[3],v[4],v[5],v[6]};return 1;
+}
+
+static int tile_bank(int value){
+ if(value<0||value%32<16)return -1;
+ return value/64*64+value%32-value%8;
+}
+static int tile_variant(int bank,unsigned faces){return bank+(int)faces+(faces>=8?24:0);}
+void world_auto_tiles(World *w){
+ const int dx[4]={-1,0,1,0},dy[4]={0,-1,0,1};
+ const unsigned bits[4]={1,2,4,8};
+ const int layers[4]={0,1,3,4};
+ /* The observed routine traverses columns first and updates in place. */
+ for(int x=0;x<w->width;x++)for(int y=0;y<w->height;y++){
+  WorldTile *t=&w->tiles[y*w->width+x];
+  for(int n=0;n<4;n++){
+   int layer=layers[n],value=t->layers[layer],bank=tile_bank(value);
+   if(bank<0)continue;
+   unsigned edges=0;
+   for(int side=0;side<4;side++){
+    const WorldTile *other=world_tile(w,x+dx[side],y+dy[side]);
+    if(!other)continue;
+    int ob=tile_bank(other->layers[layer]);
+    if(bank==ob)continue;
+    /* Farground vegetation families have an ordered overlap rule. */
+    if(layer==1&&(bank==720||bank==784||bank==848)&&(ob==720||ob==784||ob==848)&&bank>=ob)continue;
+    edges|=bits[side];
+   }
+   t->layers[layer]=(int16_t)tile_variant(bank,edges);
+  }
+  int value=t->layers[2],bank=tile_bank(value);unsigned edges=0;
+  if(t->type==1&&value%32<24){
+   for(int side=0;side<4;side++){
+    const WorldTile *other=world_tile(w,x+dx[side],y+dy[side]);
+    if(other&&(other->type!=1||other->layers[2]%32>=24))edges|=bits[side];
+   }
+   t->layers[2]=(int16_t)tile_variant(bank,edges);
+  }else if(bank>=0){
+   for(int side=0;side<4;side++){
+    const WorldTile *other=world_tile(w,x+dx[side],y+dy[side]);
+    if(other&&tile_bank(other->layers[2])!=bank)edges|=bits[side];
+   }
+   t->layers[2]=(int16_t)tile_variant(bank,edges);
+  }
+  if(t->type==10||t->type==11)t->layers[3]=-1;
+ }
 }

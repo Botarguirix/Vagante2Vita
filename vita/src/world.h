@@ -18,3 +18,5 @@ void world_collision_flags(World *world);
 const WorldTile *world_tile(const World *world,int x,int y);
 int world_solid(const World *world,int x,int y);
 int starting_stats(int player_class,StartingStats *stats);
+
+void world_auto_tiles(World *world);
