@@ -91,3 +91,17 @@ done:
  if(log){fprintf(log,"ARCHIVE stage=%s texture_bytes=%lu inflate_status=%d\n",stage,(unsigned long)texture_bytes,r->status);fprintf(log,"archive_ok=%d records=%u declared=%u inflated=%lu\n",ok,records,declared,r->z.total_out);for(int i=0;i<TEXTURE_COUNT;i++)fprintf(log,"%s %dx%d loaded=%d\n",textures[i].name,textures[i].w,textures[i].h,textures[i].rgba!=NULL);fflush(log);}
  mz_inflateEnd(&r->z);fclose(r->f);free(r);if(!ok)free_resources();return ok;
 }
+
+void free_texture(Texture *t){if(t->rgba)stbi_image_free(t->rgba);t->rgba=NULL;t->w=t->h=0;}
+int load_png_file(Texture *t,const char *path,FILE *log){
+ FILE *f=fopen(path,"rb");if(!f){if(log)fprintf(log,"WORLD_RESOURCE error=open path=%s\n",path);return 0;}
+ if(fseek(f,0,SEEK_END)||ftell(f)<1){fclose(f);return 0;}
+ long size=ftell(f);if(size>4*1024*1024||fseek(f,0,SEEK_SET)){fclose(f);return 0;}
+ unsigned char *bytes=malloc((size_t)size);if(!bytes){fclose(f);return 0;}
+ if(fread(bytes,1,(size_t)size,f)!=(size_t)size){free(bytes);fclose(f);return 0;}fclose(f);
+ int w,h,c;if(!stbi_info_from_memory(bytes,(int)size,&w,&h,&c)||w<1||h<1||w>1024||h>1024){free(bytes);return 0;}
+ unsigned char *rgba=stbi_load_from_memory(bytes,(int)size,&w,&h,&c,4);free(bytes);if(!rgba)return 0;
+ free_texture(t);t->rgba=rgba;t->w=w;t->h=h;
+ if(log)fprintf(log,"WORLD_RESOURCE ready=1 path=%s width=%d height=%d rgba_bytes=%u\n",path,w,h,(unsigned)w*h*4);
+ return 1;
+}

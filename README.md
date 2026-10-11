@@ -2,13 +2,14 @@
 
 Investigación técnica e ingeniería inversa reproducible para un posible port nativo de **Vagante a PS Vita**.
 
-**Estado:** no es un port jugable ni una decompilación recompilable. El ejecutable local es Windows x86 de 32 bits, con C++/SFML, OpenGL, OpenAL y Steamworks. Se encontró un PDB coincidente que permite recuperar nombres y tipos. La reconstrucción de la lógica y la adaptación a ARM siguen pendientes.
+**Estado:** reconstrucción parcial; la iteración 013 permite una primera prueba de recorrido del mundo inicial con movimiento y atributos base. No es todavía un port completo ni una decompilación recompilable. El ejecutable local es Windows x86 de 32 bits, con C++/SFML, OpenGL, OpenAL y Steamworks. Se encontró un PDB coincidente que permite recuperar nombres y tipos. La reconstrucción de la lógica y la adaptación a ARM siguen pendientes.
 
 Se generó localmente pseudocódigo de **30 568 funciones**, incluidos código del juego y bibliotecas/runtime, con dos fallos por timeout después de reintentar. El título 00.02 fue probado en Vita por el usuario. La iteración 00.03 añade fondo animado, sprites por atlas, vista parcial de selección de clases y log de recursos, transiciones y rendimiento; falta probar esta versión en consola. Estos resultados no representan un porcentaje de reconstrucción ni prueban rendimiento del juego en Vita.
 
 - [Viabilidad técnica y evidencia](docs/FEASIBILITY.md)
 - [Proyectos relacionados](docs/REFERENCES.md)
 - [Plan de reconstrucción](docs/ROADMAP.md)
+- [Entrega 013: primer recorrido interactivo del mundo inicial](docs/ITERATION13.md)
 - [Entrega 008: paisaje en caché y diagnóstico de stuttering](docs/ITERATION8.md)
 - [Primera prueba jugable: zona inicial, colisiones y jugador](docs/FIRST_GAMEPLAY.md)
 - [Entrega 007: actualizar la misma aplicación](docs/ITERATION7.md)
@@ -39,4 +40,4 @@ Las salidas se guardan en `_local/`: inventario PE/PDB, símbolos, recursos extr
 
 Se publican herramientas originales, documentación y el diagnóstico Vita. Cada usuario aporta su copia del juego. No se incluyen ejecutables, PDB, gráficos, audio, guardados ni pseudocódigo comercial. La licencia de las herramientas no concede derechos sobre Vagante. Proyecto no afiliado con Nuke Nine.
 
-La entrega actual 008 conserva la misma aplicación y separa entregas/logs: [instrucciones](docs/ITERATION8.md).
+La entrega actual 013 conserva la misma aplicación y separa entregas/logs: [instrucciones](docs/ITERATION13.md).

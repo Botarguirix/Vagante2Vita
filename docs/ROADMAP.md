@@ -57,3 +57,7 @@ Autotiling reconstruido, CSV nativo y composición privada de los atlas de la in
 ## Movimiento 012
 
 Cuerpo nativo y subconjunto de andar/saltar/agacharse/escaleras sobre el mapa original. Atributos y salud base conectados; equivalencia física completa y movimientos adicionales pendientes. [Alcance](ANALYSIS12.md).
+
+## Integración Vita 013
+
+Primera prueba interactiva de la habitación INTRO original con andar, salto, agacharse, plataformas, escaleras y HP/atributos base. Recursos privados de world separados. [Entrega y limitaciones](ITERATION13.md). Faltan rodar, bordes, combate/equipo/habilidades, interacción y estadísticas completas; objetivo automático activo.

@@ -21,6 +21,8 @@ def main():
     p.add_argument('--build-log',type=pathlib.Path,required=True)
     p.add_argument('--git',default='git')
     p.add_argument('--menu-archive',type=pathlib.Path,help='Optional private menu-only archive, never committed')
+    p.add_argument("--world-data-dir",type=pathlib.Path,help="Private prepared world directory; never committed")
+    p.add_argument("--validation-log",type=pathlib.Path,help="Optional native validation output")
     args=p.parse_args()
     if len(args.iteration)!=3 or not args.iteration.isdigit():p.error('Use three digits')
     root=pathlib.Path(__file__).resolve().parent.parent
@@ -37,15 +39,19 @@ def main():
         dest=pathlib.Path(temporary)
         shutil.copyfile(args.vpk,dest/args.vpk.name)
         shutil.copyfile(args.build_log,dest/'build.log')
+        if args.validation_log:shutil.copyfile(args.validation_log,dest/'validation.log')
         (dest/'source.zip').write_bytes(git('archive','--format=zip','HEAD'))
         shutil.copyfile(root/'docs/ROADMAP.md',dest/'ROADMAP.md')
         if args.menu_archive:
             shutil.copyfile(args.menu_archive,dest/'menu-only.vra')
             metadata=args.menu_archive.with_suffix('.json')
             if metadata.exists():shutil.copyfile(metadata,dest/'menu-only.json')
+        if args.world_data_dir:
+            shutil.copytree(args.world_data_dir,dest/'world')
         report=dict(iteration=args.iteration,identity=identity,commit=git('rev-parse','HEAD').decode().strip(),files={})
-        for file in dest.iterdir():
-            report['files'][file.name]=dict(bytes=file.stat().st_size,sha256=hashlib.sha256(file.read_bytes()).hexdigest())
+        for file in dest.rglob("*"):
+            if not file.is_file():continue
+            report['files'][file.relative_to(dest).as_posix()]=dict(bytes=file.stat().st_size,sha256=hashlib.sha256(file.read_bytes()).hexdigest())
         (dest/'manifest.json').write_text(json.dumps(report,indent=2)+'\n')
         dest.rename(output)
     print(output)

@@ -12,6 +12,9 @@
 #include "resources.h"
 #include "scene.h"
 #include "session_log.h"
+#include "world_visuals.h"
+static World world;
+static NativePlayer player;
 unsigned int _newlib_heap_size_user = 16 * 1024 * 1024;
 
 /* Five-column uppercase diagnostic font, seven bits per column. */
@@ -67,10 +70,20 @@ static unsigned mapped_buttons(unsigned b){
  if(b&SCE_CTRL_CIRCLE)result|=INPUT_BACK;
  return result;
 }
+static unsigned player_buttons(const SceCtrlData *pad){
+ unsigned b=pad->buttons,result=0;
+ if((b&SCE_CTRL_LEFT)||pad->lx<64)result|=PLAYER_LEFT;
+ if((b&SCE_CTRL_RIGHT)||pad->lx>192)result|=PLAYER_RIGHT;
+ if(b&SCE_CTRL_UP)result|=PLAYER_UP;
+ if(b&SCE_CTRL_DOWN)result|=PLAYER_DOWN;
+ if(b&SCE_CTRL_CROSS)result|=PLAYER_JUMP;
+ if(b&SCE_CTRL_LTRIGGER)result|=PLAYER_SLOW;
+ return result;
+}
 static void log_state(FILE *log,const Menu *m,unsigned b){
  if(!log)return;
  fprintf(log,"EVENT time_us=%llu screen=%s cursor=%d class=%d buttons=%08x tick=%llu\n",(unsigned long long)sceKernelGetSystemTimeWide(),menu_screen_name(m->screen),m->cursor,m->player_class,b,(unsigned long long)m->total_ticks);
- if(m->screen==MENU_BLOCKED)fprintf(log,"BLOCKER subsystem=world_start missing=Client_Server_GameEngine_Level_Player reconstruction_pending=1 selected_class=%d\n",m->player_class);
+ if(m->screen==MENU_BLOCKED)fprintf(log,"BLOCKER subsystem=world_start missing=world_data_or_visuals_or_spawn reconstruction_pending=1 selected_class=%d\n",m->player_class);
  fflush(log);
 }
 int main(void){
@@ -78,7 +91,7 @@ int main(void){
  mkdir("ux0:data/Vagante2Vita/logs",0777);
  char log_path[256]={0};
  FILE *log=open_session_log("ux0:data/Vagante2Vita/logs/iteration" VAGANTE_ITERATION,log_path,sizeof(log_path));
- if(log){fprintf(log,"LOG path=%s\n",log_path);fprintf(log,"BOOT version=" VAGANTE_VERSION " iteration=" VAGANTE_ITERATION " heap_bytes=%u framebuffer_bytes=%u renderer=software logical=320x180 target_draw_hz=30 lightweight=1 scenery_cached=1 particles=0\n",_newlib_heap_size_user,bytes*2);fprintf(log,"PENDING exact_intro_tween day_night_tints audio unlocks saves world_generation collision gameplay online options\n");fflush(log);}
+ if(log){fprintf(log,"LOG path=%s\n",log_path);fprintf(log,"BOOT version=" VAGANTE_VERSION " iteration=" VAGANTE_ITERATION " heap_bytes=%u framebuffer_bytes=%u renderer=software logical=320x180 target_draw_hz=30 lightweight=1 scenery_cached=1 particles=0\n",_newlib_heap_size_user,bytes*2);fprintf(log,"PENDING exact_intro_tween day_night_tints audio unlocks saves procedural_generation combat skills inventory online options\n");fflush(log);}
  SceUID block=sceKernelAllocMemBlock("VaganteMenu",SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW,(bytes*2+0x3ffff)&~0x3ffff,NULL);
  if(block<0){if(log){fprintf(log,"ERROR framebuffer_alloc code=%d\n",block);fclose(log);}return 1;}
  uint32_t *buffers;
@@ -101,7 +114,7 @@ int main(void){
  unsigned previous=0;int buffer_index=0,stats=0,display_error=0,reduction=2,lightweight=1;
  const char *labels[]={"NEW GAME","PLAY ONLINE","OPTIONS","EXIT GAME"};
  uint64_t last_tick=sceKernelGetSystemTimeWide(),last_draw=0,next_draw=last_tick,accumulator=0;
- uint64_t window_start=last_tick,cpu_sum=0,cpu_max=0,compose_sum=0,scale_sum=0;unsigned draws=0;uint64_t interval_max=0;float fps=0;
+ uint64_t window_start=last_tick,cpu_sum=0,cpu_max=0,compose_sum=0,scale_sum=0;unsigned draws=0,logic_steps=0;uint64_t logic_us=0,interval_max=0;float fps=0;
  sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
  for(;;){
   SceCtrlData pad;memset(&pad,0,sizeof(pad));sceCtrlPeekBufferPositive(0,&pad,1);
@@ -109,34 +122,59 @@ int main(void){
   if((pad.buttons&(SCE_CTRL_START|SCE_CTRL_SELECT))==(SCE_CTRL_START|SCE_CTRL_SELECT))break;
   if(!loaded&&(pressed&SCE_CTRL_START))break;
   if(pressed&SCE_CTRL_SELECT)stats=!stats;
-  if(pressed&SCE_CTRL_LTRIGGER){reduction=reduction==2?1:2;window_start=sceKernelGetSystemTimeWide();draws=0;cpu_sum=cpu_max=compose_sum=scale_sum=0;if(log){fprintf(log,"PROFILE logical_width=%d logical_height=%d\n",640/reduction,360/reduction);fflush(log);}}
-  if(pressed&SCE_CTRL_RTRIGGER){lightweight=!lightweight;scene_invalidate_cache();if(log){fprintf(log,"QUALITY lightweight=%d scenery_cached=%d particles=%d\n",lightweight,lightweight,!lightweight);fflush(log);}}
+  if(menu.screen!=MENU_WORLD&&(pressed&SCE_CTRL_LTRIGGER)){reduction=reduction==2?1:2;window_start=sceKernelGetSystemTimeWide();draws=0;cpu_sum=cpu_max=compose_sum=scale_sum=0;if(log){fprintf(log,"PROFILE logical_width=%d logical_height=%d\n",640/reduction,360/reduction);fflush(log);}}
+  if(menu.screen!=MENU_WORLD&&(pressed&SCE_CTRL_RTRIGGER)){lightweight=!lightweight;scene_invalidate_cache();if(log){fprintf(log,"QUALITY lightweight=%d scenery_cached=%d particles=%d\n",lightweight,lightweight,!lightweight);fflush(log);}}
   MenuScreen old_screen=menu.screen;int old_cursor=menu.cursor,old_class=menu.player_class;
   if(loaded){
    if(menu.screen==MENU_TITLE&&menu.cursor==3&&(pressed&SCE_CTRL_CROSS))break;
-   menu_input(&menu,mapped_buttons(pad.buttons));
+   if(menu.screen==MENU_WORLD){
+    if(pressed&SCE_CTRL_TRIANGLE)menu.screen=MENU_CLASS;
+   }else menu_input(&menu,mapped_buttons(pad.buttons));
+   if(old_screen==MENU_CLASS&&menu.screen==MENU_BLOCKED){
+    uint64_t world_start=sceKernelGetSystemTimeWide();
+    if(world_load(&world,"ux0:data/Vagante2Vita/world/intro-world.vwi",log)&&
+       load_world_visuals("ux0:data/Vagante2Vita/world",menu.player_class,log)&&player_spawn(&player,&world,menu.player_class)){
+     menu.screen=MENU_WORLD;player.previous=player_buttons(&pad);
+     if(log)fprintf(log,"WORLD_START complete=1 class=%d load_us=%llu hp=%d\n",menu.player_class,(unsigned long long)(sceKernelGetSystemTimeWide()-world_start),player.hp);
+     /* Loading is not simulation time; do not advance the player during I/O. */
+     last_tick=sceKernelGetSystemTimeWide();accumulator=0;
+    }else if(log)fprintf(log,"WORLD_START complete=0 class=%d check_world_data=1\n",menu.player_class);
+   }
   }
   uint64_t now=sceKernelGetSystemTimeWide(),delta=now-last_tick;last_tick=now;
   if(delta>250000){if(log)fprintf(log,"WARN slow_loop_us=%llu\n",(unsigned long long)delta);delta=250000;}
   accumulator+=delta;
-  while(accumulator>=16667){if(loaded)menu_tick(&menu);accumulator-=16667;}
+  PlayerMotion old_motion=player.motion;unsigned old_input=player.previous;
+  uint64_t logic_start=sceKernelGetSystemTimeWide();
+  while(accumulator>=16667){if(loaded){menu_tick(&menu);if(menu.screen==MENU_WORLD){player_step(&player,&world,player_buttons(&pad));logic_steps++;}}accumulator-=16667;}
+  logic_us+=sceKernelGetSystemTimeWide()-logic_start;
+  if(log&&menu.screen==MENU_WORLD&&(old_motion!=player.motion||old_input!=player.previous)){
+   fprintf(log,"PLAYER_EVENT tick=%u motion=%s input=%u x=%.3f y=%.3f vx=%.3f vy=%.3f contacts=%u\n",player.ticks,player_motion_name(player.motion),player.previous,player.x,player.y,player.vx,player.vy,player.contacts);
+  }
   if(old_screen!=menu.screen||old_cursor!=menu.cursor||old_class!=menu.player_class)log_state(log,&menu,pad.buttons);
   if(now>=next_draw){
    if(last_draw&&now-last_draw>interval_max)interval_max=now-last_draw;
    last_draw=now;do{next_draw+=33333;}while(next_draw<=now);start=sceKernelGetSystemTimeWide();buffer_index^=1;frame=buffers+buffer_index*(bytes/4);
    if(loaded){
-    draw_scene_profile(background,&menu,reduction,lightweight);
+    if(menu.screen==MENU_WORLD)draw_world(background,&world,&player,reduction);
+    else draw_scene_profile(background,&menu,reduction,lightweight);
     uint64_t compose_end=sceKernelGetSystemTimeWide();compose_sum+=compose_end-start;
     present_background(reduction);scale_sum+=sceKernelGetSystemTimeWide()-compose_end;
+    if(menu.screen==MENU_WORLD){
+     char info[64];snprintf(info,sizeof(info),"HP %d OF %d  STR %d DEX %d VIT %d",player.hp,player.max_hp,player.stats.strength,player.stats.dexterity,player.stats.vitality);text(18,42,info,0xff80ddff);
+     snprintf(info,sizeof(info),"SPD %d STA %d INT %d LUK %d",player.stats.speed,player.stats.stamina,player.stats.intelligence,player.stats.luck);text(18,75,info,0xffffffff);
+     text(18,475,"X JUMP DOWN DUCK UP CLIMB",0xffffffff);
+     text(18,515,"TRIANGLE RETURN  WORLD TEST " VAGANTE_ITERATION,0xffaaaaaa);
+    }
     if(menu.screen==MENU_TITLE)for(int i=0;i<4;i++)text(360,290+38*i,labels[i],i==menu.cursor?0xff80ddff:0xffdddddd);
     if(menu.screen==MENU_CLASS){text(225,49,"CHOOSE CLASS",0xff80ddff);text(195,425,"LEFT RIGHT TO SELECT",0xffffffff);text(195,461,"X CONFIRM  CIRCLE BACK",0xffffffff);}
     if(menu.screen==MENU_BLOCKED||menu.screen==MENU_NOTICE){
      for(int y=260;y<485;y++)for(int x=65;x<895;x++)frame[y*1024+x]=0xff20170f;
      text(95,285,menu.screen==MENU_BLOCKED?"CLASS SELECTED":menu.notice==1?"ONLINE PLAY PENDING":"OPTIONS RECOVERY PENDING",0xff80ddff);
-     if(menu.screen==MENU_BLOCKED){text(95,337,"WORLD START NOT RECOVERED",0xff80b0ff);text(95,379,"BLOCKER RECORDED IN LOG",0xffffffff);}
+     if(menu.screen==MENU_BLOCKED){text(95,337,"WORLD DATA OR SPAWN FAILED",0xff80b0ff);text(95,379,"BLOCKER RECORDED IN LOG",0xffffffff);}
      text(95,435,"CIRCLE TO RETURN",0xffffffff);
     }
-    text(18,515,log?"ITERATION " VAGANTE_ITERATION "  GAMEPLAY PENDING":"ERROR LOG FILE COULD NOT OPEN",log?0xffaaaaaa:0xff8080ff);
+    if(menu.screen!=MENU_WORLD)text(18,515,log?"ITERATION " VAGANTE_ITERATION "  GAMEPLAY PENDING":"ERROR LOG FILE COULD NOT OPEN",log?0xffaaaaaa:0xff8080ff);
     if(stats){char info[48];snprintf(info,sizeof(info),"DRAW FPS %u  CPU US %u",(unsigned)fps,(unsigned)cpu_max);text(18,12,info,0xff80ff80);}
    }else{
     memset(frame,0,bytes);text(48,100,"ARCHIVE LOAD FAILED",0xff8080ff);
@@ -149,12 +187,13 @@ int main(void){
   now=sceKernelGetSystemTimeWide();
   if(now-window_start>=2000000){
    fps=(float)draws*1000000.0f/(float)(now-window_start);
-   if(log){fprintf(log,"PERF time_us=%llu screen=%s draw_fps=%.2f cpu_avg_us=%llu cpu_max_us=%llu frames=%u tick=%llu caravan_frame=%u logical_width=%d logical_height=%d compose_avg_us=%llu scale_avg_us=%llu lightweight=%d cache_rebuilds=%u frame_interval_max_us=%llu\n",(unsigned long long)now,menu_screen_name(menu.screen),fps,(unsigned long long)(draws?cpu_sum/draws:0),(unsigned long long)cpu_max,draws,(unsigned long long)menu.total_ticks,(unsigned)(menu.total_ticks/7)%8,640/reduction,360/reduction,(unsigned long long)(draws?compose_sum/draws:0),(unsigned long long)(draws?scale_sum/draws:0),lightweight,scene_cache_rebuilds(),(unsigned long long)interval_max);fflush(log);}
-   window_start=now;draws=0;cpu_sum=0;cpu_max=0;compose_sum=0;scale_sum=0;interval_max=0;
+   if(log){fprintf(log,"PERF time_us=%llu screen=%s draw_fps=%.2f cpu_avg_us=%llu cpu_max_us=%llu frames=%u tick=%llu caravan_frame=%u logical_width=%d logical_height=%d compose_avg_us=%llu scale_avg_us=%llu lightweight=%d cache_rebuilds=%u frame_interval_max_us=%llu logic_steps=%u logic_total_us=%llu\n",(unsigned long long)now,menu_screen_name(menu.screen),fps,(unsigned long long)(draws?cpu_sum/draws:0),(unsigned long long)cpu_max,draws,(unsigned long long)menu.total_ticks,(unsigned)(menu.total_ticks/7)%8,640/reduction,360/reduction,(unsigned long long)(draws?compose_sum/draws:0),(unsigned long long)(draws?scale_sum/draws:0),lightweight,scene_cache_rebuilds(),(unsigned long long)interval_max,logic_steps,(unsigned long long)logic_us);fflush(log);}
+   if(log&&menu.screen==MENU_WORLD){fprintf(log,"PLAYER time_us=%llu class=%d motion=%s x=%.3f y=%.3f vx=%.3f vy=%.3f ground=%d ladder=%d duck=%d contacts=%u hp=%d max_hp=%d input=%u ticks=%u\n",(unsigned long long)now,player.player_class,player_motion_name(player.motion),player.x,player.y,player.vx,player.vy,player.on_ground,player.on_ladder,player.ducking,player.contacts,player.hp,player.max_hp,player.previous,player.ticks);fflush(log);}
+   window_start=now;draws=0;cpu_sum=0;cpu_max=0;compose_sum=0;scale_sum=0;interval_max=0;logic_steps=0;logic_us=0;
   }
   sceDisplayWaitVblankStart();
  }
  if(log){fprintf(log,"EXIT normal=%d screen=%s display_error=%d\n",display_error==0,menu_screen_name(menu.screen),display_error);fclose(log);}
- free_resources();sceDisplaySetFrameBuf(NULL,SCE_DISPLAY_SETBUF_NEXTFRAME);sceDisplayWaitVblankStart();
+ free_world_visuals();free_resources();sceDisplaySetFrameBuf(NULL,SCE_DISPLAY_SETBUF_NEXTFRAME);sceDisplayWaitVblankStart();
  sceKernelFreeMemBlock(block);sceKernelExitProcess(0);return 0;
 }

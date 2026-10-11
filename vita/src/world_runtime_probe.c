@@ -1,0 +1,26 @@
+#include "world_visuals.h"
+#include <stdlib.h>
+#include <string.h>
+static int save(const char *path,const uint32_t *pixels){
+ FILE *f=fopen(path,"wb");if(!f)return 0;fprintf(f,"P6\n640 360\n255\n");
+ for(int i=0;i<640*360;i++){unsigned char b[3]={pixels[i]&255,(pixels[i]>>8)&255,(pixels[i]>>16)&255};if(fwrite(b,1,3,f)!=3){fclose(f);return 0;}}
+ return fclose(f)==0;
+}
+int main(int argc,char **argv){
+ if(argc!=4)return 2;World world;NativePlayer player;memset(&world,0,sizeof(world));
+ uint32_t *high=malloc(640*360*4),*first=malloc(640*360*4),*low=malloc(320*180*4);int ok=0;
+ if(!high||!first||!low||!world_load(&world,argv[1],stdout))goto done;
+ for(int cls=0;cls<3;cls++){
+  if(!load_world_visuals(argv[2],cls,stdout)||!player_spawn(&player,&world,cls))goto done;
+  draw_world(first,&world,&player,1);
+  for(int i=0;i<90;i++)player_step(&player,&world,PLAYER_RIGHT|(i==20?PLAYER_JUMP:0));
+  if(player_overlaps_solid(&player,&world))goto done;
+  draw_world(high,&world,&player,1);draw_world(low,&world,&player,2);
+  if(!memcmp(high,first,640*360*4))goto done;
+  for(int y=0;y<180;y++)for(int x=0;x<320;x++)if(low[y*320+x]!=high[y*2*640+x*2])goto done;
+  if(cls==0&&!save(argv[3],high))goto done;
+  printf("WORLD_RUNTIME class=%d motion=%s x=%.3f y=%.3f hp=%d animation_changed=1 resolution_match=1\n",cls,player_motion_name(player.motion),player.x,player.y,player.hp);
+ }
+ ok=1;
+ done:free(high);free(first);free(low);free_world_visuals();return ok?0:1;
+}
