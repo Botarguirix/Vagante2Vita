@@ -18,7 +18,7 @@
 
 - Analizar manualmente los dos fallos persistentes: ItemGenerator::ItemGenerator (`0x0063cde0`) y Thief::confirmHeist (`0x007cb110`).
 - Reconstruir código portable y verificar comportamiento contra el juego.
-- Probar el diagnóstico en hardware físico; aún no se verificaron pantalla/mando en consola.
+- Captura del usuario recibida: diagnóstico visible y encabezado zlib encontrado. Falta comprobar contenido completo, mando y rendimiento del juego; el overlay de la pantalla estática no es un benchmark de Vagante.
 - Implementar un segmento jugable y medir rendimiento/memoria en Vita.
 
 No existe una decompilación recompilable del juego ni un port jugable en este estado. Los archivos locales en `_local` permanecen excluidos de Git.
@@ -30,3 +30,9 @@ No existe una decompilación recompilable del juego ni un port jugable en este e
 - `_local/ghidra/Vagante.gpr`: proyecto guardado; mantener también su directorio `Vagante.rep`.
 - `_local/assets/`: recursos de la copia local, con duplicados preservados.
 - `build-vita/Vagante2Vita-diagnostic.vpk`: diagnóstico ARM, no juego. VPK generado y comprobado como ZIP; consola física pendiente.
+
+## Iteración 2
+
+Título nativo 00.02 compilado en Release. Verificador C de escritorio confirmó los 2.705 registros, 124.879.064 bytes descomprimidos y diez texturas. Seis pruebas Python pasan. El VPK se comprobó como ZIP íntegro: 95.111 bytes, SHA-256 6e66f63f544133649fd3c5a4f4d462019ad28521c7044f1afc58841f8652a28b.
+
+Ver docs/ITERATION2.md y docs/ROADMAP.md. La pantalla y controles de 00.02 siguen pendientes de prueba física; el juego no es jugable. El archivo nuevo es build-vita/Vagante2Vita-title.vpk.
