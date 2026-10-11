@@ -41,3 +41,6 @@ Las salidas se guardan en `_local/`: inventario PE/PDB, símbolos, recursos extr
 Se publican herramientas originales, documentación y el diagnóstico Vita. Cada usuario aporta su copia del juego. No se incluyen ejecutables, PDB, gráficos, audio, guardados ni pseudocódigo comercial. La licencia de las herramientas no concede derechos sobre Vagante. Proyecto no afiliado con Nuke Nine.
 
 La entrega actual 013 conserva la misma aplicación y separa entregas/logs: [instrucciones](docs/ITERATION13.md).
+
+
+Última entrega: **iteración 014**, misma aplicación VAGV00006. Optimiza escalado, transferencia de pantalla y terreno; objetivo 60 Hz pendiente de validación física. [Instalación y resultados](docs/ITERATION14.md).

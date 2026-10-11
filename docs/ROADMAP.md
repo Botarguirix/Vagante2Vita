@@ -61,3 +61,8 @@ Cuerpo nativo y subconjunto de andar/saltar/agacharse/escaleras sobre el mapa or
 ## Integración Vita 013
 
 Primera prueba interactiva de la habitación INTRO original con andar, salto, agacharse, plataformas, escaleras y HP/atributos base. Recursos privados de world separados. [Entrega y limitaciones](ITERATION13.md). Faltan rodar, bordes, combate/equipo/habilidades, interacción y estadísticas completas; objetivo automático activo.
+
+
+## Iteración 014 — optimización de presentación
+
+Salida por filas modificadas, escalado en RAM y terreno precalculado. Objetivo 60 Hz; pendiente medir FPS reales en Vita y picos en cambios de pantalla. Véase ITERATION14.md.
