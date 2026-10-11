@@ -58,3 +58,9 @@ El log recibido pertenece a 00.02 y muestra 47,636 s de carga; no contiene PERF 
 Caché privada de 22 PNG: 153.245 bytes comprimidos; mantiene 5.128.264 bytes RGBA. Probe confirma archivo completo y caché; regresión sintética e integridad corrupta/truncada pasan. Benchmark de escritorio: 4.123 frente a 1.026 µs por composición (no Vita). Navegación, logs y seis tests Python pasan. VPK Release ZIP/SFO verificados; falta prueba física 005. SHA-256: c9c4a430a874e0b05c2d8bc90b84ef6cd076caa6c63c91f107c805a83c31db51.
 
 Ver [ITERATION5.md](ITERATION5.md). La caché se entrega sólo localmente junto al VPK, excluida de Git.
+
+## Iteración 006: LiveArea
+
+Icono y fondo originales generados con imagegen; cuatro PNG indexados y template psmobile integrados al VPK VAGV00006. Compilación Release y archivo ZIP/SFO/XML/dimensiones/paleta comprobados. SHA-256 VPK: 8425b27f6249e4fb465e3bf9ce09542b1fa6ae7148ed5b90e26d7301cd5454be. Mantiene render/caché de 005 y sus entregas anteriores. Falta prueba física de la presentación LiveArea.
+
+El usuario reportó mejora de FPS y carga; los logs recibidos aún marcan 00.03 y no sirven para medir 005. Instrucciones: [ITERATION6.md](ITERATION6.md).

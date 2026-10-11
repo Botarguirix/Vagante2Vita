@@ -29,4 +29,9 @@ add_executable(vagante2vita src/main.c src/session_log.c)
 target_compile_options(vagante2vita PRIVATE -Wall -Wextra -Werror)
 target_link_libraries(vagante2vita resources SceDisplay_stub SceCtrl_stub SceSysmem_stub SceLibKernel_stub)
 vita_create_self(eboot.bin vagante2vita UNSAFE)
-vita_create_vpk(Vagante2Vita-iteration005.vpk VAGV00005 eboot.bin VERSION 00.05 NAME "Vagante2Vita Iteration 005")
+vita_create_vpk(Vagante2Vita-iteration006.vpk VAGV00006 eboot.bin VERSION 00.06 NAME "Vagante2Vita Iteration 006"
+  FILE sce_sys/icon0.png sce_sys/icon0.png
+  FILE sce_sys/pic0.png sce_sys/pic0.png
+  FILE sce_sys/livearea/contents/bg0.png sce_sys/livearea/contents/bg0.png
+  FILE sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
+  FILE sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml)
