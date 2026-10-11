@@ -40,8 +40,16 @@ static void text(int x,int y,const char *s,uint32_t color){
     }
 }
 static uint32_t background[640*360];
-static void present_background(void){
+static void present_background(int reduction){
  memset(frame,0,2*1024*4);memset(frame+542*1024,0,2*1024*4);
+ if(reduction==2){
+  for(int y=0;y<180;y++){
+   uint32_t *dst=frame+(2+y*3)*1024;const uint32_t *src=background+y*320;
+   for(int x=0;x<320;x++)dst[x*3]=dst[x*3+1]=dst[x*3+2]=src[x];
+   memcpy(dst+1024,dst,960*4);memcpy(dst+2048,dst,960*4);
+  }
+  return;
+ }
  for(int y=0;y<360;y++){
   uint32_t *dst=frame+(2+(y*3+1)/2)*1024;const uint32_t *src=background+y*640;
   for(int x=0;x<320;x++){dst[x*3]=src[x*2];dst[x*3+1]=src[x*2];dst[x*3+2]=src[x*2+1];}
@@ -68,8 +76,8 @@ int main(void){
  const unsigned bytes=1024*544*4;
  mkdir("ux0:data/Vagante2Vita/logs",0777);
  char log_path[256]={0};
- FILE *log=open_session_log("ux0:data/Vagante2Vita/logs/iteration004",log_path,sizeof(log_path));
- if(log){fprintf(log,"LOG path=%s\n",log_path);fprintf(log,"BOOT version=00.04 iteration=004 heap_bytes=%u framebuffer_bytes=%u renderer=software logical=640x360 target_draw_hz=30\n",_newlib_heap_size_user,bytes*2);fprintf(log,"PENDING exact_intro_tween day_night_tints audio unlocks saves world_generation collision gameplay online options\n");fflush(log);}
+ FILE *log=open_session_log("ux0:data/Vagante2Vita/logs/iteration005",log_path,sizeof(log_path));
+ if(log){fprintf(log,"LOG path=%s\n",log_path);fprintf(log,"BOOT version=00.05 iteration=005 heap_bytes=%u framebuffer_bytes=%u renderer=software logical=320x180 target_draw_hz=30\n",_newlib_heap_size_user,bytes*2);fprintf(log,"PENDING exact_intro_tween day_night_tints audio unlocks saves world_generation collision gameplay online options\n");fflush(log);}
  SceUID block=sceKernelAllocMemBlock("VaganteMenu",SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW,(bytes*2+0x3ffff)&~0x3ffff,NULL);
  if(block<0){if(log){fprintf(log,"ERROR framebuffer_alloc code=%d\n",block);fclose(log);}return 1;}
  uint32_t *buffers;
@@ -82,13 +90,17 @@ int main(void){
  int display_status=sceDisplaySetFrameBuf(&fb,SCE_DISPLAY_SETBUF_NEXTFRAME);
  if(display_status<0){if(log){fprintf(log,"ERROR display_initial code=%d\n",display_status);fclose(log);}sceKernelFreeMemBlock(block);return 1;}
  uint64_t start=sceKernelGetSystemTimeWide();
- int loaded=load_resources("ux0:data/Vagante2Vita/data.vra",log);
+ FILE *cache=fopen("ux0:data/Vagante2Vita/menu-only.vra","rb");
+ int loaded=0;
+ if(cache){fclose(cache);if(log)fprintf(log,"CACHE candidate=menu-only.vra\n");loaded=load_resources("ux0:data/Vagante2Vita/menu-only.vra",log);if(!loaded&&log)fprintf(log,"WARN menu_cache_invalid fallback=data.vra\n");}
+ if(!loaded){if(log)fprintf(log,"SOURCE archive=data.vra\n");loaded=load_resources("ux0:data/Vagante2Vita/data.vra",log);}
+ else if(log)fprintf(log,"SOURCE archive=menu-only.vra scope=menu_only origin_not_rehashed_on_vita\n");
  if(log){fprintf(log,"LOAD complete=%d load_us=%llu\n",loaded,(unsigned long long)(sceKernelGetSystemTimeWide()-start));fflush(log);}
  Menu menu={0};log_state(log,&menu,0);
- unsigned previous=0;int buffer_index=0,stats=0,display_error=0;
+ unsigned previous=0;int buffer_index=0,stats=0,display_error=0,reduction=2;
  const char *labels[]={"NEW GAME","PLAY ONLINE","OPTIONS","EXIT GAME"};
  uint64_t last_tick=sceKernelGetSystemTimeWide(),last_draw=0,accumulator=0;
- uint64_t window_start=last_tick,cpu_sum=0,cpu_max=0;unsigned draws=0;float fps=0;
+ uint64_t window_start=last_tick,cpu_sum=0,cpu_max=0,compose_sum=0,scale_sum=0;unsigned draws=0;float fps=0;
  sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
  for(;;){
   SceCtrlData pad;memset(&pad,0,sizeof(pad));sceCtrlPeekBufferPositive(0,&pad,1);
@@ -96,6 +108,7 @@ int main(void){
   if((pad.buttons&(SCE_CTRL_START|SCE_CTRL_SELECT))==(SCE_CTRL_START|SCE_CTRL_SELECT))break;
   if(!loaded&&(pressed&SCE_CTRL_START))break;
   if(pressed&SCE_CTRL_SELECT)stats=!stats;
+  if(pressed&SCE_CTRL_LTRIGGER){reduction=reduction==2?1:2;window_start=sceKernelGetSystemTimeWide();draws=0;cpu_sum=cpu_max=compose_sum=scale_sum=0;if(log){fprintf(log,"PROFILE logical_width=%d logical_height=%d\n",640/reduction,360/reduction);fflush(log);}}
   MenuScreen old_screen=menu.screen;int old_cursor=menu.cursor,old_class=menu.player_class;
   if(loaded){
    if(menu.screen==MENU_TITLE&&menu.cursor==3&&(pressed&SCE_CTRL_CROSS))break;
@@ -109,7 +122,9 @@ int main(void){
   if(now-last_draw>=33333){
    last_draw=now;start=sceKernelGetSystemTimeWide();buffer_index^=1;frame=buffers+buffer_index*(bytes/4);
    if(loaded){
-    draw_animated_scene(background,&menu);present_background();
+    draw_scene_resolution(background,&menu,reduction);
+    uint64_t compose_end=sceKernelGetSystemTimeWide();compose_sum+=compose_end-start;
+    present_background(reduction);scale_sum+=sceKernelGetSystemTimeWide()-compose_end;
     if(menu.screen==MENU_TITLE)for(int i=0;i<4;i++)text(360,290+38*i,labels[i],i==menu.cursor?0xff80ddff:0xffdddddd);
     if(menu.screen==MENU_CLASS){text(225,49,"CHOOSE CLASS",0xff80ddff);text(195,425,"LEFT RIGHT TO SELECT",0xffffffff);text(195,461,"X CONFIRM  CIRCLE BACK",0xffffffff);}
     if(menu.screen==MENU_BLOCKED||menu.screen==MENU_NOTICE){
@@ -118,7 +133,7 @@ int main(void){
      if(menu.screen==MENU_BLOCKED){text(95,337,"WORLD START NOT RECOVERED",0xff80b0ff);text(95,379,"BLOCKER RECORDED IN LOG",0xffffffff);}
      text(95,435,"CIRCLE TO RETURN",0xffffffff);
     }
-    text(18,515,log?"ITERATION 004  GAMEPLAY PENDING":"ERROR LOG FILE COULD NOT OPEN",log?0xffaaaaaa:0xff8080ff);
+    text(18,515,log?"ITERATION 005  GAMEPLAY PENDING":"ERROR LOG FILE COULD NOT OPEN",log?0xffaaaaaa:0xff8080ff);
     if(stats){char info[48];snprintf(info,sizeof(info),"DRAW FPS %u  CPU US %u",(unsigned)fps,(unsigned)cpu_max);text(18,12,info,0xff80ff80);}
    }else{
     memset(frame,0,bytes);text(48,100,"ARCHIVE LOAD FAILED",0xff8080ff);
@@ -127,15 +142,14 @@ int main(void){
    uint64_t cpu=sceKernelGetSystemTimeWide()-start;cpu_sum+=cpu;if(cpu>cpu_max)cpu_max=cpu;draws++;
    fb.base=frame;int status=sceDisplaySetFrameBuf(&fb,SCE_DISPLAY_SETBUF_NEXTFRAME);
    if(status<0){display_error=status;if(log)fprintf(log,"ERROR display code=%d\n",status);break;}
-   sceDisplayWaitVblankStart();
   }
   now=sceKernelGetSystemTimeWide();
   if(now-window_start>=2000000){
    fps=(float)draws*1000000.0f/(float)(now-window_start);
-   if(log){fprintf(log,"PERF time_us=%llu screen=%s draw_fps=%.2f cpu_avg_us=%llu cpu_max_us=%llu frames=%u tick=%llu caravan_frame=%u\n",(unsigned long long)now,menu_screen_name(menu.screen),fps,(unsigned long long)(draws?cpu_sum/draws:0),(unsigned long long)cpu_max,draws,(unsigned long long)menu.total_ticks,(unsigned)(menu.total_ticks/7)%8);fflush(log);}
-   window_start=now;draws=0;cpu_sum=0;cpu_max=0;
+   if(log){fprintf(log,"PERF time_us=%llu screen=%s draw_fps=%.2f cpu_avg_us=%llu cpu_max_us=%llu frames=%u tick=%llu caravan_frame=%u logical_width=%d logical_height=%d compose_avg_us=%llu scale_avg_us=%llu\n",(unsigned long long)now,menu_screen_name(menu.screen),fps,(unsigned long long)(draws?cpu_sum/draws:0),(unsigned long long)cpu_max,draws,(unsigned long long)menu.total_ticks,(unsigned)(menu.total_ticks/7)%8,640/reduction,360/reduction,(unsigned long long)(draws?compose_sum/draws:0),(unsigned long long)(draws?scale_sum/draws:0));fflush(log);}
+   window_start=now;draws=0;cpu_sum=0;cpu_max=0;compose_sum=0;scale_sum=0;
   }
-  sceKernelDelayThread(1000);
+  sceDisplayWaitVblankStart();
  }
  if(log){fprintf(log,"EXIT normal=%d screen=%s display_error=%d\n",display_error==0,menu_screen_name(menu.screen),display_error);fclose(log);}
  free_resources();sceDisplaySetFrameBuf(NULL,SCE_DISPLAY_SETBUF_NEXTFRAME);sceDisplayWaitVblankStart();

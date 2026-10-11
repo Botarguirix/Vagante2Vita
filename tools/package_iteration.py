@@ -7,6 +7,7 @@ def main():
     p.add_argument('vpk',type=pathlib.Path)
     p.add_argument('--build-log',type=pathlib.Path,required=True)
     p.add_argument('--git',default='git')
+    p.add_argument('--menu-archive',type=pathlib.Path,help='Optional private menu-only archive, never committed')
     args=p.parse_args()
     if len(args.iteration)!=3 or not args.iteration.isdigit():p.error('Use three digits')
     root=pathlib.Path(__file__).resolve().parent.parent
@@ -22,6 +23,10 @@ def main():
         shutil.copyfile(args.build_log,dest/'build.log')
         (dest/'source.zip').write_bytes(git('archive','--format=zip','HEAD'))
         shutil.copyfile(root/'docs/ROADMAP.md',dest/'ROADMAP.md')
+        if args.menu_archive:
+            shutil.copyfile(args.menu_archive,dest/'menu-only.vra')
+            metadata=args.menu_archive.with_suffix('.json')
+            if metadata.exists():shutil.copyfile(metadata,dest/'menu-only.json')
         report=dict(iteration=args.iteration,commit=git('rev-parse','HEAD').decode().strip(),files={})
         for file in dest.iterdir():
             report['files'][file.name]=dict(bytes=file.stat().st_size,sha256=hashlib.sha256(file.read_bytes()).hexdigest())

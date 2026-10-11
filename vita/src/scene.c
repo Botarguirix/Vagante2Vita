@@ -1,16 +1,20 @@
 #include "scene.h"
 #include "resources.h"
 #include <math.h>
+static int divisor=1,render_width=640,render_height=360;
+static int ceil_div(int n,int d){return n>=0?(n+d-1)/d:n/d;}
 static void blit(uint32_t *p,int i,int x,int y,int sx0,int sy0,int width,int height,unsigned tint,unsigned alpha,int scale){
  Texture *t=&textures[i];if(!t->rgba||scale<1)return;
- for(int sy=0;sy<height;sy++)for(int sx=0;sx<width;sx++){
-  if(sx0+sx<0||sx0+sx>=t->w||sy0+sy<0||sy0+sy>=t->h)continue;
-  const unsigned char *s=t->rgba+4*((sy0+sy)*t->w+sx0+sx);
-  unsigned a=s[3]*alpha/255;if(!a)continue;
-  unsigned r=s[0]*(tint&255)/255,g=s[1]*((tint>>8)&255)/255,b=s[2]*((tint>>16)&255)/255;
-  for(int yy=0;yy<scale;yy++)for(int xx=0;xx<scale;xx++){
-   int dx=x+sx*scale+xx,dy=y+sy*scale+yy;if(dx<0||dx>=640||dy<0||dy>=360)continue;
-   uint32_t *d=&p[dy*640+dx];
+ int left=ceil_div(x,divisor),top=ceil_div(y,divisor);
+ int right=ceil_div(x+width*scale,divisor),bottom=ceil_div(y+height*scale,divisor);
+ if(left<0)left=0;if(top<0)top=0;if(right>render_width)right=render_width;if(bottom>render_height)bottom=render_height;
+ for(int dy=top;dy<bottom;dy++){
+  int sy=sy0+(dy*divisor-y)/scale;if(sy<0||sy>=t->h)continue;
+  for(int dx=left;dx<right;dx++){
+   int sx=sx0+(dx*divisor-x)/scale;if(sx<0||sx>=t->w)continue;
+   const unsigned char *s=t->rgba+4*(sy*t->w+sx);unsigned a=s[3]*alpha/255;if(!a)continue;
+   unsigned r=s[0]*(tint&255)/255,g=s[1]*((tint>>8)&255)/255,b=s[2]*((tint>>16)&255)/255;
+   uint32_t *d=&p[dy*render_width+dx];
    if(a==255){*d=0xff000000|r|g<<8|b<<16;continue;}
    unsigned rr=((*d&255)*(255-a)+r*a)/255;
    unsigned gg=(((*d>>8)&255)*(255-a)+g*a)/255,bb=(((*d>>16)&255)*(255-a)+b*a)/255;
@@ -23,12 +27,15 @@ static void layer(uint32_t *p,int i,float offset,unsigned tint,unsigned alpha){
  for(;x<640;x+=400)blit(p,i,x,0,0,0,textures[i].w,textures[i].h,tint,alpha,1);
 }
 static void rect(uint32_t *p,int x,int y,int w,int h,uint32_t color){
- for(int yy=y;yy<y+h;yy++)for(int xx=x;xx<x+w;xx++)if(xx>=0&&xx<640&&yy>=0&&yy<360)p[yy*640+xx]=color;
+ int left=ceil_div(x,divisor),top=ceil_div(y,divisor),right=ceil_div(x+w,divisor),bottom=ceil_div(y+h,divisor);
+ if(left<0)left=0;if(top<0)top=0;if(right>render_width)right=render_width;if(bottom>render_height)bottom=render_height;
+ for(int yy=top;yy<bottom;yy++)for(int xx=left;xx<right;xx++)p[yy*render_width+xx]=color;
 }
-void draw_animated_scene(uint32_t *p,const Menu *m){
+void draw_scene_resolution(uint32_t *p,const Menu *m,int reduction){
+ divisor=reduction==2?2:1;render_width=640/divisor;render_height=360/divisor;
  /* Measured time is mapped to 60 logic ticks. Exact original tween/day state is pending. */
  float move=(float)(m->total_ticks%240000),night=0.75f+0.25f*sinf((float)(m->total_ticks%24000)*0.0005f);
- for(int i=0;i<640*360;i++)p[i]=0xff20170f;
+ for(int i=0;i<render_width*render_height;i++)p[i]=0xff20170f;
  layer(p,0,0,0xffffff,255);layer(p,1,0,0xffffff,(unsigned)(night*255));
  blit(p,2,3,45,0,0,128,128,0xffd0b0,(unsigned)(night*230),1);
  layer(p,3,move*0.0035f+move*0.005f,0xc0c0c0,120);
@@ -69,7 +76,8 @@ void draw_animated_scene(uint32_t *p,const Menu *m){
  }
  if(m->screen==MENU_FADE){
   unsigned a=(unsigned)(90-m->ticks)*255/90;
-  for(int i=0;i<640*360;i++){uint32_t d=p[i];p[i]=0xff000000|((d&255)*a/255)|((((d>>8)&255)*a/255)<<8)|((((d>>16)&255)*a/255)<<16);}
+  for(int i=0;i<render_width*render_height;i++){uint32_t d=p[i];p[i]=0xff000000|((d&255)*a/255)|((((d>>8)&255)*a/255)<<8)|((((d>>16)&255)*a/255)<<16);}
  }
 }
+void draw_animated_scene(uint32_t *p,const Menu *m){draw_scene_resolution(p,m,1);}
 void draw_scene(uint32_t *p){Menu m={0};draw_animated_scene(p,&m);}

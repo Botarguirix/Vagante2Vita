@@ -13,3 +13,4 @@ jobs:
       - run: cmake -S vita -B build-host -DHOST_PROBE=ON -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build-host -j2
       - run: ctest --test-dir build-host --output-on-failure
+      - run: python tests/native_archive_check.py build-host/vagante-probe

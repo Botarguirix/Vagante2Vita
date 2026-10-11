@@ -50,3 +50,11 @@ VPK `build-vita/Vagante2Vita-menu.vpk`, SHA-256 `dec545ea0282c9bc02ed92fe0df01e1
 VPKs 001–003 preservados en artifacts/iteration001, iteration002 e iteration003. Nueva entrega 004 con título VAGV00004, instalable junto a la aplicación anterior. Logs creados con O_EXCL en logs/iteration004, numerados por sesión y sin borrado de anteriores. Test de preservación y navegación pasan; compilación Vita y ZIP/SFO verificados. SHA-256 VPK: d76dcc2da9004b44681f9fad6146da82b5c2d6f4404ef7c52919cc36e3b9014b. Pendiente prueba física 004.
 
 Empaquetador local preserva VPK, snapshot del commit, roadmap, build.log y hashes; rechaza sobrescribir una carpeta de iteración. Ver [ITERATION4.md](ITERATION4.md). No hay cambios de gameplay en esta entrega.
+
+## Iteración 005: render y carga
+
+El log recibido pertenece a 00.02 y muestra 47,636 s de carga; no contiene PERF del menú animado. El usuario confirma animación y CPU alto, pero no se infiere un porcentaje CPU del archivo. 005 compone por defecto a 320×180 y alterna con 640×360 por L; añade tiempos separados de composición/escalado y espera de mando a vblank.
+
+Caché privada de 22 PNG: 153.245 bytes comprimidos; mantiene 5.128.264 bytes RGBA. Probe confirma archivo completo y caché; regresión sintética e integridad corrupta/truncada pasan. Benchmark de escritorio: 4.123 frente a 1.026 µs por composición (no Vita). Navegación, logs y seis tests Python pasan. VPK Release ZIP/SFO verificados; falta prueba física 005. SHA-256: c9c4a430a874e0b05c2d8bc90b84ef6cd076caa6c63c91f107c805a83c31db51.
+
+Ver [ITERATION5.md](ITERATION5.md). La caché se entrega sólo localmente junto al VPK, excluida de Git.

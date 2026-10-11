@@ -30,11 +30,11 @@ Texture textures[TEXTURE_COUNT]={
  {"gfx/classes/mage/1/walk.png",0,0,0},
  {"gfx/scenes/intro/entities/little_firefly.png",0,0,0}
 };
-typedef struct { FILE *f; mz_stream z; unsigned char in[32768],out[32768]; size_t pos,len; int end,status; } Reader;
+typedef struct { FILE *f; mz_stream z; unsigned char in[32768],out[32768]; size_t pos,len; int end,status,eof; } Reader;
 static int fill(Reader *r){
  if(r->end)return 0;
  for(;;){
-  if(!r->z.avail_in){r->z.avail_in=(unsigned)fread(r->in,1,sizeof(r->in),r->f);r->z.next_in=r->in;if(!r->z.avail_in)return -1;}
+  if(!r->z.avail_in&&!r->eof){r->z.avail_in=(unsigned)fread(r->in,1,sizeof(r->in),r->f);r->z.next_in=r->in;if(!r->z.avail_in){if(ferror(r->f))return -1;r->eof=1;}}
   r->z.next_out=r->out;r->z.avail_out=sizeof(r->out);
   int status=mz_inflate(&r->z,MZ_NO_FLUSH);r->status=status;
   r->len=sizeof(r->out)-r->z.avail_out;r->pos=0;
@@ -43,6 +43,7 @@ static int fill(Reader *r){
   if(r->z.total_out>256u*1024u*1024u)return -1;
   if(r->len)return 1;
   if(r->end)return 0;
+  if(r->eof&&!r->z.avail_in)return -1;
  }
 }
 static int read_bytes(Reader *r,void *dst,size_t n){
