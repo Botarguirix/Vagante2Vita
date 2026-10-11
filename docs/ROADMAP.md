@@ -33,3 +33,7 @@ Base de render: 320×180 o 640×360 con comparación por L y tiempos separados d
 ## Presentación 006
 
 Icono, fondo LiveArea, puerta de inicio y splash integrados; VAGV00006 independiente. Ver [ITERATION6.md](ITERATION6.md). El usuario reporta mejora con 005; los logs adjuntos son 003 y falta cuantificar 005/006 con logs numerados. Próximo avance funcional: reconstruir arranque de mundo y completar el flujo de selección, conservando mediciones de composición/escalado.
+
+## Estándar desde 007
+
+Mantener TITLE_ID VAGV00006 y nombre Vagante2Vita; incrementar sólo versión/iteración. Una aplicación actualizada en Vita, entregas y logs separados en PC/consola. Ver [ITERATION7.md](ITERATION7.md). Abrir la carpeta de entrega al finalizar cada iteración.

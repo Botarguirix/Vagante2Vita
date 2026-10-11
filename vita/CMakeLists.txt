@@ -4,6 +4,7 @@ if(NOT HOST_PROBE AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   set(CMAKE_TOOLCHAIN_FILE "$ENV{VITASDK}/share/vita.toolchain.cmake" CACHE PATH "Vita toolchain")
 endif()
 project(Vagante2Vita C)
+include("${CMAKE_CURRENT_SOURCE_DIR}/iteration.cmake")
 add_library(miniz STATIC ../third_party/miniz/miniz.c ../third_party/miniz/miniz_tinfl.c)
 target_include_directories(miniz PUBLIC ../third_party/miniz)
 target_compile_definitions(miniz PUBLIC MINIZ_NO_ARCHIVE_APIS MINIZ_NO_DEFLATE_APIS)
@@ -27,9 +28,11 @@ endif()
 include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
 add_executable(vagante2vita src/main.c src/session_log.c)
 target_compile_options(vagante2vita PRIVATE -Wall -Wextra -Werror)
+target_compile_definitions(vagante2vita PRIVATE
+  VAGANTE_ITERATION="${VAGANTE_ITERATION}" VAGANTE_VERSION="${VITA_VERSION}")
 target_link_libraries(vagante2vita resources SceDisplay_stub SceCtrl_stub SceSysmem_stub SceLibKernel_stub)
 vita_create_self(eboot.bin vagante2vita UNSAFE)
-vita_create_vpk(Vagante2Vita-iteration006.vpk VAGV00006 eboot.bin VERSION 00.06 NAME "Vagante2Vita Iteration 006"
+vita_create_vpk(Vagante2Vita-iteration${VAGANTE_ITERATION}.vpk ${VITA_TITLEID} eboot.bin VERSION ${VITA_VERSION} NAME "${VITA_APP_NAME}"
   FILE sce_sys/icon0.png sce_sys/icon0.png
   FILE sce_sys/pic0.png sce_sys/pic0.png
   FILE sce_sys/livearea/contents/bg0.png sce_sys/livearea/contents/bg0.png

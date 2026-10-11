@@ -64,3 +64,9 @@ Ver [ITERATION5.md](ITERATION5.md). La caché se entrega sólo localmente junto 
 Icono y fondo originales generados con imagegen; cuatro PNG indexados y template psmobile integrados al VPK VAGV00006. Compilación Release y archivo ZIP/SFO/XML/dimensiones/paleta comprobados. SHA-256 VPK: 8425b27f6249e4fb465e3bf9ce09542b1fa6ae7148ed5b90e26d7301cd5454be. Mantiene render/caché de 005 y sus entregas anteriores. Falta prueba física de la presentación LiveArea.
 
 El usuario reportó mejora de FPS y carga; los logs recibidos aún marcan 00.03 y no sirven para medir 005. Instrucciones: [ITERATION6.md](ITERATION6.md).
+
+## Iteración 007: identidad estable
+
+Comparada configuración con Touhou75Vita. Se fija VAGV00006 y nombre Vagante2Vita; nueva versión 00.07 actualiza 006. SFO verificado contra el VPK 006: mismo TITLE_ID, APP_VER mayor. Todos los recursos de LiveArea se conservan byte por byte. Metadatos centralizados en vita/iteration.cmake y manifest con identidad del SFO. Empaquetador rechaza nuevas identidades/nombres fuera del estándar.
+
+Compilación Release/ZIP verificados; actualización física pendiente. SHA-256: 68e85e2878a1c2b2e1ee275065edd2ffdd3aeb01f10746a0a721953377e2d5e5. Entrega y logs independientes en iteration007. Ver [ITERATION7.md](ITERATION7.md).

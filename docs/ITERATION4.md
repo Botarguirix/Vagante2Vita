@@ -1,3 +1,5 @@
+> Política histórica de IDs independientes, sustituida desde [007](ITERATION7.md): VAGV00006 permanece fijo. Las carpetas y logs continúan separados.
+
 # Iteración 004: preservar versiones y sesiones
 
 Las entregas se guardan en `artifacts/iterationNNN/`, sin reemplazar carpetas existentes. El empaquetador rechaza una iteración ya guardada. Cada entrega nueva conserva VPK, snapshot ZIP del código de su commit, roadmap, log de compilación y hashes SHA-256. Las iteraciones históricas 001–003 conservan los VPK existentes y sus hashes; no se afirma que tengan snapshots de código asociados a esta nueva entrega.
