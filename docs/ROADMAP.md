@@ -53,3 +53,7 @@ INTRO=4 confirmado por PDB y selección por acto/tipo. Implementados paquete pri
 ## Terreno 011
 
 Autotiling reconstruido, CSV nativo y composición privada de los atlas de la intro generados. Pruebas aprobadas; falta comparación con PC, doodads, iluminación y personaje. [Resultados](ANALYSIS11.md).
+
+## Movimiento 012
+
+Cuerpo nativo y subconjunto de andar/saltar/agacharse/escaleras sobre el mapa original. Atributos y salud base conectados; equivalencia física completa y movimientos adicionales pendientes. [Alcance](ANALYSIS12.md).
