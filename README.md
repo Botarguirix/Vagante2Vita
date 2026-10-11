@@ -4,12 +4,12 @@ Investigación técnica e ingeniería inversa reproducible para un posible port 
 
 **Estado:** no es un port jugable ni una decompilación recompilable. El ejecutable local es Windows x86 de 32 bits, con C++/SFML, OpenGL, OpenAL y Steamworks. Se encontró un PDB coincidente que permite recuperar nombres y tipos. La reconstrucción de la lógica y la adaptación a ARM siguen pendientes.
 
-Se generó localmente pseudocódigo de **30 568 funciones**, incluidos código del juego y bibliotecas/runtime, con dos fallos por timeout después de reintentar. También se compiló el título nativo 00.02 con recursos originales, navegación y cargador VRA por streaming; falta comprobarlo en Vita. Estos resultados no representan un porcentaje de reconstrucción ni prueban rendimiento del juego en Vita.
+Se generó localmente pseudocódigo de **30 568 funciones**, incluidos código del juego y bibliotecas/runtime, con dos fallos por timeout después de reintentar. El título 00.02 fue probado en Vita por el usuario. La iteración 00.03 añade fondo animado, sprites por atlas, vista parcial de selección de clases y log de recursos, transiciones y rendimiento; falta probar esta versión en consola. Estos resultados no representan un porcentaje de reconstrucción ni prueban rendimiento del juego en Vita.
 
 - [Viabilidad técnica y evidencia](docs/FEASIBILITY.md)
 - [Proyectos relacionados](docs/REFERENCES.md)
 - [Plan de reconstrucción](docs/ROADMAP.md)
-- [Probar el título 00.02](docs/ITERATION2.md)
+- [Probar el menú animado 00.03 y leer sus logs](docs/ITERATION3.md)
 - [Cómo reproducir el análisis](docs/REPRODUCING.md)
 - [Resultados de esta ejecución](docs/STATUS.md)
 - [Compilar y usar el diagnóstico Vita](docs/VITA_DIAGNOSTIC.md)

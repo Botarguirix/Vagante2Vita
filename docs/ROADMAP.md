@@ -1,18 +1,16 @@
 # Roadmap hacia Vagante en Vita
 
-## Iteración 2: título nativo
+## Estado después de la iteración 3
 
-Verificado en escritorio y compilación Vita: lector C de data.vra por streaming, integridad zlib/Adler, límites de tamaño, rechazo de truncamiento y bytes sobrantes. La copia local contiene 2.705 registros aunque declara 2.702. Se cargan diez PNG originales; no se reserva el archivo descomprimido completo.
+El usuario comprobó el título 00.02 en Vita: carga correcta, pantalla estática. 00.03 está compilada y comprobada en escritorio; requiere prueba física. Carga 22 PNG desde data.vra, verifica los 2.705 registros, anima fondo/caravana/luciérnagas y alterna dos framebuffers. New Game abre una selección parcial de las tres clases base tras 90 pasos. Confirmar una clase registra el bloqueo: falta reconstruir el arranque del mundo.
 
-El fondo y logotipo se componen a 640×360 y se escalan a 960×540. Se calcula el fondo una vez y se actualiza la pantalla al cambiar la selección. Las cuatro opciones son New Game, Play Online, Options y Exit Game. Las tres primeras muestran avisos de implementación pendiente; la última sale. La cruceta actúa por pulsaciones, sin repetición al mantenerla.
-
-VPK 00.02 compilado. La prueba física anterior validó sólo el diagnóstico 00.01: **esta iteración todavía necesita prueba en Vita**. No se recuperó gameplay. Fuente, tintes, caravana y composición son aproximados; faltan animaciones, parallax y audio. No ejecutamos directamente el menú original descompilado.
+[Prueba y diagnóstico 00.03](ITERATION3.md). El log registra recursos, estados, rendimiento CPU y tareas pendientes. Los datos de render no representan rendimiento de gameplay.
 
 ## Hitos pendientes
 
-1. **Validar título en Vita:** comprobar carga, colores, selección y salida; recuperar runtime.log. Medir memoria máxima y separar CPU de espera de vblank. render_us incluye espera y presentación, y no representa FPS del juego.
-2. **Completar presentación:** recuperar Sprite/Animation, atlas, tintes día/noche, intro y temporizadores; comparar fotogramas con PC. Integrar fuente, signpost y audio originales. Evaluar GPU con mediciones.
-3. **Selección de personaje:** seguir callbacks de New Game, reconstruir clases, desbloqueos e interfaces. Criterio: elegir personaje y obtener semilla reproducible.
+1. **Validar título en Vita:** comprobar carga, colores, selección y salida; recuperar runtime.log. Medir memoria máxima y separar CPU de espera de vblank. En 00.03 los tiempos CPU excluyen espera/presentación; medir draw_fps en el título y vista de clases.
+2. **Completar presentación:** recuperar Sprite/Animation, atlas, tintes día/noche, intro y temporizadores; comparar fotogramas con PC. Signpost ya se carga; recuperar su posición exacta, fuente y audio originales. Evaluar GPU con mediciones.
+3. **Selección de personaje:** la vista parcial ya cambia entre tres clases; reconstruir el flujo Client/Server, desbloqueos, fondos, variantes y guardados. Criterio: elegir personaje y obtener semilla reproducible.
 4. **Una habitación funcional:** recuperar RNG, generación mínima, tiles, Player/Entity, movimiento, colisión y cámara. Comparar estados con semilla y entradas fijas en PC y luego Vita.
 5. **Combate y progreso mínimo:** enemigo, daño, objetos, transición y persistencia. Criterio: recorrido mínimo sin corrupción.
 6. **Ampliar y optimizar:** generación completa, clases, enemigos, objetos y jefes. Medir CPU/GPU/memoria en consola; cache acotada, atlas y streaming de audio.
@@ -22,4 +20,4 @@ No hay fecha ni porcentaje fiable. Los 30.568 cuerpos de Ghidra incluyen bibliot
 
 ## Evidencia local
 
-MainMenu: constructor 0x006a2ca0, updateStrings 0x006a3c00, drawBackground 0x006a4ba0, draw 0x006a5b50, up 0x006a6790, down 0x006a67d0, action 0x006a6810. Pseudocódigo exclusivamente en _local/decompiled. La siguiente investigación debe recuperar los destinos de los callbacks de action para abrir selección de personaje.
+MainMenu: constructor 0x006a2ca0, updateStrings 0x006a3c00, drawBackground 0x006a4ba0, draw 0x006a5b50, up 0x006a6790, down 0x006a67d0, action 0x006a6810. Pseudocódigo exclusivamente en _local/decompiled. La siguiente investigación debe seguir readyToStartGame en Client::step y reconstruir la inicialización del mundo, además de completar PlayerMenu.

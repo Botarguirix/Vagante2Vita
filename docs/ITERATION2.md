@@ -1,3 +1,5 @@
+> Versión histórica: el usuario confirmó que cargó en Vita. La siguiente prueba es [00.03](ITERATION3.md).
+
 # Prueba del título 00.02
 
 Instalar build-vita/Vagante2Vita-title.vpk con VitaShell. Usa VAGV00001 y actualiza el diagnóstico anterior. Mantener tu data.vra completo en ux0:data/Vagante2Vita/data.vra. El VPK no contiene recursos comerciales. El arranque recorre todo el archivo: esperar en LOADING AND VERIFYING DATA VRA.

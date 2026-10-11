@@ -36,3 +36,11 @@ No existe una decompilación recompilable del juego ni un port jugable en este e
 Título nativo 00.02 compilado en Release. Verificador C de escritorio confirmó los 2.705 registros, 124.879.064 bytes descomprimidos y diez texturas. Seis pruebas Python pasan. El VPK se comprobó como ZIP íntegro: 95.111 bytes, SHA-256 6e66f63f544133649fd3c5a4f4d462019ad28521c7044f1afc58841f8652a28b.
 
 Ver docs/ITERATION2.md y docs/ROADMAP.md. La pantalla y controles de 00.02 siguen pendientes de prueba física; el juego no es jugable. El archivo nuevo es build-vita/Vagante2Vita-title.vpk.
+
+## Iteración 3
+
+El usuario confirmó arranque y título en Vita para 00.02. La versión 00.03 incorpora 22 texturas, animación por atlas/parallax, dos framebuffers, selección parcial de las tres clases base y log periódico. New Game ya abre esa vista; confirmar una clase registra explícitamente la falta de reconstrucción del arranque del mundo.
+
+Probe C: 2.705 registros íntegros, 22 PNG (5.128.264 bytes RGBA), fotogramas distintos y composición de clases. Test C de transiciones pasa; seis pruebas Python y cuatro rechazos de archivo inválido pasan. Compilación Vita Release completada. Falta prueba física de 00.03 y medición real.
+
+VPK `build-vita/Vagante2Vita-menu.vpk`, SHA-256 `dec545ea0282c9bc02ed92fe0df01e1758fb66335e740ab0b9acfc71300b6cf0`. Instrucciones y lectura del log: [ITERATION3.md](ITERATION3.md).
