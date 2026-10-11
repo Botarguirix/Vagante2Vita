@@ -45,3 +45,7 @@ Los logs físicos de 006 confirman carga de 0,644 s, dibujo de 9,2–9,8 FPS y c
 ## Análisis independiente 009
 
 Validadas 15 habitaciones INTERMISSION de 960 tiles y generadas vistas privadas de geometría. Clasificación base de sólidos/plataformas identificada en generateCollisionFlags; faltan carga/transformaciones, enum INTRO, caras de colisión y física. [Resultados](ANALYSIS9.md). La aplicación de prueba sigue en 008.
+
+## Base nativa 010
+
+INTRO=4 confirmado por PDB y selección por acto/tipo. Implementados paquete privado de 960 tiles, campos de capas visuales, flags/caras de colisión y atributos base de tres clases. Pruebas nativas aprobadas. [Detalle](ANALYSIS10.md). Próximo: autotiling/render, entidades y movimiento del jugador sobre la habitación real. Objetivo jugable activo.
