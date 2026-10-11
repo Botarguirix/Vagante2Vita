@@ -44,3 +44,6 @@ La entrega actual 013 conserva la misma aplicación y separa entregas/logs: [ins
 
 
 Última entrega: **iteración 014**, misma aplicación VAGV00006. Optimiza escalado, transferencia de pantalla y terreno; objetivo 60 Hz pendiente de validación física. [Instalación y resultados](docs/ITERATION14.md).
+
+
+Última entrega local: **015**, con mundo inicial incluido en el VPK privado y fallback `app0:world`. [Instalación, controles y alcance](docs/ITERATION15.md). Los recursos comerciales no forman parte del repositorio; builds públicos requieren preparar la copia del usuario.

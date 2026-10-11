@@ -1,3 +1,13 @@
+# Estado vigente: iteración 015
+
+La prueba física 014 no entró al mundo: faltaba intro-world.vwi. La entrega local
+015 incluye el mundo original en su VPK y una alternativa de carga app0:world.
+Permite probar el recorrido implementado (movimiento, colisiones y atributos).
+Falta validar entrada y rendimiento físico; combate/interacciones/primer piso
+procedural siguen pendientes. [Instalación y alcance](ITERATION15.md).
+
+Los apartados siguientes conservan el historial de decisiones y pendientes.
+
 # Roadmap hacia Vagante en Vita
 
 ## Estado después de la iteración 3
