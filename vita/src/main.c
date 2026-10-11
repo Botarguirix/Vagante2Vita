@@ -7,9 +7,11 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <psp2/kernel/threadmgr.h>
 #include "resources.h"
 #include "scene.h"
+#include "session_log.h"
 unsigned int _newlib_heap_size_user = 16 * 1024 * 1024;
 
 /* Five-column uppercase diagnostic font, seven bits per column. */
@@ -64,19 +66,21 @@ static void log_state(FILE *log,const Menu *m,unsigned b){
 }
 int main(void){
  const unsigned bytes=1024*544*4;
- remove("ux0:data/Vagante2Vita/runtime.previous.log");
- rename("ux0:data/Vagante2Vita/runtime.log","ux0:data/Vagante2Vita/runtime.previous.log");
- FILE *log=fopen("ux0:data/Vagante2Vita/runtime.log","w");
- if(log){fprintf(log,"BOOT version=00.03 heap_bytes=%u framebuffer_bytes=%u renderer=software logical=640x360 target_draw_hz=30\n",_newlib_heap_size_user,bytes*2);fprintf(log,"PENDING exact_intro_tween day_night_tints audio unlocks saves world_generation collision gameplay online options\n");fflush(log);}
+ mkdir("ux0:data/Vagante2Vita/logs",0777);
+ char log_path[256]={0};
+ FILE *log=open_session_log("ux0:data/Vagante2Vita/logs/iteration004",log_path,sizeof(log_path));
+ if(log){fprintf(log,"LOG path=%s\n",log_path);fprintf(log,"BOOT version=00.04 iteration=004 heap_bytes=%u framebuffer_bytes=%u renderer=software logical=640x360 target_draw_hz=30\n",_newlib_heap_size_user,bytes*2);fprintf(log,"PENDING exact_intro_tween day_night_tints audio unlocks saves world_generation collision gameplay online options\n");fflush(log);}
  SceUID block=sceKernelAllocMemBlock("VaganteMenu",SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW,(bytes*2+0x3ffff)&~0x3ffff,NULL);
  if(block<0){if(log){fprintf(log,"ERROR framebuffer_alloc code=%d\n",block);fclose(log);}return 1;}
  uint32_t *buffers;
- if(sceKernelGetMemBlockBase(block,(void **)&buffers)<0){sceKernelFreeMemBlock(block);if(log)fclose(log);return 1;}
+ int base_status=sceKernelGetMemBlockBase(block,(void **)&buffers);
+ if(base_status<0){if(log){fprintf(log,"ERROR framebuffer_base code=%d\n",base_status);fclose(log);}sceKernelFreeMemBlock(block);return 1;}
  frame=buffers;memset(buffers,0,bytes*2);
  text(48,100,"LOADING AND VERIFYING DATA VRA",0xffffffff);
  SceDisplayFrameBuf fb;memset(&fb,0,sizeof(fb));fb.size=sizeof(fb);fb.base=frame;fb.pitch=1024;
  fb.pixelformat=SCE_DISPLAY_PIXELFORMAT_A8B8G8R8;fb.width=960;fb.height=544;
- if(sceDisplaySetFrameBuf(&fb,SCE_DISPLAY_SETBUF_NEXTFRAME)<0){sceKernelFreeMemBlock(block);if(log)fclose(log);return 1;}
+ int display_status=sceDisplaySetFrameBuf(&fb,SCE_DISPLAY_SETBUF_NEXTFRAME);
+ if(display_status<0){if(log){fprintf(log,"ERROR display_initial code=%d\n",display_status);fclose(log);}sceKernelFreeMemBlock(block);return 1;}
  uint64_t start=sceKernelGetSystemTimeWide();
  int loaded=load_resources("ux0:data/Vagante2Vita/data.vra",log);
  if(log){fprintf(log,"LOAD complete=%d load_us=%llu\n",loaded,(unsigned long long)(sceKernelGetSystemTimeWide()-start));fflush(log);}
@@ -114,7 +118,7 @@ int main(void){
      if(menu.screen==MENU_BLOCKED){text(95,337,"WORLD START NOT RECOVERED",0xff80b0ff);text(95,379,"BLOCKER RECORDED IN LOG",0xffffffff);}
      text(95,435,"CIRCLE TO RETURN",0xffffffff);
     }
-    text(18,515,"RECONSTRUCTION  GAMEPLAY PENDING",0xffaaaaaa);
+    text(18,515,log?"ITERATION 004  GAMEPLAY PENDING":"ERROR LOG FILE COULD NOT OPEN",log?0xffaaaaaa:0xff8080ff);
     if(stats){char info[48];snprintf(info,sizeof(info),"DRAW FPS %u  CPU US %u",(unsigned)fps,(unsigned)cpu_max);text(18,12,info,0xff80ff80);}
    }else{
     memset(frame,0,bytes);text(48,100,"ARCHIVE LOAD FAILED",0xff8080ff);

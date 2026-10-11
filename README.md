@@ -9,7 +9,8 @@ Se generó localmente pseudocódigo de **30 568 funciones**, incluidos código d
 - [Viabilidad técnica y evidencia](docs/FEASIBILITY.md)
 - [Proyectos relacionados](docs/REFERENCES.md)
 - [Plan de reconstrucción](docs/ROADMAP.md)
-- [Probar el menú animado 00.03 y leer sus logs](docs/ITERATION3.md)
+- [Entrega 004 independiente y logs por sesión](docs/ITERATION4.md)
+- [Cambios del menú animado 003](docs/ITERATION3.md)
 - [Cómo reproducir el análisis](docs/REPRODUCING.md)
 - [Resultados de esta ejecución](docs/STATUS.md)
 - [Compilar y usar el diagnóstico Vita](docs/VITA_DIAGNOSTIC.md)
@@ -32,3 +33,5 @@ Las salidas se guardan en `_local/`: inventario PE/PDB, símbolos, recursos extr
 ## Alcance del repositorio
 
 Se publican herramientas originales, documentación y el diagnóstico Vita. Cada usuario aporta su copia del juego. No se incluyen ejecutables, PDB, gráficos, audio, guardados ni pseudocódigo comercial. La licencia de las herramientas no concede derechos sobre Vagante. Proyecto no afiliado con Nuke Nine.
+
+La entrega actual 004 conserva versiones y logs por sesión: [instrucciones](docs/ITERATION4.md).

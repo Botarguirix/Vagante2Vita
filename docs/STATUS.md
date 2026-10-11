@@ -44,3 +44,9 @@ El usuario confirmó arranque y título en Vita para 00.02. La versión 00.03 in
 Probe C: 2.705 registros íntegros, 22 PNG (5.128.264 bytes RGBA), fotogramas distintos y composición de clases. Test C de transiciones pasa; seis pruebas Python y cuatro rechazos de archivo inválido pasan. Compilación Vita Release completada. Falta prueba física de 00.03 y medición real.
 
 VPK `build-vita/Vagante2Vita-menu.vpk`, SHA-256 `dec545ea0282c9bc02ed92fe0df01e1758fb66335e740ab0b9acfc71300b6cf0`. Instrucciones y lectura del log: [ITERATION3.md](ITERATION3.md).
+
+## Iteración 004: entregas y logs independientes
+
+VPKs 001–003 preservados en artifacts/iteration001, iteration002 e iteration003. Nueva entrega 004 con título VAGV00004, instalable junto a la aplicación anterior. Logs creados con O_EXCL en logs/iteration004, numerados por sesión y sin borrado de anteriores. Test de preservación y navegación pasan; compilación Vita y ZIP/SFO verificados. SHA-256 VPK: d76dcc2da9004b44681f9fad6146da82b5c2d6f4404ef7c52919cc36e3b9014b. Pendiente prueba física 004.
+
+Empaquetador local preserva VPK, snapshot del commit, roadmap, build.log y hashes; rechaza sobrescribir una carpeta de iteración. Ver [ITERATION4.md](ITERATION4.md). No hay cambios de gameplay en esta entrega.
