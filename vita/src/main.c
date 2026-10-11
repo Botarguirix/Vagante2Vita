@@ -41,19 +41,20 @@ static void text(int x,int y,const char *s,uint32_t color){
 }
 static uint32_t background[640*360];
 static void present_background(int reduction){
+ uint32_t row[960];
  memset(frame,0,2*1024*4);memset(frame+542*1024,0,2*1024*4);
  if(reduction==2){
   for(int y=0;y<180;y++){
    uint32_t *dst=frame+(2+y*3)*1024;const uint32_t *src=background+y*320;
-   for(int x=0;x<320;x++)dst[x*3]=dst[x*3+1]=dst[x*3+2]=src[x];
-   memcpy(dst+1024,dst,960*4);memcpy(dst+2048,dst,960*4);
+   for(int x=0;x<320;x++)row[x*3]=row[x*3+1]=row[x*3+2]=src[x];
+   memcpy(dst,row,sizeof(row));memcpy(dst+1024,row,sizeof(row));memcpy(dst+2048,row,sizeof(row));
   }
   return;
  }
  for(int y=0;y<360;y++){
   uint32_t *dst=frame+(2+(y*3+1)/2)*1024;const uint32_t *src=background+y*640;
-  for(int x=0;x<320;x++){dst[x*3]=src[x*2];dst[x*3+1]=src[x*2];dst[x*3+2]=src[x*2+1];}
-  if(!(y&1))memcpy(dst+1024,dst,960*4);
+  for(int x=0;x<320;x++){row[x*3]=src[x*2];row[x*3+1]=src[x*2];row[x*3+2]=src[x*2+1];}
+  memcpy(dst,row,sizeof(row));if(!(y&1))memcpy(dst+1024,row,sizeof(row));
  }
 }
 static unsigned mapped_buttons(unsigned b){
@@ -77,7 +78,7 @@ int main(void){
  mkdir("ux0:data/Vagante2Vita/logs",0777);
  char log_path[256]={0};
  FILE *log=open_session_log("ux0:data/Vagante2Vita/logs/iteration" VAGANTE_ITERATION,log_path,sizeof(log_path));
- if(log){fprintf(log,"LOG path=%s\n",log_path);fprintf(log,"BOOT version=" VAGANTE_VERSION " iteration=" VAGANTE_ITERATION " heap_bytes=%u framebuffer_bytes=%u renderer=software logical=320x180 target_draw_hz=30\n",_newlib_heap_size_user,bytes*2);fprintf(log,"PENDING exact_intro_tween day_night_tints audio unlocks saves world_generation collision gameplay online options\n");fflush(log);}
+ if(log){fprintf(log,"LOG path=%s\n",log_path);fprintf(log,"BOOT version=" VAGANTE_VERSION " iteration=" VAGANTE_ITERATION " heap_bytes=%u framebuffer_bytes=%u renderer=software logical=320x180 target_draw_hz=30 lightweight=1 scenery_cached=1 particles=0\n",_newlib_heap_size_user,bytes*2);fprintf(log,"PENDING exact_intro_tween day_night_tints audio unlocks saves world_generation collision gameplay online options\n");fflush(log);}
  SceUID block=sceKernelAllocMemBlock("VaganteMenu",SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW,(bytes*2+0x3ffff)&~0x3ffff,NULL);
  if(block<0){if(log){fprintf(log,"ERROR framebuffer_alloc code=%d\n",block);fclose(log);}return 1;}
  uint32_t *buffers;
@@ -97,10 +98,10 @@ int main(void){
  else if(log)fprintf(log,"SOURCE archive=menu-only.vra scope=menu_only origin_not_rehashed_on_vita\n");
  if(log){fprintf(log,"LOAD complete=%d load_us=%llu\n",loaded,(unsigned long long)(sceKernelGetSystemTimeWide()-start));fflush(log);}
  Menu menu={0};log_state(log,&menu,0);
- unsigned previous=0;int buffer_index=0,stats=0,display_error=0,reduction=2;
+ unsigned previous=0;int buffer_index=0,stats=0,display_error=0,reduction=2,lightweight=1;
  const char *labels[]={"NEW GAME","PLAY ONLINE","OPTIONS","EXIT GAME"};
- uint64_t last_tick=sceKernelGetSystemTimeWide(),last_draw=0,accumulator=0;
- uint64_t window_start=last_tick,cpu_sum=0,cpu_max=0,compose_sum=0,scale_sum=0;unsigned draws=0;float fps=0;
+ uint64_t last_tick=sceKernelGetSystemTimeWide(),last_draw=0,next_draw=last_tick,accumulator=0;
+ uint64_t window_start=last_tick,cpu_sum=0,cpu_max=0,compose_sum=0,scale_sum=0;unsigned draws=0;uint64_t interval_max=0;float fps=0;
  sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
  for(;;){
   SceCtrlData pad;memset(&pad,0,sizeof(pad));sceCtrlPeekBufferPositive(0,&pad,1);
@@ -109,6 +110,7 @@ int main(void){
   if(!loaded&&(pressed&SCE_CTRL_START))break;
   if(pressed&SCE_CTRL_SELECT)stats=!stats;
   if(pressed&SCE_CTRL_LTRIGGER){reduction=reduction==2?1:2;window_start=sceKernelGetSystemTimeWide();draws=0;cpu_sum=cpu_max=compose_sum=scale_sum=0;if(log){fprintf(log,"PROFILE logical_width=%d logical_height=%d\n",640/reduction,360/reduction);fflush(log);}}
+  if(pressed&SCE_CTRL_RTRIGGER){lightweight=!lightweight;scene_invalidate_cache();if(log){fprintf(log,"QUALITY lightweight=%d scenery_cached=%d particles=%d\n",lightweight,lightweight,!lightweight);fflush(log);}}
   MenuScreen old_screen=menu.screen;int old_cursor=menu.cursor,old_class=menu.player_class;
   if(loaded){
    if(menu.screen==MENU_TITLE&&menu.cursor==3&&(pressed&SCE_CTRL_CROSS))break;
@@ -119,10 +121,11 @@ int main(void){
   accumulator+=delta;
   while(accumulator>=16667){if(loaded)menu_tick(&menu);accumulator-=16667;}
   if(old_screen!=menu.screen||old_cursor!=menu.cursor||old_class!=menu.player_class)log_state(log,&menu,pad.buttons);
-  if(now-last_draw>=33333){
-   last_draw=now;start=sceKernelGetSystemTimeWide();buffer_index^=1;frame=buffers+buffer_index*(bytes/4);
+  if(now>=next_draw){
+   if(last_draw&&now-last_draw>interval_max)interval_max=now-last_draw;
+   last_draw=now;do{next_draw+=33333;}while(next_draw<=now);start=sceKernelGetSystemTimeWide();buffer_index^=1;frame=buffers+buffer_index*(bytes/4);
    if(loaded){
-    draw_scene_resolution(background,&menu,reduction);
+    draw_scene_profile(background,&menu,reduction,lightweight);
     uint64_t compose_end=sceKernelGetSystemTimeWide();compose_sum+=compose_end-start;
     present_background(reduction);scale_sum+=sceKernelGetSystemTimeWide()-compose_end;
     if(menu.screen==MENU_TITLE)for(int i=0;i<4;i++)text(360,290+38*i,labels[i],i==menu.cursor?0xff80ddff:0xffdddddd);
@@ -146,8 +149,8 @@ int main(void){
   now=sceKernelGetSystemTimeWide();
   if(now-window_start>=2000000){
    fps=(float)draws*1000000.0f/(float)(now-window_start);
-   if(log){fprintf(log,"PERF time_us=%llu screen=%s draw_fps=%.2f cpu_avg_us=%llu cpu_max_us=%llu frames=%u tick=%llu caravan_frame=%u logical_width=%d logical_height=%d compose_avg_us=%llu scale_avg_us=%llu\n",(unsigned long long)now,menu_screen_name(menu.screen),fps,(unsigned long long)(draws?cpu_sum/draws:0),(unsigned long long)cpu_max,draws,(unsigned long long)menu.total_ticks,(unsigned)(menu.total_ticks/7)%8,640/reduction,360/reduction,(unsigned long long)(draws?compose_sum/draws:0),(unsigned long long)(draws?scale_sum/draws:0));fflush(log);}
-   window_start=now;draws=0;cpu_sum=0;cpu_max=0;compose_sum=0;scale_sum=0;
+   if(log){fprintf(log,"PERF time_us=%llu screen=%s draw_fps=%.2f cpu_avg_us=%llu cpu_max_us=%llu frames=%u tick=%llu caravan_frame=%u logical_width=%d logical_height=%d compose_avg_us=%llu scale_avg_us=%llu lightweight=%d cache_rebuilds=%u frame_interval_max_us=%llu\n",(unsigned long long)now,menu_screen_name(menu.screen),fps,(unsigned long long)(draws?cpu_sum/draws:0),(unsigned long long)cpu_max,draws,(unsigned long long)menu.total_ticks,(unsigned)(menu.total_ticks/7)%8,640/reduction,360/reduction,(unsigned long long)(draws?compose_sum/draws:0),(unsigned long long)(draws?scale_sum/draws:0),lightweight,scene_cache_rebuilds(),(unsigned long long)interval_max);fflush(log);}
+   window_start=now;draws=0;cpu_sum=0;cpu_max=0;compose_sum=0;scale_sum=0;interval_max=0;
   }
   sceDisplayWaitVblankStart();
  }

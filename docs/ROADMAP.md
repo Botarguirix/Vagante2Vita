@@ -37,3 +37,7 @@ Icono, fondo LiveArea, puerta de inicio y splash integrados; VAGV00006 independi
 ## Estándar desde 007
 
 Mantener TITLE_ID VAGV00006 y nombre Vagante2Vita; incrementar sólo versión/iteración. Una aplicación actualizada en Vita, entregas y logs separados en PC/consola. Ver [ITERATION7.md](ITERATION7.md). Abrir la carpeta de entrega al finalizar cada iteración.
+
+## Medición y avance 008
+
+Los logs físicos de 006 confirman carga de 0,644 s, dibujo de 9,2–9,8 FPS y composición de 69–72 ms más escalado de 23–25 ms. 008 aplica caché de paisaje, animación de sprites y escalado desde RAM; falta medición física. Ver [ITERATION8.md](ITERATION8.md). La siguiente tarea funcional es recuperar INTERMISSION de 40×24 tiles desde rooms.json, resolver el grupo INTRO y sus seis campos por tile; después, colisión, jugador y cámara. [Criterios y funciones pendientes](FIRST_GAMEPLAY.md). El mundo jugable sigue pendiente.

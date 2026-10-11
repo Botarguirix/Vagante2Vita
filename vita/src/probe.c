@@ -25,6 +25,26 @@ int main(int argc,char **argv){
  begin=clock();for(int i=0;i<20;i++)draw_scene_resolution(low,&m,2);
  double low_us=(double)(clock()-begin)*1000000/CLOCKS_PER_SEC/20;
  printf("BENCH host_only=1 high_avg_us=%.0f low_avg_us=%.0f low_matches_decimated_high=1\n",high_us,low_us);
+
+ scene_invalidate_cache();m.total_ticks=0;draw_scene_profile(first,&m,2,1);
+ unsigned builds=scene_cache_rebuilds();m.total_ticks=7;draw_scene_profile(low,&m,2,1);
+ if(scene_cache_rebuilds()!=builds||!memcmp(first,low,320*180*4)){free(low);goto done;}
+ memcpy(first,low,320*180*4);scene_invalidate_cache();draw_scene_profile(low,&m,2,1);
+ if(memcmp(first,low,320*180*4)){free(low);goto done;}
+ begin=clock();for(int i=0;i<200;i++){m.total_ticks++;draw_scene_profile(low,&m,2,1);}
+ double lite_us=(double)(clock()-begin)*1000000/CLOCKS_PER_SEC/200;
+ printf("BENCH host_only=1 lite_avg_us=%.0f cached_animation=1 no_ghosting=1\n",lite_us);
+ m.screen=MENU_CLASS;m.player_class=0;draw_scene_profile(low,&m,2,1);builds=scene_cache_rebuilds();
+ memcpy(first,low,320*180*4);m.player_class=1;draw_scene_profile(low,&m,2,1);
+ if(scene_cache_rebuilds()!=builds+1||!memcmp(first,low,320*180*4)){free(low);goto done;}
+ draw_scene_profile(p,&m,1,1);draw_scene_profile(low,&m,2,1);
+ for(int y=0;y<180;y++)for(int x=0;x<320;x++)if(low[y*320+x]!=p[(y*2)*640+x*2]){free(low);goto done;}
+ snprintf(path,sizeof(path),"%s.lite-classes.ppm",argv[2]);if(!save(path,p)){free(low);goto done;}
+ m.screen=MENU_FADE;m.ticks=89;draw_scene_profile(low,&m,2,1);builds=scene_cache_rebuilds();
+ m.ticks=90;draw_scene_profile(low,&m,2,1);
+ if(scene_cache_rebuilds()!=builds){free(low);goto done;}
+ for(int i=0;i<320*180;i++)if(low[i]!=0xff000000){free(low);goto done;}
+ puts("RENDER lite_class_invalidation=1 lite_resolution_match=1 fade_black=1");
  free(low);
  m.screen=MENU_CLASS;m.player_class=1;draw_animated_scene(p,&m);
  snprintf(path,sizeof(path),"%s.classes.ppm",argv[2]);if(!save(path,p))goto done;

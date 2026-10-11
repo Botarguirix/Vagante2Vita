@@ -9,6 +9,8 @@ Se generó localmente pseudocódigo de **30 568 funciones**, incluidos código d
 - [Viabilidad técnica y evidencia](docs/FEASIBILITY.md)
 - [Proyectos relacionados](docs/REFERENCES.md)
 - [Plan de reconstrucción](docs/ROADMAP.md)
+- [Entrega 008: paisaje en caché y diagnóstico de stuttering](docs/ITERATION8.md)
+- [Primera prueba jugable: zona inicial, colisiones y jugador](docs/FIRST_GAMEPLAY.md)
 - [Entrega 007: actualizar la misma aplicación](docs/ITERATION7.md)
 - [Arte de LiveArea](docs/ITERATION6.md)
 - [Optimización 005: resolución reducida y caché](docs/ITERATION5.md)
@@ -37,4 +39,4 @@ Las salidas se guardan en `_local/`: inventario PE/PDB, símbolos, recursos extr
 
 Se publican herramientas originales, documentación y el diagnóstico Vita. Cada usuario aporta su copia del juego. No se incluyen ejecutables, PDB, gráficos, audio, guardados ni pseudocódigo comercial. La licencia de las herramientas no concede derechos sobre Vagante. Proyecto no afiliado con Nuke Nine.
 
-La entrega actual 004 conserva versiones y logs por sesión: [instrucciones](docs/ITERATION4.md).
+La entrega actual 008 conserva la misma aplicación y separa entregas/logs: [instrucciones](docs/ITERATION8.md).
