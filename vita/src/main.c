@@ -148,6 +148,7 @@ int main(void){
      if(log)fprintf(log,"WORLD_SOURCE directory=%s ready=%d\n",directories[source],world_ready);
     }
     if(world_ready){
+     world_load_entities(&world,"ux0:data/Vagante2Vita/world/intro-entities.vwe",log);
      menu.screen=MENU_WORLD;player.previous=player_buttons(&pad);
      if(log)fprintf(log,"WORLD_START complete=1 class=%d load_us=%llu hp=%d\n",menu.player_class,(unsigned long long)(sceKernelGetSystemTimeWide()-world_start),player.hp);
      /* Loading is not simulation time; do not advance the player during I/O. */

@@ -59,3 +59,6 @@ La entrega actual 013 conserva la misma aplicación y separa entregas/logs: [ins
 
 
 **Entrega vigente: 019.** Selección tras comparaciones locales: ligero por defecto, animado preparado disponible por R. Intro jugable; todavía no juego completo. [Validación e instalación](docs/ITERATION19.md).
+
+
+**Entrega vigente: 020.** Entidades del mundo inicial original cargadas desde `world/intro-entities.vwe`, decorado y atlas animados. Copiar el world externo de la nueva entrega. [Instalación y limitaciones](docs/ITERATION20.md).

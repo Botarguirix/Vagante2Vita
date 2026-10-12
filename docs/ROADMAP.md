@@ -1,3 +1,10 @@
+# Estado vigente: iteración 020
+
+Integradas las 22 entidades de INTRO mediante archivo privado externo. Se
+dibujan antorchas, flores y luciérnagas; marcadores sin Sprite y trofeo sujeto
+ a desbloqueo no se dibujan. Trayectorias, luces e interacciones aún pendientes.
+[Instalación y pruebas](ITERATION20.md). Objetivo completo activo, no alcanzado.
+
 # Estado vigente: iteración 019
 
 Comparados tres perfiles de menú en ambas resoluciones. Perfil preparado nuevo

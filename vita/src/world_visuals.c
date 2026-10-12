@@ -2,11 +2,11 @@
 #include "resources.h"
 #include <stdio.h>
 #include <string.h>
-static Texture terrain,sprites[8];
+static Texture terrain,sprites[8],decor[3];
 static int cached_class=-1;
 static uint32_t terrain_full[640*384],terrain_low[320*192];
 static void pixel(uint32_t *dst,const unsigned char *src);
-void free_world_visuals(void){free_texture(&terrain);for(int i=0;i<8;i++)free_texture(&sprites[i]);cached_class=-1;}
+void free_world_visuals(void){free_texture(&terrain);for(int i=0;i<8;i++)free_texture(&sprites[i]);for(int i=0;i<3;i++)free_texture(&decor[i]);cached_class=-1;}
 int load_world_visuals(const char *directory,int player_class,FILE *log){
  if(player_class<0||player_class>=3)return 0;
  if(cached_class==player_class&&terrain.rgba)return 1;
@@ -28,6 +28,11 @@ int load_world_visuals(const char *directory,int player_class,FILE *log){
  if(!load_png_file(&sprites[7],path,log)||sprites[7].w%24||sprites[7].h%24){
   free_texture(&sprites[7]);if(log)fprintf(log,"WORLD_OPTIONAL hang_sprite=0 fallback=climb\n");
  }
+ const char *props[]={"torch","flower_1","little_firefly"};
+ for(int i=0;i<3;i++){
+  snprintf(path,sizeof(path),"%s/entities/%s.png",directory,props[i]);
+  if(!load_png_file(&decor[i],path,log)){if(log)fprintf(log,"WORLD_OPTIONAL entity_sprite=%s ready=0\n",props[i]);}
+ }
  cached_class=player_class;if(log)fprintf(log,"WORLD_VISUALS ready=1 class=%d terrain_cached=1 dynamic_lights=0\n",player_class);return 1;
  invalid:if(log)fprintf(log,"WORLD_VISUALS ready=0 error=missing_or_invalid_png\n");free_world_visuals();return 0;
 }
@@ -39,8 +44,19 @@ static void pixel(uint32_t *dst,const unsigned char *src){
  unsigned b=(((*dst>>16)&255)*(255-a)+src[2]*a)/255;
  *dst=0xff000000|r|g<<8|b<<16;
 }
+static void draw_prop(uint32_t *p,const Texture *t,int left,int top,int size,unsigned frame,int d,int width,int height){
+ if(!t->rgba||t->w<size||t->h<size)return;
+ int cols=t->w/size,frames=cols*(t->h/size);frame%=frames;
+ int y0=top>0?(top+d-1)/d:0,y1=(top+size-1)/d;
+ int x0=left>0?(left+d-1)/d:0,x1=(left+size-1)/d;
+ if(y1>=height)y1=height-1;if(x1>=width)x1=width-1;
+ for(int y=y0;y<=y1;y++)for(int x=x0;x<=x1;x++){
+  int sy=y*d-top,sx=x*d-left;if(sx<0||sy<0||sx>=size||sy>=size)continue;
+  pixel(&p[y*width+x],t->rgba+4*((frame/cols*size+sy)*t->w+frame%cols*size+sx));
+ }
+}
 void draw_world(uint32_t *p,const World *w,const NativePlayer *player,int reduction){
- (void)w;int d=reduction==2?2:1,width=640/d,height=360/d;
+ int d=reduction==2?2:1,width=640/d,height=360/d;
  int camera=(int)(player->y-180);if(camera<0)camera=0;if(camera>24)camera=24;
  /* Quantize scrolling to logical pixels to preserve nearest-neighbor sampling. */
  camera=camera/d*d;
@@ -48,6 +64,14 @@ void draw_world(uint32_t *p,const World *w,const NativePlayer *player,int reduct
   const uint32_t *cached=d==2?terrain_low:terrain_full;
   memcpy(p,cached+(camera/d)*width,(size_t)width*height*sizeof(*p));
  }else for(int i=0;i<width*height;i++)p[i]=0xff201810;
+ /* Rage markers have no Sprite in setTypeVars; trophy requires saved unlock.
+    Preserve metadata, do not make invisible gameplay markers into fake art. */
+ for(unsigned i=0;i<w->entity_count;i++){
+  const WorldEntity *e=&w->entities[i];
+  if(e->kind==1&&e->subtype==3)draw_prop(p,&decor[0],e->x,e->y-camera,24,0,d,width,height);
+  else if(e->kind==1&&e->subtype==13)draw_prop(p,&decor[1],e->x,e->y-camera,16,player->ticks/5,d,width,height);
+  else if(e->kind==2)draw_prop(p,&decor[2],e->x,e->y-camera,16,player->ticks/8+i,d,width,height);
+ }
  Texture *t=&sprites[player->motion];if(player->motion==PLAYER_HANG&&!t->rgba)t=&sprites[PLAYER_CLIMB];if(!t->rgba)return;
  int cols=t->w/24,frames=cols*(t->h/24);if(frames>8)frames=8;if(frames<1)return;
  unsigned frame=(player->ticks/7)%(unsigned)frames;

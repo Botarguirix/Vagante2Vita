@@ -10,9 +10,19 @@ int main(int argc,char **argv){
  if(argc!=4)return 2;World world;NativePlayer player;memset(&world,0,sizeof(world));
  uint32_t *high=malloc(640*360*4),*first=malloc(640*360*4),*low=malloc(320*180*4);int ok=0;
  if(!high||!first||!low||!world_load(&world,argv[1],stdout))goto done;
+ char entity_path[512];snprintf(entity_path,sizeof(entity_path),"%s/intro-entities.vwe",argv[2]);
+ if(!world_load_entities(&world,entity_path,stdout)||world.entity_count!=22)goto done;
  for(int cls=0;cls<3;cls++){
   if(!load_world_visuals(argv[2],cls,stdout)||!player_spawn(&player,&world,cls))goto done;
   draw_world(first,&world,&player,1);
+  unsigned count=world.entity_count;world.entity_count=0;
+  draw_world(high,&world,&player,1);world.entity_count=count;
+  if(!memcmp(first,high,640*360*4))goto done;
+  NativePlayer still=player;still.motion=PLAYER_RISE;still.ticks=0;
+  draw_world(first,&world,&still,1);still.ticks=8;draw_world(high,&world,&still,1);
+  if(!memcmp(first,high,640*360*4))goto done;
+  draw_world(first,&world,&player,1);
+  printf("WORLD_DECOR class=%d visible_entities_change_image=1 sprite_animation_changed=1 entity_count=%u\n",cls,count);
   for(int i=0;i<90;i++)player_step(&player,&world,PLAYER_RIGHT|(i==20?PLAYER_JUMP:0));
   if(player_overlaps_solid(&player,&world))goto done;
   draw_world(high,&world,&player,1);draw_world(low,&world,&player,2);
