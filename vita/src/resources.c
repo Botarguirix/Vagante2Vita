@@ -76,7 +76,7 @@ int load_resources(const char *path,FILE *log){
   stage="png_decode";unsigned char *encoded=malloc(size);if(!encoded)goto done;
   if(!read_bytes(r,encoded,size)){free(encoded);goto done;}
   int w,h,c;
-  if(!stbi_info_from_memory(encoded,(int)size,&w,&h,&c)||w<1||h<1||w>1024||h>1024){free(encoded);goto done;}
+  if(!stbi_info_from_memory(encoded,(int)size,&w,&h,&c)||w<1||h<1||w>2048||h>2048||(size_t)w*(size_t)h>1048576){free(encoded);goto done;}
   Texture *t=&textures[target];t->rgba=stbi_load_from_memory(encoded,(int)size,&t->w,&t->h,&c,4);free(encoded);
   if(!t->rgba)goto done;
   texture_bytes+=(size_t)t->w*t->h*4;
@@ -99,7 +99,7 @@ int load_png_file(Texture *t,const char *path,FILE *log){
  long size=ftell(f);if(size>4*1024*1024||fseek(f,0,SEEK_SET)){fclose(f);return 0;}
  unsigned char *bytes=malloc((size_t)size);if(!bytes){fclose(f);return 0;}
  if(fread(bytes,1,(size_t)size,f)!=(size_t)size){free(bytes);fclose(f);return 0;}fclose(f);
- int w,h,c;if(!stbi_info_from_memory(bytes,(int)size,&w,&h,&c)||w<1||h<1||w>1024||h>1024){free(bytes);return 0;}
+ int w,h,c;if(!stbi_info_from_memory(bytes,(int)size,&w,&h,&c)||w<1||h<1||w>2048||h>2048||(size_t)w*(size_t)h>1048576){free(bytes);return 0;}
  unsigned char *rgba=stbi_load_from_memory(bytes,(int)size,&w,&h,&c,4);free(bytes);if(!rgba)return 0;
  free_texture(t);t->rgba=rgba;t->w=w;t->h=h;
  if(log)fprintf(log,"WORLD_RESOURCE ready=1 path=%s width=%d height=%d rgba_bytes=%u\n",path,w,h,(unsigned)w*h*4);

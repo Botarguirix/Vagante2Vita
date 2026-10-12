@@ -1,3 +1,11 @@
+# Estado vigente: iteración 024
+
+VWI2 admite dimensiones/entrada/salida variables; cámara horizontal y vertical,
+terreno con caché sin segunda copia completa y comprobación de tamaño por mapa.
+Intro original conservada. ACT_ONE 80×40 probado con fixture local de geometría,
+no ensamblado todavía con habitaciones originales. [Instalación y cobertura](ITERATION24.md).
+Generación, transición y juego completo continúan pendientes.
+
 # Avance de reconstrucción 024 (VPK vigente 023)
 
 Validadas 780 habitaciones originales y reconstruida la comprobación vertical

@@ -17,7 +17,7 @@ int main(int argc,char **argv){
  snprintf(entity_path,sizeof(entity_path),"%s/intro-bow.vwb",argv[2]);
  if(!bow_load(&world.bow,entity_path,stdout))goto done;
  for(int cls=0;cls<3;cls++){
-  if(!load_world_visuals(argv[2],cls,stdout)||!player_spawn(&player,&world,cls))goto done;
+  if(!load_world_visuals(argv[2],cls,&world,stdout)||!player_spawn(&player,&world,cls))goto done;
   draw_world(first,&world,&player,1);
   unsigned count=world.entity_count;world.entity_count=0;
   draw_world(high,&world,&player,1);world.entity_count=count;

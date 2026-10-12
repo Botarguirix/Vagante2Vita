@@ -71,3 +71,6 @@ La entrega actual 013 conserva la misma aplicación y separa entregas/logs: [ins
 
 
 **Entrega vigente: 023.** Rogue carga y dispara su arco con R, consume munición y las flechas colisionan con terreno. Copiar world externo actualizado. Combate con entidades y generación de pisos siguen pendientes. [Instalación y pruebas](docs/ITERATION23.md).
+
+
+**Entrega vigente: 024.** Cargador VWI2 de tamaño variable, cámara en dos ejes y menor duplicación de terreno en memoria. Conserva la intro original; primer piso aún sin ensamblar. [Instalación, pruebas y límites](docs/ITERATION24.md).

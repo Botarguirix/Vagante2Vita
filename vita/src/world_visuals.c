@@ -3,27 +3,32 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <stdlib.h>
 static Texture terrain,sprites[8],decor[3],attack_pose,weapon_atlas,bow_pose,bow_arm,arrow_sprite;
 static int cached_class=-1;
-static uint32_t terrain_full[640*384],terrain_low[320*192];
+static char cached_directory[256];
+static uint32_t *terrain_full,*terrain_low;
 static void pixel(uint32_t *dst,const unsigned char *src);
-void free_world_visuals(void){free_texture(&terrain);free_texture(&attack_pose);free_texture(&weapon_atlas);free_texture(&bow_pose);free_texture(&bow_arm);free_texture(&arrow_sprite);for(int i=0;i<8;i++)free_texture(&sprites[i]);for(int i=0;i<3;i++)free_texture(&decor[i]);cached_class=-1;}
-int load_world_visuals(const char *directory,int player_class,FILE *log){
- if(player_class<0||player_class>=3)return 0;
- if(cached_class==player_class&&terrain.rgba)return 1;
+void free_world_visuals(void){free(terrain_low);terrain_low=NULL;terrain_full=NULL;free_texture(&terrain);free_texture(&attack_pose);free_texture(&weapon_atlas);free_texture(&bow_pose);free_texture(&bow_arm);free_texture(&arrow_sprite);for(int i=0;i<8;i++)free_texture(&sprites[i]);for(int i=0;i<3;i++)free_texture(&decor[i]);cached_class=-1;cached_directory[0]=0;}
+int load_world_visuals(const char *directory,int player_class,const World *world,FILE *log){
+ if(player_class<0||player_class>=3||!world->ready||strlen(directory)>=sizeof(cached_directory))return 0;
+ if(cached_class==player_class&&terrain.rgba&&!strcmp(cached_directory,directory)&&terrain.w==world->width*16&&terrain.h==world->height*16)return 1;
  free_world_visuals();char path[256];
  snprintf(path,sizeof(path),"%s/intro-terrain.png",directory);
- if(!load_png_file(&terrain,path,log)||terrain.w!=640||terrain.h!=384)goto invalid;
+ if(!load_png_file(&terrain,path,log)||terrain.w!=world->width*16||terrain.h!=world->height*16)goto invalid;
  const char *classes[]={"knight","rogue","mage"};
  const char *names[]={"stand","walk","jump","fall","duck","climb","lookup"};
  for(int i=0;i<7;i++){
   snprintf(path,sizeof(path),"%s/%s/%s.png",directory,classes[player_class],names[i]);
   if(!load_png_file(&sprites[i],path,log)||sprites[i].w%24||sprites[i].h%24)goto invalid;
  }
- for(int y=0;y<384;y++)for(int x=0;x<640;x++){
-  uint32_t color=0xff201810;pixel(&color,terrain.rgba+4*(y*640+x));
-  terrain_full[y*640+x]=color;
-  if(!(x&1)&&!(y&1))terrain_low[y/2*320+x/2]=color;
+ /* Reuse decoded RGBA storage for opaque terrain, avoiding a second full map. */
+ terrain_full=(uint32_t *)terrain.rgba;
+ terrain_low=malloc((size_t)(terrain.w/2)*(terrain.h/2)*sizeof(*terrain_low));if(!terrain_low)goto invalid;
+ for(int y=0;y<terrain.h;y++)for(int x=0;x<terrain.w;x++){
+  uint32_t color=0xff201810;pixel(&color,terrain.rgba+4*(y*terrain.w+x));
+  terrain_full[y*terrain.w+x]=color;
+  if(!(x&1)&&!(y&1))terrain_low[y/2*(terrain.w/2)+x/2]=color;
  }
  snprintf(path,sizeof(path),"%s/%s/hang.png",directory,classes[player_class]);
  if(!load_png_file(&sprites[7],path,log)||sprites[7].w%24||sprites[7].h%24){
@@ -46,7 +51,7 @@ int load_world_visuals(const char *directory,int player_class,FILE *log){
   snprintf(path,sizeof(path),"%s/entities/dart.png",directory);
   if(!load_png_file(&arrow_sprite,path,log)||arrow_sprite.w!=16||arrow_sprite.h!=16)free_texture(&arrow_sprite);
  }
- cached_class=player_class;if(log)fprintf(log,"WORLD_VISUALS ready=1 class=%d terrain_cached=1 dynamic_lights=0\n",player_class);return 1;
+ cached_class=player_class;strcpy(cached_directory,directory);if(log)fprintf(log,"WORLD_VISUALS ready=1 class=%d terrain_cached=1 dynamic_lights=0\n",player_class);return 1;
  invalid:if(log)fprintf(log,"WORLD_VISUALS ready=0 error=missing_or_invalid_png\n");free_world_visuals();return 0;
 }
 static void pixel(uint32_t *dst,const unsigned char *src){
@@ -90,41 +95,46 @@ static void draw_rotated(uint32_t *p,const Texture *t,int cell,unsigned frame,fl
   pixel(&p[y*width+x],t->rgba+4*(ay*t->w+ax));
  }
 }
-static void draw_equipment(uint32_t *p,const NativePlayer *player,int camera,int d,int width,int height){
+static void draw_equipment(uint32_t *p,const NativePlayer *player,WorldCamera camera,int d,int width,int height){
  const MeleeFrame *k=melee_frame(&player->melee);const MeleeDefinition *weapon=player->melee.definition;
  if(k){
   float flip=player->facing<0?-1.0f:1.0f;
-  draw_rotated(p,&weapon_atlas,20,weapon->sprite,player->x+player->w*0.5f+flip*k->x,player->y+player->h+k->y-camera,k->degrees*0.0174532925199433f,player->facing,k->scale_x,k->scale_y,weapon->anchor_x,weapon->anchor_y,d,width,height);
+  draw_rotated(p,&weapon_atlas,20,weapon->sprite,player->x+player->w*0.5f+flip*k->x-camera.x,player->y+player->h+k->y-camera.y,k->degrees*0.0174532925199433f,player->facing,k->scale_x,k->scale_y,weapon->anchor_x,weapon->anchor_y,d,width,height);
  }
  if(player->bow.active){
   const BowDefinition *b=player->bow.definition;const BowFrame *frame=&b->frames[player->bow.keyframe];
   float angle=player->bow.angle,c=cosf(angle),s=sinf(angle),flip=player->bow.facing<0?-1.0f:1.0f;
-  float cx=player->x+player->w*0.5f,bottom=player->y+player->h-camera;
+  float cx=player->x+player->w*0.5f-camera.x,bottom=player->y+player->h-camera.y;
   draw_rotated(p,&bow_arm,24,0,cx+flip*frame->aim_x,bottom+frame->aim_y,angle,player->bow.facing,1,1,b->arm_x,b->arm_y,d,width,height);
   float ox=cx+flip*(frame->aim_x+c*frame->x-s*frame->y),oy=bottom+frame->aim_y+s*frame->x+c*frame->y;
   draw_rotated(p,&weapon_atlas,20,b->sprite,ox,oy,angle+frame->degrees*0.0174532925199433f,player->bow.facing,frame->scale_x,frame->scale_y,b->anchor_x,b->anchor_y,d,width,height);
  }
  for(unsigned i=0;i<ARROW_LIMIT;i++){
   const NativeArrow *a=&player->arrows.arrows[i];if(!a->active)continue;
-  draw_rotated(p,&arrow_sprite,16,0,a->x,a->y-camera,a->angle,a->facing,1,1,0.75f,0.5f,d,width,height);
+  draw_rotated(p,&arrow_sprite,16,0,a->x-camera.x,a->y-camera.y,a->angle,a->facing,1,1,0.75f,0.5f,d,width,height);
  }
 }
 void draw_world(uint32_t *p,const World *w,const NativePlayer *player,int reduction){
  int d=reduction==2?2:1,width=640/d,height=360/d;
- int camera=(int)(player->y-180);if(camera<0)camera=0;if(camera>24)camera=24;
- /* Quantize scrolling to logical pixels to preserve nearest-neighbor sampling. */
- camera=camera/d*d;
- if(terrain.rgba){
-  const uint32_t *cached=d==2?terrain_low:terrain_full;
-  memcpy(p,cached+(camera/d)*width,(size_t)width*height*sizeof(*p));
- }else for(int i=0;i<width*height;i++)p[i]=0xff201810;
+ WorldCamera camera=world_camera(w,player->x+player->w*0.5f,player->y);
+ /* Copy visible rows only; cache dimensions belong to the loaded terrain. */
+ for(int y=0;y<height;y++){
+  int sy=y*d+camera.y;
+  uint32_t *row=p+y*width;
+  int available=(terrain.w-camera.x)/d;if(available>width)available=width;
+  if(terrain_full&&sy<terrain.h&&available>0){
+   const uint32_t *cached=d==2?terrain_low:terrain_full;
+   memcpy(row,cached+(sy/d)*(terrain.w/d)+camera.x/d,(size_t)available*sizeof(*row));
+  }else available=0;
+  if(available<0)available=0;for(int x=available;x<width;x++)row[x]=0xff201810;
+ }
  /* Rage markers have no Sprite in setTypeVars; trophy requires saved unlock.
     Preserve metadata, do not make invisible gameplay markers into fake art. */
  for(unsigned i=0;i<w->entity_count;i++){
   const WorldEntity *e=&w->entities[i];
-  if(e->kind==1&&e->subtype==3)draw_prop(p,&decor[0],e->x,e->y-camera,24,0,d,width,height);
-  else if(e->kind==1&&e->subtype==13)draw_prop(p,&decor[1],e->x,e->y-camera,16,player->ticks/5,d,width,height);
-  else if(e->kind==2)draw_prop(p,&decor[2],e->x,e->y-camera,16,player->ticks/8+i,d,width,height);
+  if(e->kind==1&&e->subtype==3)draw_prop(p,&decor[0],e->x-camera.x,e->y-camera.y,24,0,d,width,height);
+  else if(e->kind==1&&e->subtype==13)draw_prop(p,&decor[1],e->x-camera.x,e->y-camera.y,16,player->ticks/5,d,width,height);
+  else if(e->kind==2)draw_prop(p,&decor[2],e->x-camera.x,e->y-camera.y,16,player->ticks/8+i,d,width,height);
  }
  Texture *t=&sprites[player->motion];if(player->motion==PLAYER_HANG&&!t->rgba)t=&sprites[PLAYER_CLIMB];
  const MeleeFrame *attack=melee_frame(&player->melee);if(attack&&attack_pose.rgba)t=&attack_pose;
@@ -136,7 +146,7 @@ void draw_world(uint32_t *p,const World *w,const NativePlayer *player,int reduct
  if(attack&&t==&attack_pose)frame=attack->sprite;
  if(player->bow.active&&t==&bow_pose)frame=player->bow.definition->frames[player->bow.keyframe].sprite;
  if(frame>=(unsigned)(cols*(t->h/24)))frame=(unsigned)(cols*(t->h/24))-1;
- int left=(int)player->x-8,top=(int)(player->y+player->h)-24-camera;
+ int left=(int)player->x-8-camera.x,top=(int)(player->y+player->h)-24-camera.y;
  int y0=top>0?(top+d-1)/d:0,y1=(top+23)/d;
  int x0=left>0?(left+d-1)/d:0,x1=(left+23)/d;
  if(y1>=height)y1=height-1;if(x1>=width)x1=width-1;

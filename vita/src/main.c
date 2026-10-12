@@ -137,7 +137,7 @@ int main(void){
     int world_ready=0;
     for(unsigned source=0;source<1&&!world_ready;source++){
      char packet[128];snprintf(packet,sizeof(packet),"%s/intro-world.vwi",directories[source]);
-     world_ready=world_load(&world,packet,log)&&load_world_visuals(directories[source],menu.player_class,log)&&player_spawn(&player,&world,menu.player_class);
+     world_ready=world_load(&world,packet,log)&&load_world_visuals(directories[source],menu.player_class,&world,log)&&player_spawn(&player,&world,menu.player_class);
      if(log)fprintf(log,"WORLD_SOURCE directory=%s ready=%d\n",directories[source],world_ready);
     }
     if(world_ready){
