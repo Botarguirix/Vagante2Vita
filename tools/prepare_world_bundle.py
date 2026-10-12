@@ -10,6 +10,7 @@ def main():
     p.add_argument("terrain",type=Path)
     p.add_argument("output",type=Path)
     p.add_argument("--intro-metadata",type=Path,help="Private original INTRO metadata including entities")
+    p.add_argument("--attacks",type=Path,help="Private original attacks.json for base melee")
     args=p.parse_args()
     sources={"intro-world.vwi":args.packet,"intro-terrain.png":args.terrain}
     for cls in ("knight","rogue","mage"):
@@ -19,6 +20,10 @@ def main():
         for name in ("torch","flower_1"):
             sources[f"entities/{name}.png"]=args.assets/"gfx"/"doodads"/(name+".png")
         sources["entities/little_firefly.png"]=args.assets/"gfx/scenes/intro/entities/little_firefly.png"
+    if args.attacks:
+        sources["items-weapons.png"]=args.assets/"gfx/items/items-weapons.png"
+        for cls in ("knight","rogue","mage"):
+            sources[f"{cls}/stab.png"]=args.assets/"gfx/classes"/cls/"1/stab.png"
     for src in sources.values():
         if not src.is_file():raise FileNotFoundError(src)
     args.output.mkdir(parents=True,exist_ok=False)
@@ -38,6 +43,11 @@ def main():
             packet.extend(struct.pack("<BBhhH",kind,subtype,e["x"],e["y"],0))
         (args.output/"intro-entities.vwe").write_bytes(packet)
         manifest["intro-entities.vwe"]={"bytes":len(packet),"sha256":hashlib.sha256(packet).hexdigest()}
+    if args.attacks:
+        from prepare_melee import encode
+        packet=encode(args.attacks)
+        (args.output/"intro-melee.vwa").write_bytes(packet)
+        manifest["intro-melee.vwa"]={"bytes":len(packet),"sha256":hashlib.sha256(packet).hexdigest(),"source_sha256":hashlib.sha256(args.attacks.read_bytes()).hexdigest()}
     (args.output/"manifest.json").write_text(json.dumps(manifest,indent=2)+"\n",encoding="utf-8")
     print(args.output)
 

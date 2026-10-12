@@ -65,3 +65,6 @@ La entrega actual 013 conserva la misma aplicación y separa entregas/logs: [ins
 
 
 **Entrega vigente: 021.** SELECT muestra estadísticas derivadas, equipo base y habilidades iniciales. Ficha consultable; combate/equipo funcional aún pendientes. [Controles y validación](docs/ITERATION21.md).
+
+
+**Entrega vigente: 022.** Cuadrado ejecuta la secuencia de estocada original, personaje/arma y geometría de impacto. Copiar world externo actualizado. Daño a entidades y efectos/proyectiles aún pendientes. [Instalación y pruebas](docs/ITERATION22.md).

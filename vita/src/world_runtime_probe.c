@@ -12,6 +12,8 @@ int main(int argc,char **argv){
  if(!high||!first||!low||!world_load(&world,argv[1],stdout))goto done;
  char entity_path[512];snprintf(entity_path,sizeof(entity_path),"%s/intro-entities.vwe",argv[2]);
  if(!world_load_entities(&world,entity_path,stdout)||world.entity_count!=22)goto done;
+ snprintf(entity_path,sizeof(entity_path),"%s/intro-melee.vwa",argv[2]);
+ if(!melee_load(&world.melee,entity_path,stdout)||world.melee.count!=3)goto done;
  for(int cls=0;cls<3;cls++){
   if(!load_world_visuals(argv[2],cls,stdout)||!player_spawn(&player,&world,cls))goto done;
   draw_world(first,&world,&player,1);
@@ -28,7 +30,17 @@ int main(int argc,char **argv){
   draw_world(high,&world,&player,1);draw_world(low,&world,&player,2);
   if(!memcmp(high,first,640*360*4))goto done;
   for(int y=0;y<180;y++)for(int x=0;x<320;x++)if(low[y*320+x]!=high[y*2*640+x*2])goto done;
-  if(cls==0&&!save(argv[3],high))goto done;
+  unsigned active=0,hit=0;
+  for(int step=0;step<80;step++){
+   player_step(&player,&world,step<14?PLAYER_ATTACK:0);
+   const MeleeFrame *key=melee_frame(&player.melee);if(!key)continue;
+   active++;if(key->enabled)hit++;
+   draw_world(high,&world,&player,1);draw_world(low,&world,&player,2);
+   for(int y=0;y<180;y++)for(int x=0;x<320;x++)if(low[y*320+x]!=high[y*2*640+x*2])goto done;
+   if(cls==0&&key->enabled&&!save(argv[3],high))goto done;
+  }
+  if(!active||!hit||player.melee.active||player.melee.serial!=1)goto done;
+  printf("WORLD_MELEE class=%d active_steps=%u hit_steps=%u serial=%u completed=1 resolution_match=1\n",cls,active,hit,player.melee.serial);
   printf("WORLD_RUNTIME class=%d motion=%s x=%.3f y=%.3f hp=%d animation_changed=1 resolution_match=1\n",cls,player_motion_name(player.motion),player.x,player.y,player.hp);
  }
  ok=1;

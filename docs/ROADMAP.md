@@ -1,3 +1,10 @@
+# Estado vigente: iteración 022
+
+Ataque base player-stab ejecutable con Cuadrado, datos externos originales,
+animación de personaje/arma y polígonos activos. Rod incluye retención de carga;
+aplicación de daño, efecto mágico y combate con entidades todavía pendientes.
+[Instalación y cobertura](ITERATION22.md). Objetivo completo aún no alcanzado.
+
 # Estado vigente: iteración 021
 
 Estadísticas derivadas intrínsecas y equipo/skills iniciales recuperados. SELECT

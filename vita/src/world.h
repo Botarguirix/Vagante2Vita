@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <stdio.h>
+#include "melee.h"
 #define WORLD_WIDTH 40
 #define WORLD_HEIGHT 24
 #define WORLD_TILE_SIZE 16
@@ -10,6 +11,7 @@ typedef struct {int8_t type;int16_t layers[5];uint8_t solid,platform,faces;} Wor
 typedef struct {uint8_t kind,subtype;int16_t x,y;} WorldEntity;
 #define WORLD_ENTITY_LIMIT 64
 typedef struct {
+ MeleeDatabase melee;
  WorldEntity entities[WORLD_ENTITY_LIMIT];unsigned entity_count;
  WorldTile tiles[WORLD_TILE_COUNT];
  int width,height,open_sky,open_left,open_right,ready;

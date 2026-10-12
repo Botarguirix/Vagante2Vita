@@ -55,6 +55,7 @@ int player_spawn(NativePlayer *p,const World *w,int player_class){
  next.x=(float)(w->entrance_x*16)+4;next.y=(float)(w->entrance_y*16)+16-next.h;
  player_derive_stats(&next.stats,&next.derived);
  if(!player_starting_loadout(player_class,&next.loadout))return 0;
+ next.melee.definition=melee_find(&w->melee,(unsigned)next.loadout.items[0].type);
  next.max_hp=next.derived.max_hp;next.hp=next.max_hp;
  if(player_overlaps_solid(&next,w))return 0;
  *p=next;return 1;
@@ -95,6 +96,8 @@ void player_step(NativePlayer *p,const World *w,unsigned input){
   else if(input&PLAYER_DOWN){p->hanging=0;p->hang_cooldown=12;}
   else {if(input&PLAYER_UP)mantle(p,w);return;}
  }
+ if((pressed&PLAYER_ATTACK)&&!p->hanging&&!p->on_ladder&&!p->ducking)melee_start(&p->melee,p->melee.definition,p->derived.attack_speed_bonus,p->facing);
+ melee_step(&p->melee,!!(input&PLAYER_ATTACK));
  int dir=!!(input&PLAYER_RIGHT)-!!(input&PLAYER_LEFT);
  int touching_ladder=ladder(p,w);
  if((input&(PLAYER_UP|PLAYER_DOWN))&&touching_ladder&&!p->ducking)p->on_ladder=1;
@@ -117,7 +120,8 @@ void player_step(NativePlayer *p,const World *w,unsigned input){
  if(p->on_ladder)p->vy=(float)(!!(input&PLAYER_DOWN)-!!(input&PLAYER_UP))*1.4f;
  else {p->vy+=0.16f;if(p->vy>8)p->vy=8;}
  p->on_ground=0;axis_move(p,w,p->vx,0);axis_move(p,w,p->vy,1);
- try_ledge(p,w,dir);
+ if(!p->melee.active)try_ledge(p,w,dir);
+ p->melee.facing=p->facing;
  if(p->hanging)p->motion=PLAYER_HANG;
  else if(p->on_ladder)p->motion=PLAYER_CLIMB;
  else if(p->ducking)p->motion=PLAYER_DUCK;

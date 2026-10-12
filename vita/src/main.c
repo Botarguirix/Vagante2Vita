@@ -56,6 +56,7 @@ static unsigned player_buttons(const SceCtrlData *pad){
  if(b&SCE_CTRL_DOWN)result|=PLAYER_DOWN;
  if(b&SCE_CTRL_CROSS)result|=PLAYER_JUMP;
  if(b&SCE_CTRL_LTRIGGER)result|=PLAYER_SLOW;
+ if(b&SCE_CTRL_SQUARE)result|=PLAYER_ATTACK;
  return result;
 }
 static void log_state(FILE *log,const Menu *m,unsigned b){
@@ -139,6 +140,8 @@ int main(void){
      if(log)fprintf(log,"WORLD_SOURCE directory=%s ready=%d\n",directories[source],world_ready);
     }
     if(world_ready){
+     melee_load(&world.melee,"ux0:data/Vagante2Vita/world/intro-melee.vwa",log);
+     player.melee.definition=melee_find(&world.melee,(unsigned)player.loadout.items[0].type);
      world_load_entities(&world,"ux0:data/Vagante2Vita/world/intro-entities.vwe",log);
      menu.screen=MENU_WORLD;character=0;player.previous=player_buttons(&pad);
      if(log)fprintf(log,"WORLD_START complete=1 class=%d load_us=%llu hp=%d\n",menu.player_class,(unsigned long long)(sceKernelGetSystemTimeWide()-world_start),player.hp);
@@ -155,10 +158,18 @@ int main(void){
   uint64_t now=sceKernelGetSystemTimeWide(),delta=now-last_tick;last_tick=now;
   if(delta>250000){if(log)fprintf(log,"WARN slow_loop_us=%llu\n",(unsigned long long)delta);delta=250000;}
   accumulator+=delta;
+  unsigned old_attack_serial=player.melee.serial,old_attack_frame=player.melee.keyframe,old_attack_active=player.melee.active;
   PlayerMotion old_motion=player.motion;unsigned old_input=player.previous;
   while(accumulator>=16667){if(loaded){menu_tick(&menu);if(menu.screen==MENU_WORLD&&!paused&&!character)player_step(&player,&world,player_buttons(&pad));}accumulator-=16667;}
   if(log&&menu.screen==MENU_WORLD&&(old_motion!=player.motion||old_input!=player.previous)){
    fprintf(log,"PLAYER_EVENT tick=%u motion=%s input=%u x=%.3f y=%.3f vx=%.3f vy=%.3f contacts=%u\n",player.ticks,player_motion_name(player.motion),player.previous,player.x,player.y,player.vx,player.vy,player.contacts);
+  }
+  if(log&&menu.screen==MENU_WORLD&&!paused&&!character){
+   if(old_attack_serial!=player.melee.serial||old_attack_frame!=player.melee.keyframe||old_attack_active!=player.melee.active){
+    const MeleeFrame *key=melee_frame(&player.melee);
+    fprintf(log,"MELEE_EVENT serial=%u active=%u keyframe=%u timer=%u shape_active=%u charge_ticks=%u type=%u\n",player.melee.serial,player.melee.active,player.melee.keyframe,player.melee.timer,key?key->enabled:0,player.melee.charge_ticks,player.melee.definition?player.melee.definition->type:0);
+   }
+   if((player.previous&PLAYER_ATTACK)&&!(old_input&PLAYER_ATTACK)&&!player.melee.definition)fprintf(log,"MELEE_BLOCKED reason=missing_external_data\n");
   }
   if(old_screen!=menu.screen||old_cursor!=menu.cursor||old_class!=menu.player_class)log_state(log,&menu,pad.buttons);
   if(now>=next_draw){
@@ -170,7 +181,7 @@ int main(void){
     if(menu.screen==MENU_WORLD){
      char info[64];snprintf(info,sizeof(info),"HP %d OF %d  STR %d DEX %d VIT %d",player.hp,player.max_hp,player.stats.strength,player.stats.dexterity,player.stats.vitality);text(18,42,info,0xff80ddff);
      snprintf(info,sizeof(info),"SPD %d STA %d INT %d LUK %d",player.stats.speed,player.stats.stamina,player.stats.intelligence,player.stats.luck);text(18,75,info,0xffffffff);
-     text(18,475,paused?"PAUSED START TO RESUME":"X JUMP UP CLIMB DOWN DROP",0xffffffff);
+     text(18,475,paused?"PAUSED START TO RESUME":"SQUARE MELEE X JUMP UP CLIMB",0xffffffff);
      text(18,515,"SELECT CHARACTER O RESET TRIANGLE RETURN",0xffaaaaaa);
     }
     if(menu.screen==MENU_WORLD&&character)draw_character_panel(frame,&player,character_page);

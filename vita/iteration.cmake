@@ -2,5 +2,5 @@
 set(VITA_TITLEID "VAGV00006")
 set(VITA_APP_NAME "Vagante2Vita")
 # Change only iteration/version for subsequent updates.
-set(VAGANTE_ITERATION "021")
-set(VITA_VERSION "00.21")
+set(VAGANTE_ITERATION "022")
+set(VITA_VERSION "00.22")
