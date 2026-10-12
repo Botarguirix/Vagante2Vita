@@ -32,3 +32,47 @@ mapas de otros tamaños, cámara y recursos por acto antes de conectar un piso
 completo. Hay que conservar un caso determinista con semilla y validar
 conectividad/spawn/salida. Esta recuperación de rutas no implica que los
 pisos estén implementados ni que una galería de habitaciones sea generación.
+
+## Recuperación 024: dimensiones y conectividad de habitaciones
+
+Level::Level 0x00646c70 distingue roomW/roomH de widthOfSingleRoom y
+heightOfSingleRoom: w = roomW * widthOfSingleRoom y h = roomH * heightOfSingleRoom.
+generateLevel inicia ACT_ONE con cuadrícula 8×5 y rooms.json aporta 10×8 tiles
+por habitación: 80×40 tiles, 1280×640 píxeles de terreno. Por tanto el cargador
+actual 40×24 no puede sustituirlo sin ampliar tamaño, cámara y caché.
+
+Room::getRoomTypeBasedOnFlags 0x00756f00 confirma tamaño doble: bit 0x2000
+para ancho y 0x1000 para alto. Room::load 0x007579d0 multiplica las dimensiones
+por esas cantidades. Se validaron las 780 habitaciones de los 12 actos/grupos,
+incluyendo entidades originales conservadas en la fuente privada. La nueva
+herramienta no exporta ni modifica entidades ni monta pisos.
+
+RoomDatabase::roomsFitVertically 0x0075eb90 se reconstruye como predicado
+geométrico en tools/room_connectivity.py: compara salida inferior y entrada
+superior, acceso desde escalera/plataforma o escalón lateral, espacio libre y
+apoyo en la habitación inferior. Usa tipo 1 en sus pruebas de sólido, tal como
+la función recuperada; no sustituir por world_solid (tipos 1 y 7). Es direccional,
+no una prueba de mera coincidencia de huecos. randomizeRooms 0x0075ed40 invoca
+esta función para habitaciones cuyo enlace UP (bit 2) está activo; DOWN es bit 8.
+
+El informe privado _local/generation024/room-connectivity.json incluye pares
+compatibles, hash de rooms.json y conteos por acto. ACT_ONE: 287 habitaciones;
+19 035 pares simples con enlaces DOWN/UP, 16 119 aceptados por la geometría.
+No incluye casos de habitaciones dobles, conectividad horizontal, selección
+ponderada/frecuencias, consumo RNG ni recorribilidad global. No equivale a
+paridad física con PC: requiere contraste del ensamblado y recorridos reales.
+
+Comando reproducible (después de extraer la copia del usuario):
+
+```powershell
+python tools/room_connectivity.py _local/assets/rooms.json --output _local/generation024/room-connectivity.json
+python -m unittest discover -s tests -v
+```
+
+Seis pruebas nuevas cubren dirección, escalera/plataforma, escalón, espacio
+libre, apoyo vecino, bordes cerrados, dimensiones y campos inválidos; pasan las
+12 pruebas Python incluyendo las seis del archivo. No cambió el ejecutable de
+Vita: el VPK vigente sigue siendo 023, y no se presenta un VPK idéntico como
+una nueva versión jugable. El siguiente cambio de runtime debe admitir 80×40
+sin inflar toda la caché a escala de actos futuros, y después conectar el
+ensamblado de habitaciones y la transición de INTRO preservando personaje.

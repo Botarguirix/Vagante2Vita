@@ -1,3 +1,10 @@
+# Avance de reconstrucción 024 (VPK vigente 023)
+
+Validadas 780 habitaciones originales y reconstruida la comprobación vertical
+de enlaces simples. Primer piso ACT_ONE: cuadrícula 8×5 de habitaciones 10×8,
+80×40 tiles. Cargador/cámara, ensamblado, RNG e interacciones siguen pendientes.
+[Datos recuperados y comandos](GENERATION_RECOVERY.md). No hay nuevo VPK aún.
+
 # Estado vigente: iteración 023
 
 Arco de Rogue con carga, apuntado discreto, disparo, munición y colisión de
