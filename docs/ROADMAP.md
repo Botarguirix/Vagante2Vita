@@ -1,3 +1,10 @@
+# Estado vigente: iteración 021
+
+Estadísticas derivadas intrínsecas y equipo/skills iniciales recuperados. SELECT
+abre ficha consultable de tres páginas con física detenida. No ejecuta combate
+ni reemplaza inventario/menús originales completos. Recursos externos iguales a 020.
+[Instalación y validación](ITERATION21.md). [Auditoría: objetivo aún incompleto](GOAL_AUDIT21.md).
+
 # Estado vigente: iteración 020
 
 Integradas las 22 entidades de INTRO mediante archivo privado externo. Se

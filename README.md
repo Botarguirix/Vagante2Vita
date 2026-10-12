@@ -62,3 +62,6 @@ La entrega actual 013 conserva la misma aplicación y separa entregas/logs: [ins
 
 
 **Entrega vigente: 020.** Entidades del mundo inicial original cargadas desde `world/intro-entities.vwe`, decorado y atlas animados. Copiar el world externo de la nueva entrega. [Instalación y limitaciones](docs/ITERATION20.md).
+
+
+**Entrega vigente: 021.** SELECT muestra estadísticas derivadas, equipo base y habilidades iniciales. Ficha consultable; combate/equipo funcional aún pendientes. [Controles y validación](docs/ITERATION21.md).

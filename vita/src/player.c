@@ -53,7 +53,9 @@ int player_spawn(NativePlayer *p,const World *w,int player_class){
  if(!w->ready||!starting_stats(player_class,&next.stats))return 0;
  next.player_class=player_class;next.facing=1;next.w=8;next.h=12;
  next.x=(float)(w->entrance_x*16)+4;next.y=(float)(w->entrance_y*16)+16-next.h;
- next.max_hp=50+next.stats.vitality*10;next.hp=next.max_hp;
+ player_derive_stats(&next.stats,&next.derived);
+ if(!player_starting_loadout(player_class,&next.loadout))return 0;
+ next.max_hp=next.derived.max_hp;next.hp=next.max_hp;
  if(player_overlaps_solid(&next,w))return 0;
  *p=next;return 1;
 }
@@ -105,7 +107,7 @@ void player_step(NativePlayer *p,const World *w,unsigned input){
   p->y-=6;p->h=12;
   if(player_overlaps_solid(p,w)){p->y+=6;p->h=6;}else p->ducking=0;
  }
- float limit=1.4f+(float)p->stats.speed*0.1f;
+ float limit=p->derived.move_speed;
  if(p->ducking||(input&PLAYER_SLOW))limit*=0.5f;
  if(dir){p->facing=dir;p->vx+=(float)dir*(p->on_ground?0.3f:0.2f);}
  else p->vx*=0.8f;
