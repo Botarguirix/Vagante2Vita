@@ -56,6 +56,7 @@ int player_spawn(NativePlayer *p,const World *w,int player_class){
  player_derive_stats(&next.stats,&next.derived);
  if(!player_starting_loadout(player_class,&next.loadout))return 0;
  next.melee.definition=melee_find(&w->melee,(unsigned)next.loadout.items[0].type);
+ if(player_class==1&&w->bow.ready)next.bow.definition=&w->bow;
  next.max_hp=next.derived.max_hp;next.hp=next.max_hp;
  if(player_overlaps_solid(&next,w))return 0;
  *p=next;return 1;
@@ -87,6 +88,7 @@ static int mantle(NativePlayer *p,const World *w){
  next.hang_cooldown=12;*p=next;return 1;
 }
 void player_step(NativePlayer *p,const World *w,unsigned input){
+ arrows_step(&p->arrows,w);
  unsigned pressed=input&~p->previous,released=p->previous&~input;p->previous=input;p->ticks++;p->contacts=0;
  if(p->drop_ticks)p->drop_ticks--;
  if(p->hang_cooldown)p->hang_cooldown--;
@@ -96,16 +98,25 @@ void player_step(NativePlayer *p,const World *w,unsigned input){
   else if(input&PLAYER_DOWN){p->hanging=0;p->hang_cooldown=12;}
   else {if(input&PLAYER_UP)mantle(p,w);return;}
  }
- if((pressed&PLAYER_ATTACK)&&!p->hanging&&!p->on_ladder&&!p->ducking)melee_start(&p->melee,p->melee.definition,p->derived.attack_speed_bonus,p->facing);
+ int dir=!!(input&PLAYER_RIGHT)-!!(input&PLAYER_LEFT);if(dir)p->facing=dir;
+ if((pressed&PLAYER_ATTACK)&&!p->bow.active&&!p->hanging&&!p->on_ladder&&!p->ducking)melee_start(&p->melee,p->melee.definition,p->derived.attack_speed_bonus,p->facing);
  melee_step(&p->melee,!!(input&PLAYER_ATTACK));
- int dir=!!(input&PLAYER_RIGHT)-!!(input&PLAYER_LEFT);
+ StartingItem *ammo=NULL;
+ for(unsigned i=0;i<p->loadout.item_count;i++)if(p->loadout.items[i].type==3)ammo=&p->loadout.items[i];
+ if((pressed&PLAYER_RANGE)&&!p->melee.active&&!p->hanging&&!p->on_ladder&&!p->ducking)
+  bow_start(&p->bow,p->bow.definition,p->derived.attack_speed_bonus,p->facing,ammo?ammo->quantity:0);
+ BowState shot=p->bow;int fire=0;
+ if(p->bow.active){
+  p->bow.facing=p->facing;p->bow.angle=((input&PLAYER_UP)?-0.785398163f:(input&PLAYER_DOWN)?0.785398163f:0);
+  shot=p->bow;fire=bow_step(&p->bow,!!(input&PLAYER_RANGE));
+ }
  int touching_ladder=ladder(p,w);
- if((input&(PLAYER_UP|PLAYER_DOWN))&&touching_ladder&&!p->ducking)p->on_ladder=1;
+ if(!p->bow.active&&(input&(PLAYER_UP|PLAYER_DOWN))&&touching_ladder&&!p->ducking)p->on_ladder=1;
  if(!touching_ladder)p->on_ladder=0;
  if((pressed&PLAYER_JUMP)&&(input&PLAYER_DOWN)&&p->on_ground){p->drop_ticks=12;p->on_ground=0;}
  else if((pressed&PLAYER_JUMP)&&(p->on_ground||p->on_ladder)){p->vy=-3.5f;p->on_ground=0;p->on_ladder=0;}
  if((released&PLAYER_JUMP)&&p->vy<0)p->vy*=0.6666667f;
- if((input&PLAYER_DOWN)&&p->on_ground&&!p->on_ladder&&!p->ducking){p->y+=6;p->h=6;p->ducking=1;}
+ if(!p->bow.active&&(input&PLAYER_DOWN)&&p->on_ground&&!p->on_ladder&&!p->ducking){p->y+=6;p->h=6;p->ducking=1;}
  if(!(input&PLAYER_DOWN)&&p->ducking){
   p->y-=6;p->h=12;
   if(player_overlaps_solid(p,w)){p->y+=6;p->h=6;}else p->ducking=0;
@@ -120,7 +131,13 @@ void player_step(NativePlayer *p,const World *w,unsigned input){
  if(p->on_ladder)p->vy=(float)(!!(input&PLAYER_DOWN)-!!(input&PLAYER_UP))*1.4f;
  else {p->vy+=0.16f;if(p->vy>8)p->vy=8;}
  p->on_ground=0;axis_move(p,w,p->vx,0);axis_move(p,w,p->vy,1);
- if(!p->melee.active)try_ledge(p,w,dir);
+ if(fire&&ammo&&ammo->quantity>0){
+  float x,y;bow_projectile_origin(&shot,p->x+p->w*0.5f,p->y+p->h,&x,&y);
+  float speed=bow_projectile_speed(&shot),flip=shot.facing<0?-1.0f:1.0f;
+  float damage=shot.keyframe?fminf(1,(float)(shot.keyframe+1)/shot.definition->draw_frames):0;
+  if(arrow_launch(&p->arrows,w,p->x+p->w*0.5f,p->y+p->h-6,x,y,flip*cosf(shot.angle)*speed,sinf(shot.angle)*speed,damage))ammo->quantity--;
+ }
+ if(!p->melee.active&&!p->bow.active)try_ledge(p,w,dir);
  p->melee.facing=p->facing;
  if(p->hanging)p->motion=PLAYER_HANG;
  else if(p->on_ladder)p->motion=PLAYER_CLIMB;

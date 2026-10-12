@@ -24,6 +24,10 @@ def main():
         sources["items-weapons.png"]=args.assets/"gfx/items/items-weapons.png"
         for cls in ("knight","rogue","mage"):
             sources[f"{cls}/stab.png"]=args.assets/"gfx/classes"/cls/"1/stab.png"
+    if args.attacks:
+        for name in ("aim","aim_arm"):
+            sources[f"rogue/{name}.png"]=args.assets/"gfx/classes/rogue/1"/(name+".png")
+        sources["entities/dart.png"]=args.assets/"gfx/projectiles/dart.png"
     for src in sources.values():
         if not src.is_file():raise FileNotFoundError(src)
     args.output.mkdir(parents=True,exist_ok=False)
@@ -48,6 +52,10 @@ def main():
         packet=encode(args.attacks)
         (args.output/"intro-melee.vwa").write_bytes(packet)
         manifest["intro-melee.vwa"]={"bytes":len(packet),"sha256":hashlib.sha256(packet).hexdigest(),"source_sha256":hashlib.sha256(args.attacks.read_bytes()).hexdigest()}
+    if args.attacks:
+        from prepare_bow import encode as encode_bow
+        packet=encode_bow(args.attacks);(args.output/"intro-bow.vwb").write_bytes(packet)
+        manifest["intro-bow.vwb"]={"bytes":len(packet),"sha256":hashlib.sha256(packet).hexdigest()}
     (args.output/"manifest.json").write_text(json.dumps(manifest,indent=2)+"\n",encoding="utf-8")
     print(args.output)
 

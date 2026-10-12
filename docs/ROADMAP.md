@@ -1,3 +1,10 @@
+# Estado vigente: iteración 023
+
+Arco de Rogue con carga, apuntado discreto, disparo, munición y colisión de
+flechas con terreno. Datos y sprites originales permanecen externos al VPK.
+Recuperación de flechas, daño a entidades, magia y generación de pisos pendientes.
+[Instalación y validación](ITERATION23.md). Objetivo completo aún no alcanzado.
+
 # Estado vigente: iteración 022
 
 Ataque base player-stab ejecutable con Cuadrado, datos externos originales,

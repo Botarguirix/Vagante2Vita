@@ -14,6 +14,8 @@ int main(int argc,char **argv){
  if(!world_load_entities(&world,entity_path,stdout)||world.entity_count!=22)goto done;
  snprintf(entity_path,sizeof(entity_path),"%s/intro-melee.vwa",argv[2]);
  if(!melee_load(&world.melee,entity_path,stdout)||world.melee.count!=3)goto done;
+ snprintf(entity_path,sizeof(entity_path),"%s/intro-bow.vwb",argv[2]);
+ if(!bow_load(&world.bow,entity_path,stdout))goto done;
  for(int cls=0;cls<3;cls++){
   if(!load_world_visuals(argv[2],cls,stdout)||!player_spawn(&player,&world,cls))goto done;
   draw_world(first,&world,&player,1);
@@ -41,6 +43,23 @@ int main(int argc,char **argv){
   }
   if(!active||!hit||player.melee.active||player.melee.serial!=1)goto done;
   printf("WORLD_MELEE class=%d active_steps=%u hit_steps=%u serial=%u completed=1 resolution_match=1\n",cls,active,hit,player.melee.serial);
+  if(cls==1){
+   for(int n=0;n<90;n++){
+    player_step(&player,&world,n<60?PLAYER_RANGE:0);
+    draw_world(high,&world,&player,1);draw_world(low,&world,&player,2);
+    for(int y=0;y<180;y++)for(int x=0;x<320;x++)if(low[y*320+x]!=high[y*2*640+x*2])goto done;
+    if(n==50||n==65){char image_path[512];snprintf(image_path,sizeof(image_path),n==50?"%s.charge.ppm":"%s.bow.ppm",argv[3]);if(!save(image_path,high))goto done;}
+   }
+   if(player.arrows.fired!=1||player.loadout.items[2].quantity!=29||player.bow.active)goto done;
+   for(int n=0;n<90;n++){
+    player_step(&player,&world,n<60?(PLAYER_RANGE|PLAYER_LEFT|PLAYER_UP):PLAYER_UP);
+    draw_world(high,&world,&player,1);draw_world(low,&world,&player,2);
+    for(int y=0;y<180;y++)for(int x=0;x<320;x++)if(low[y*320+x]!=high[y*2*640+x*2])goto done;
+    if(n==65){char image_path[512];snprintf(image_path,sizeof(image_path),"%s.bow-left.ppm",argv[3]);if(!save(image_path,high))goto done;}
+   }
+   if(player.arrows.fired!=2||player.loadout.items[2].quantity!=28||player.bow.active||player_overlaps_solid(&player,&world))goto done;
+   printf("WORLD_BOW class=1 fired=%u ammo=%d completed=1 left_diagonal=1 resolution_match=1\n",player.arrows.fired,player.loadout.items[2].quantity);
+  }
   printf("WORLD_RUNTIME class=%d motion=%s x=%.3f y=%.3f hp=%d animation_changed=1 resolution_match=1\n",cls,player_motion_name(player.motion),player.x,player.y,player.hp);
  }
  ok=1;

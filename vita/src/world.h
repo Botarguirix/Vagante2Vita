@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "melee.h"
+#include "bow.h"
 #define WORLD_WIDTH 40
 #define WORLD_HEIGHT 24
 #define WORLD_TILE_SIZE 16
@@ -10,7 +11,8 @@ enum { WORLD_LEFT=1, WORLD_UP=2, WORLD_RIGHT=4, WORLD_DOWN=8 };
 typedef struct {int8_t type;int16_t layers[5];uint8_t solid,platform,faces;} WorldTile;
 typedef struct {uint8_t kind,subtype;int16_t x,y;} WorldEntity;
 #define WORLD_ENTITY_LIMIT 64
-typedef struct {
+typedef struct World {
+ BowDefinition bow;
  MeleeDatabase melee;
  WorldEntity entities[WORLD_ENTITY_LIMIT];unsigned entity_count;
  WorldTile tiles[WORLD_TILE_COUNT];

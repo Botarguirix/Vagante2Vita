@@ -57,6 +57,7 @@ static unsigned player_buttons(const SceCtrlData *pad){
  if(b&SCE_CTRL_CROSS)result|=PLAYER_JUMP;
  if(b&SCE_CTRL_LTRIGGER)result|=PLAYER_SLOW;
  if(b&SCE_CTRL_SQUARE)result|=PLAYER_ATTACK;
+ if(b&SCE_CTRL_RTRIGGER)result|=PLAYER_RANGE;
  return result;
 }
 static void log_state(FILE *log,const Menu *m,unsigned b){
@@ -141,6 +142,8 @@ int main(void){
     }
     if(world_ready){
      melee_load(&world.melee,"ux0:data/Vagante2Vita/world/intro-melee.vwa",log);
+     bow_load(&world.bow,"ux0:data/Vagante2Vita/world/intro-bow.vwb",log);
+     if(menu.player_class==1&&world.bow.ready)player.bow.definition=&world.bow;
      player.melee.definition=melee_find(&world.melee,(unsigned)player.loadout.items[0].type);
      world_load_entities(&world,"ux0:data/Vagante2Vita/world/intro-entities.vwe",log);
      menu.screen=MENU_WORLD;character=0;player.previous=player_buttons(&pad);
@@ -158,6 +161,7 @@ int main(void){
   uint64_t now=sceKernelGetSystemTimeWide(),delta=now-last_tick;last_tick=now;
   if(delta>250000){if(log)fprintf(log,"WARN slow_loop_us=%llu\n",(unsigned long long)delta);delta=250000;}
   accumulator+=delta;
+  unsigned old_arrows=player.arrows.fired,old_impacts=player.arrows.impacts,old_bow_frame=player.bow.keyframe,old_bow_active=player.bow.active;
   unsigned old_attack_serial=player.melee.serial,old_attack_frame=player.melee.keyframe,old_attack_active=player.melee.active;
   PlayerMotion old_motion=player.motion;unsigned old_input=player.previous;
   while(accumulator>=16667){if(loaded){menu_tick(&menu);if(menu.screen==MENU_WORLD&&!paused&&!character)player_step(&player,&world,player_buttons(&pad));}accumulator-=16667;}
@@ -165,6 +169,10 @@ int main(void){
    fprintf(log,"PLAYER_EVENT tick=%u motion=%s input=%u x=%.3f y=%.3f vx=%.3f vy=%.3f contacts=%u\n",player.ticks,player_motion_name(player.motion),player.previous,player.x,player.y,player.vx,player.vy,player.contacts);
   }
   if(log&&menu.screen==MENU_WORLD&&!paused&&!character){
+   if(old_arrows!=player.arrows.fired||old_impacts!=player.arrows.impacts||old_bow_frame!=player.bow.keyframe||old_bow_active!=player.bow.active)
+    fprintf(log,"BOW_EVENT active=%u keyframe=%u timer=%u fired=%u terrain_hits=%u expired=%u\n",player.bow.active,player.bow.keyframe,player.bow.timer,player.arrows.fired,player.arrows.impacts,player.arrows.expired);
+   if((player.previous&PLAYER_RANGE)&&!(old_input&PLAYER_RANGE)&&!player.bow.active)fprintf(log,"BOW_BLOCKED missing_bow_or_data_or_ammo_or_state=1\n");
+
    if(old_attack_serial!=player.melee.serial||old_attack_frame!=player.melee.keyframe||old_attack_active!=player.melee.active){
     const MeleeFrame *key=melee_frame(&player.melee);
     fprintf(log,"MELEE_EVENT serial=%u active=%u keyframe=%u timer=%u shape_active=%u charge_ticks=%u type=%u\n",player.melee.serial,player.melee.active,player.melee.keyframe,player.melee.timer,key?key->enabled:0,player.melee.charge_ticks,player.melee.definition?player.melee.definition->type:0);
@@ -181,7 +189,7 @@ int main(void){
     if(menu.screen==MENU_WORLD){
      char info[64];snprintf(info,sizeof(info),"HP %d OF %d  STR %d DEX %d VIT %d",player.hp,player.max_hp,player.stats.strength,player.stats.dexterity,player.stats.vitality);text(18,42,info,0xff80ddff);
      snprintf(info,sizeof(info),"SPD %d STA %d INT %d LUK %d",player.stats.speed,player.stats.stamina,player.stats.intelligence,player.stats.luck);text(18,75,info,0xffffffff);
-     text(18,475,paused?"PAUSED START TO RESUME":"SQUARE MELEE X JUMP UP CLIMB",0xffffffff);
+     text(18,475,paused?"PAUSED START TO RESUME":"SQUARE MELEE R BOW X JUMP",0xffffffff);
      text(18,515,"SELECT CHARACTER O RESET TRIANGLE RETURN",0xffaaaaaa);
     }
     if(menu.screen==MENU_WORLD&&character)draw_character_panel(frame,&player,character_page);

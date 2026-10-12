@@ -68,3 +68,6 @@ La entrega actual 013 conserva la misma aplicación y separa entregas/logs: [ins
 
 
 **Entrega vigente: 022.** Cuadrado ejecuta la secuencia de estocada original, personaje/arma y geometría de impacto. Copiar world externo actualizado. Daño a entidades y efectos/proyectiles aún pendientes. [Instalación y pruebas](docs/ITERATION22.md).
+
+
+**Entrega vigente: 023.** Rogue carga y dispara su arco con R, consume munición y las flechas colisionan con terreno. Copiar world externo actualizado. Combate con entidades y generación de pisos siguen pendientes. [Instalación y pruebas](docs/ITERATION23.md).
