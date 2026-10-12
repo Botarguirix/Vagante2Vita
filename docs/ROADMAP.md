@@ -1,3 +1,9 @@
+# Estado vigente: iteración 018
+
+Menú con fondo animado por defecto; R permite comparación externa con perfil
+ligero. Sin métricas internas ni recursos del juego dentro del VPK.
+[Instalación](ITERATION18.md). [Dependencias de generación recuperadas](GENERATION_RECOVERY.md).
+
 # Estado vigente: iteración 017 y alcance ampliado
 
 Primera adaptación de agarre/subida/suelta/salto de bordes, aún sin paridad PC

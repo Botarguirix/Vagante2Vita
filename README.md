@@ -53,3 +53,6 @@ La entrega actual 013 conserva la misma aplicación y separa entregas/logs: [ins
 
 
 **Entrega vigente: 017.** Primera adaptación de bordes, recursos hang externos opcionales. [Instalación y alcance](docs/ITERATION17.md). Objetivo ampliado al mundo completo; generación, entidades y combate siguen pendientes.
+
+
+**Entrega vigente: 018.** Fondo de menú animado por defecto, R alterna perfil ligero para medición externa. [Detalles](docs/ITERATION18.md).
