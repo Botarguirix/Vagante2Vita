@@ -1,3 +1,10 @@
+# Estado vigente: iteración 019
+
+Comparados tres perfiles de menú en ambas resoluciones. Perfil preparado nuevo
+con capas por filas y colores precalculados; predeterminado ligero para priorizar
+el recorrido jugable. Sin métricas internas ni recursos comerciales en VPK.
+[Pruebas y límites](ITERATION19.md). El juego completo sigue pendiente.
+
 # Estado vigente: iteración 018
 
 Menú con fondo animado por defecto; R permite comparación externa con perfil

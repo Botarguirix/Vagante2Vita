@@ -2,10 +2,28 @@
 #include "resources.h"
 #include <math.h>
 #include <string.h>
-static int divisor=1,render_width=640,render_height=360;
+#include <stdlib.h>
+static int divisor=1,render_width=640,render_height=360,stable_tint,fast_layers=1;
+typedef struct {uint32_t *pixels;unsigned tint,alpha;int w,h;} Prepared;
+static Prepared prepared[22];
+void scene_free_cache(void){for(int i=0;i<22;i++){free(prepared[i].pixels);memset(&prepared[i],0,sizeof(prepared[i]));}}
+static const uint32_t *prepare(int i,unsigned tint,unsigned alpha){
+ Texture *t=&textures[i];Prepared *c=&prepared[i];
+ if(c->pixels&&c->tint==tint&&c->alpha==alpha&&c->w==t->w&&c->h==t->h)return c->pixels;
+ if(!c->pixels||c->w!=t->w||c->h!=t->h){free(c->pixels);c->pixels=malloc((size_t)t->w*t->h*4);}
+ if(!c->pixels)return NULL;
+ c->w=t->w;c->h=t->h;c->tint=tint;c->alpha=alpha;
+ for(int n=0;n<t->w*t->h;n++){
+  const unsigned char *s=t->rgba+4*n;
+  unsigned r=s[0]*(tint&255)/255,g=s[1]*((tint>>8)&255)/255,b=s[2]*((tint>>16)&255)/255;
+  c->pixels[n]=r|g<<8|b<<16|(s[3]*alpha/255)<<24;
+ }
+ return c->pixels;
+}
 static int ceil_div(int n,int d){return n>=0?(n+d-1)/d:n/d;}
 static void blit(uint32_t *p,int i,int x,int y,int sx0,int sy0,int width,int height,unsigned tint,unsigned alpha,int scale){
  Texture *t=&textures[i];if(!t->rgba||scale<1)return;
+ const uint32_t *ready=stable_tint?prepare(i,tint,alpha):NULL;
  int left=ceil_div(x,divisor),top=ceil_div(y,divisor);
  int right=ceil_div(x+width*scale,divisor),bottom=ceil_div(y+height*scale,divisor);
  if(left<0)left=0;if(top<0)top=0;if(right>render_width)right=render_width;if(bottom>render_height)bottom=render_height;
@@ -13,8 +31,11 @@ static void blit(uint32_t *p,int i,int x,int y,int sx0,int sy0,int width,int hei
   int sy=sy0+(dy*divisor-y)/scale;if(sy<0||sy>=t->h)continue;
   for(int dx=left;dx<right;dx++){
    int sx=sx0+(dx*divisor-x)/scale;if(sx<0||sx>=t->w)continue;
-   const unsigned char *s=t->rgba+4*(sy*t->w+sx);unsigned a=s[3]*alpha/255;if(!a)continue;
-   unsigned r=s[0]*(tint&255)/255,g=s[1]*((tint>>8)&255)/255,b=s[2]*((tint>>16)&255)/255;
+   unsigned a,r,g,b;
+   if(ready){uint32_t v=ready[sy*t->w+sx];a=v>>24;r=v&255;g=(v>>8)&255;b=(v>>16)&255;}
+   else {const unsigned char *s=t->rgba+4*(sy*t->w+sx);a=s[3]*alpha/255;
+    r=s[0]*(tint&255)/255;g=s[1]*((tint>>8)&255)/255;b=s[2]*((tint>>16)&255)/255;}
+   if(!a)continue;
    uint32_t *d=&p[dy*render_width+dx];
    if(a==255){*d=0xff000000|r|g<<8|b<<16;continue;}
    unsigned rr=((*d&255)*(255-a)+r*a)/255;
@@ -25,6 +46,27 @@ static void blit(uint32_t *p,int i,int x,int y,int sx0,int sy0,int width,int hei
 }
 static void layer(uint32_t *p,int i,float offset,unsigned tint,unsigned alpha){
  int x=(int)fmodf(offset,400.0f)-400;
+ if(stable_tint&&fast_layers&&textures[i].w==400){
+  const uint32_t *colors=prepare(i,tint,alpha);
+  if(colors){
+   int first=(-x)%400;
+   int rows=textures[i].h/divisor;if(rows>render_height)rows=render_height;
+   for(int y=0;y<rows;y++){
+    int sx=first;const uint32_t *source=colors+y*divisor*400;
+    uint32_t *dst=p+y*render_width;
+    for(int dx=0;dx<render_width;dx++){
+     uint32_t v=source[sx];unsigned a=v>>24;
+     if(a==255)dst[dx]=v;
+     else if(a){uint32_t old=dst[dx];unsigned r=((old&255)*(255-a)+(v&255)*a)/255;
+      unsigned g=(((old>>8)&255)*(255-a)+((v>>8)&255)*a)/255;
+      unsigned b=(((old>>16)&255)*(255-a)+((v>>16)&255)*a)/255;
+      dst[dx]=0xff000000|r|g<<8|b<<16;}
+     sx+=divisor;if(sx>=400)sx-=400;
+    }
+   }
+   return;
+  }
+ }
  for(;x<640;x+=400)blit(p,i,x,0,0,0,textures[i].w,textures[i].h,tint,alpha,1);
 }
 static void rect(uint32_t *p,int x,int y,int w,int h,uint32_t color){
@@ -35,7 +77,7 @@ static void rect(uint32_t *p,int x,int y,int w,int h,uint32_t color){
 static void compose(uint32_t *p,const Menu *m,int reduction,int static_only){
  divisor=reduction==2?2:1;render_width=640/divisor;render_height=360/divisor;
  /* Measured time is mapped to 60 logic ticks. Exact original tween/day state is pending. */
- float move=(float)(m->total_ticks%240000),night=0.75f+0.25f*sinf((float)(m->total_ticks%24000)*0.0005f);
+ float move=(float)(m->total_ticks%240000),night=stable_tint?0.75f:0.75f+0.25f*sinf((float)(m->total_ticks%24000)*0.0005f);
  for(int i=0;i<render_width*render_height;i++)p[i]=0xff20170f;
  layer(p,0,0,0xffffff,255);layer(p,1,0,0xffffff,(unsigned)(night*255));
  blit(p,2,3,45,0,0,128,128,0xffd0b0,(unsigned)(night*230),1);
@@ -50,7 +92,7 @@ static void compose(uint32_t *p,const Menu *m,int reduction,int static_only){
  }
  blit(p,10,520+(int)fmodf(move*0.3f,400)-400,259,0,0,32,32,0xffffff,255,1);
  layer(p,7,move*0.6f,0x90aaaa,255);
- if(!static_only)for(int i=0;i<12;i++){
+ if(!static_only)for(int i=0;i<(stable_tint?4:12);i++){
   int fx=(int)(i*61+move*0.3f+12*sinf(move*0.013f+i))%680-20;
   int fy=180+i%4*33+(int)(10*sinf(move*0.02f+i*2));
   unsigned pulse=(unsigned)(120+100*sinf(move*0.05f+i));
@@ -95,9 +137,11 @@ static MenuScreen cache_screen;
 static unsigned cache_rebuilds;
 void scene_invalidate_cache(void){cache_valid=0;}
 unsigned scene_cache_rebuilds(void){return cache_rebuilds;}
-void draw_scene_resolution(uint32_t *p,const Menu *m,int reduction){compose(p,m,reduction,0);}
+void draw_scene_resolution(uint32_t *p,const Menu *m,int reduction){stable_tint=0;compose(p,m,reduction,0);}
 void draw_scene_profile(uint32_t *p,const Menu *m,int reduction,int lightweight){
+ if(lightweight==2){stable_tint=1;compose(p,m,reduction,0);stable_tint=0;return;}
  if(!lightweight){draw_scene_resolution(p,m,reduction);return;}
+ stable_tint=0;
  Menu stable=*m;stable.total_ticks=0;stable.ticks=0;
  if(stable.screen==MENU_FADE)stable.screen=MENU_TITLE;
  int d=reduction==2?2:1;
@@ -125,3 +169,9 @@ void draw_scene_profile(uint32_t *p,const Menu *m,int reduction,int lightweight)
   }
  }
 }
+
+#ifdef HOST_PROBE
+void draw_scene_prepared_reference(uint32_t *p,const Menu *m,int reduction){
+ stable_tint=1;fast_layers=0;compose(p,m,reduction,0);fast_layers=1;stable_tint=0;
+}
+#endif

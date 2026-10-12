@@ -91,7 +91,7 @@ int main(void){
  mkdir("ux0:data/Vagante2Vita/logs",0777);
  char log_path[256]={0};
  FILE *log=open_session_log("ux0:data/Vagante2Vita/logs/iteration" VAGANTE_ITERATION,log_path,sizeof(log_path));
- if(log){fprintf(log,"LOG path=%s\n",log_path);fprintf(log,"BOOT version=" VAGANTE_VERSION " iteration=" VAGANTE_ITERATION " heap_bytes=%u framebuffer_bytes=%u renderer=software logical=320x180 target_draw_hz=60 direct_row_scaler=1 lightweight=0 scenery_cached=0 particles=1\n",_newlib_heap_size_user,bytes*2);fprintf(log,"PENDING exact_intro_tween day_night_tints audio unlocks saves procedural_generation combat skills inventory online options\n");fflush(log);}
+ if(log){fprintf(log,"LOG path=%s\n",log_path);fprintf(log,"BOOT version=" VAGANTE_VERSION " iteration=" VAGANTE_ITERATION " heap_bytes=%u framebuffer_bytes=%u renderer=software logical=320x180 target_draw_hz=60 direct_row_scaler=1 profile=lightweight scenery_cached=1 prepared_colors=0 particles=0\n",_newlib_heap_size_user,bytes*2);fprintf(log,"PENDING exact_intro_tween day_night_tints audio unlocks saves procedural_generation combat skills inventory online options\n");fflush(log);}
  SceUID block=sceKernelAllocMemBlock("VaganteMenu",SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW,(bytes*2+0x3ffff)&~0x3ffff,NULL);
  if(block<0){if(log){fprintf(log,"ERROR framebuffer_alloc code=%d\n",block);fclose(log);}return 1;}
  uint32_t *buffers;
@@ -111,7 +111,7 @@ int main(void){
  else if(log)fprintf(log,"SOURCE archive=menu-only.vra scope=menu_only origin_not_rehashed_on_vita\n");
  if(log){fprintf(log,"LOAD complete=%d load_us=%llu\n",loaded,(unsigned long long)(sceKernelGetSystemTimeWide()-start));fflush(log);}
  Menu menu={0};log_state(log,&menu,0);
- unsigned previous=0;int buffer_index=0,paused=0,display_error=0,reduction=2,lightweight=0;
+ unsigned previous=0;int buffer_index=0,paused=0,display_error=0,reduction=2,lightweight=1;
  const char *labels[]={"NEW GAME","PLAY ONLINE","OPTIONS","EXIT GAME"};
  uint64_t last_tick=sceKernelGetSystemTimeWide(),next_draw=last_tick,accumulator=0;
  uint64_t state_log_time=last_tick;
@@ -126,7 +126,7 @@ int main(void){
    if(log){fprintf(log,"PAUSE active=%d tick=%u\n",paused,player.ticks);fflush(log);}
   }
   if(menu.screen!=MENU_WORLD&&(pressed&SCE_CTRL_LTRIGGER)){reduction=reduction==2?1:2;if(log){fprintf(log,"PROFILE logical_width=%d logical_height=%d\n",640/reduction,360/reduction);fflush(log);}}
-  if(menu.screen!=MENU_WORLD&&(pressed&SCE_CTRL_RTRIGGER)){lightweight=!lightweight;scene_invalidate_cache();if(log){fprintf(log,"QUALITY lightweight=%d scenery_cached=%d particles=%d\n",lightweight,lightweight,!lightweight);fflush(log);}}
+  if(menu.screen!=MENU_WORLD&&(pressed&SCE_CTRL_RTRIGGER)){lightweight=(lightweight+2)%3;scene_invalidate_cache();if(log){fprintf(log,"QUALITY profile=%d scenery_cached=%d prepared_colors=%d particles=%d\n",lightweight,lightweight==1,lightweight==2,lightweight==1?0:lightweight==2?4:12);fflush(log);}}
   MenuScreen old_screen=menu.screen;int old_cursor=menu.cursor,old_class=menu.player_class;
   if(loaded){
    if(menu.screen==MENU_TITLE&&menu.cursor==3&&(pressed&SCE_CTRL_CROSS))break;
@@ -139,6 +139,7 @@ int main(void){
    }else menu_input(&menu,mapped_buttons(pad.buttons));
    if(old_screen==MENU_CLASS&&menu.screen==MENU_BLOCKED){
     uint64_t world_start=sceKernelGetSystemTimeWide();
+    scene_free_cache();
     const char *directories[]={"ux0:data/Vagante2Vita/world"};
     int world_ready=0;
     for(unsigned source=0;source<1&&!world_ready;source++){
@@ -183,7 +184,7 @@ int main(void){
      if(menu.screen==MENU_BLOCKED){text(95,337,"CHECK UX0 DATA VAGANTE2VITA WORLD",0xff80b0ff);text(95,379,"BLOCKER RECORDED IN LOG",0xffffffff);}
      text(95,435,"CIRCLE TO RETURN",0xffffffff);
     }
-    if(menu.screen==MENU_TITLE)text(18,480,lightweight?"R ANIMATED BACKGROUND":"R LIGHTWEIGHT BACKGROUND",0xffaaaaaa);
+    if(menu.screen==MENU_TITLE)text(18,480,lightweight==2?"R SWITCH TO LIGHTWEIGHT":lightweight==1?"R SWITCH TO FULL ANIMATION":"R SWITCH TO PREPARED ANIMATION",0xffaaaaaa);
     if(menu.screen!=MENU_WORLD)text(18,515,log?"ITERATION " VAGANTE_ITERATION "  GAMEPLAY PENDING":"ERROR LOG FILE COULD NOT OPEN",log?0xffaaaaaa:0xff8080ff);
    }else{
     memset(frame,0,bytes);text(48,100,"ARCHIVE LOAD FAILED",0xff8080ff);
@@ -200,6 +201,6 @@ int main(void){
   sceDisplayWaitVblankStart();
  }
  if(log){fprintf(log,"EXIT normal=%d screen=%s display_error=%d\n",display_error==0,menu_screen_name(menu.screen),display_error);fclose(log);}
- free_world_visuals();free_resources();sceDisplaySetFrameBuf(NULL,SCE_DISPLAY_SETBUF_NEXTFRAME);sceDisplayWaitVblankStart();
+ scene_free_cache();free_world_visuals();free_resources();sceDisplaySetFrameBuf(NULL,SCE_DISPLAY_SETBUF_NEXTFRAME);sceDisplayWaitVblankStart();
  sceKernelFreeMemBlock(block);sceKernelExitProcess(0);return 0;
 }

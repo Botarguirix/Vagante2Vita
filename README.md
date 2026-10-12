@@ -56,3 +56,6 @@ La entrega actual 013 conserva la misma aplicación y separa entregas/logs: [ins
 
 
 **Entrega vigente: 018.** Fondo de menú animado por defecto, R alterna perfil ligero para medición externa. [Detalles](docs/ITERATION18.md).
+
+
+**Entrega vigente: 019.** Selección tras comparaciones locales: ligero por defecto, animado preparado disponible por R. Intro jugable; todavía no juego completo. [Validación e instalación](docs/ITERATION19.md).

@@ -12,6 +12,7 @@ add_library(resources STATIC src/resources.c src/scene.c src/menu.c src/world.c 
 target_include_directories(resources PRIVATE ../third_party/stb)
 target_link_libraries(resources PUBLIC miniz m)
 if(HOST_PROBE)
+  target_compile_definitions(resources PUBLIC HOST_PROBE=1)
   add_executable(vagante-probe src/probe.c)
   target_link_libraries(vagante-probe resources)
   enable_testing()

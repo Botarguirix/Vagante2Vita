@@ -46,8 +46,28 @@ int main(int argc,char **argv){
  for(int i=0;i<320*180;i++)if(low[i]!=0xff000000){free(low);goto done;}
  puts("RENDER lite_class_invalidation=1 lite_resolution_match=1 fade_black=1");
  free(low);
+ for(int resolution=1;resolution<=2;resolution++){
+  for(int trial=0;trial<3;trial++)for(int mode=0;mode<3;mode++){
+   m.screen=MENU_TITLE;m.total_ticks=0;draw_scene_profile(p,&m,resolution,mode);
+   memcpy(first,p,(size_t)(640/resolution)*(360/resolution)*4);
+   int changed=0;begin=clock();for(int n=0;n<24;n++){m.total_ticks=(uint64_t)(n+1)*7;draw_scene_profile(p,&m,resolution,mode);if(memcmp(p,first,(size_t)(640/resolution)*(360/resolution)*4))changed=1;}
+   double elapsed=(double)(clock()-begin)*1000000/CLOCKS_PER_SEC/24;
+   if(!changed)goto done;
+   printf("PROFILE_BENCH host_only=1 trial=%d resolution=%d mode=%d avg_us=%.0f animation_changed=1\n",trial,resolution,mode,elapsed);
+  }
+ }
+ for(int tick=0;tick<1200;tick+=137){
+  m.total_ticks=(uint64_t)tick;draw_scene_profile(first,&m,1,2);
+  draw_scene_prepared_reference(p,&m,1);
+  if(memcmp(first,p,640*360*4))goto done;
+ }
+ puts("PREPARED_ANIMATION fast_layers_reference_match=1");
+ m.total_ticks=100;draw_scene_profile(p,&m,1,2);
+ uint32_t *check=malloc(320*180*4);if(!check)goto done;draw_scene_profile(check,&m,2,2);
+ for(int y=0;y<180;y++)for(int x=0;x<320;x++)if(check[y*320+x]!=p[y*2*640+x*2]){free(check);goto done;}
+ free(check);puts("PREPARED_ANIMATION resolution_match=1");
  m.screen=MENU_CLASS;m.player_class=1;draw_animated_scene(p,&m);
  snprintf(path,sizeof(path),"%s.classes.ppm",argv[2]);if(!save(path,p))goto done;
  puts("RENDER animation_changed=1 class_preview_written=1");ok=1;
- done:free(p);free(first);free_resources();return ok?0:1;
+ done:free(p);free(first);scene_free_cache();free_resources();return ok?0:1;
 }
