@@ -172,7 +172,7 @@ int main(void){
     if(menu.screen==MENU_WORLD){
      char info[64];snprintf(info,sizeof(info),"HP %d OF %d  STR %d DEX %d VIT %d",player.hp,player.max_hp,player.stats.strength,player.stats.dexterity,player.stats.vitality);text(18,42,info,0xff80ddff);
      snprintf(info,sizeof(info),"SPD %d STA %d INT %d LUK %d",player.stats.speed,player.stats.stamina,player.stats.intelligence,player.stats.luck);text(18,75,info,0xffffffff);
-     text(18,475,paused?"PAUSED START TO RESUME":"X JUMP DOWN DUCK UP CLIMB",0xffffffff);
+     text(18,475,paused?"PAUSED START TO RESUME":"X JUMP UP CLIMB DOWN DROP",0xffffffff);
      text(18,515,"O RESET TRIANGLE RETURN " VAGANTE_ITERATION,0xffaaaaaa);
     }
     if(menu.screen==MENU_TITLE)for(int i=0;i<4;i++)text(360,290+38*i,labels[i],i==menu.cursor?0xff80ddff:0xffdddddd);
@@ -193,7 +193,7 @@ int main(void){
   }
   now=sceKernelGetSystemTimeWide();
   if(now-state_log_time>=2000000){
-   if(log&&menu.screen==MENU_WORLD){fprintf(log,"PLAYER time_us=%llu class=%d motion=%s x=%.3f y=%.3f vx=%.3f vy=%.3f ground=%d ladder=%d duck=%d contacts=%u hp=%d max_hp=%d input=%u ticks=%u\n",(unsigned long long)now,player.player_class,player_motion_name(player.motion),player.x,player.y,player.vx,player.vy,player.on_ground,player.on_ladder,player.ducking,player.contacts,player.hp,player.max_hp,player.previous,player.ticks);fflush(log);}
+   if(log&&menu.screen==MENU_WORLD){fprintf(log,"PLAYER time_us=%llu class=%d motion=%s x=%.3f y=%.3f vx=%.3f vy=%.3f ground=%d ladder=%d duck=%d contacts=%u hanging=%d hp=%d max_hp=%d input=%u ticks=%u\n",(unsigned long long)now,player.player_class,player_motion_name(player.motion),player.x,player.y,player.vx,player.vy,player.on_ground,player.on_ladder,player.ducking,player.contacts,player.hanging,player.hp,player.max_hp,player.previous,player.ticks);fflush(log);}
    state_log_time=now;
   }
   sceDisplayWaitVblankStart();

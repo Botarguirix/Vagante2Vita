@@ -57,9 +57,42 @@ int player_spawn(NativePlayer *p,const World *w,int player_class){
  if(player_overlaps_solid(&next,w))return 0;
  *p=next;return 1;
 }
+/* Geometry adapter for the observed original hanging state. Pixel thresholds
+   and mantle timing still require comparison with the PC runtime. */
+static void try_ledge(NativePlayer *p,const World *w,int dir){
+ if(!dir||p->on_ground||p->on_ladder||p->ducking||p->hang_cooldown||p->vy<0)return;
+ float edge=dir>0?p->x+p->w:p->x;
+ int tx=cell(edge+(dir>0?0.5f:-0.5f)),ty=cell(p->y+4);
+ const WorldTile *t=world_tile(w,tx,ty);
+ if(!t||!t->solid||world_solid(w,tx,ty-1))return;
+ float top=ty*16.0f,boundary=(dir>0?tx:tx+1)*16.0f;
+ if(fabsf(edge-boundary)>0.75f||fabsf(p->y-top)>4)return;
+ NativePlayer next=*p;next.x=dir>0?boundary-p->w:boundary;next.y=top;
+ if(player_overlaps_solid(&next,w))return;
+ next.vx=next.vy=0;next.hanging=1;next.hang_x=tx;next.hang_y=ty;
+ next.facing=dir;next.motion=PLAYER_HANG;*p=next;
+}
+static int mantle(NativePlayer *p,const World *w){
+ NativePlayer next=*p;
+ float target_y=p->hang_y*16.0f-p->h;
+ float target_x=p->facing>0?p->hang_x*16.0f:(p->hang_x+1)*16.0f-p->w;
+ axis_move(&next,w,target_y-next.y,1);
+ if(fabsf(next.y-target_y)>0.001f)return 0;
+ axis_move(&next,w,target_x-next.x,0);
+ if(fabsf(next.x-target_x)>0.001f||player_overlaps_solid(&next,w))return 0;
+ next.hanging=0;next.on_ground=1;next.vx=next.vy=0;next.motion=PLAYER_STAND;
+ next.hang_cooldown=12;*p=next;return 1;
+}
 void player_step(NativePlayer *p,const World *w,unsigned input){
  unsigned pressed=input&~p->previous,released=p->previous&~input;p->previous=input;p->ticks++;p->contacts=0;
  if(p->drop_ticks)p->drop_ticks--;
+ if(p->hang_cooldown)p->hang_cooldown--;
+ if(p->hanging){
+  if(!world_solid(w,p->hang_x,p->hang_y)){p->hanging=0;p->hang_cooldown=12;}
+  else if(pressed&PLAYER_JUMP){p->hanging=0;p->hang_cooldown=12;p->vy=-3.5f;p->vx=-p->facing*1.5f;}
+  else if(input&PLAYER_DOWN){p->hanging=0;p->hang_cooldown=12;}
+  else {if(input&PLAYER_UP)mantle(p,w);return;}
+ }
  int dir=!!(input&PLAYER_RIGHT)-!!(input&PLAYER_LEFT);
  int touching_ladder=ladder(p,w);
  if((input&(PLAYER_UP|PLAYER_DOWN))&&touching_ladder&&!p->ducking)p->on_ladder=1;
@@ -82,13 +115,15 @@ void player_step(NativePlayer *p,const World *w,unsigned input){
  if(p->on_ladder)p->vy=(float)(!!(input&PLAYER_DOWN)-!!(input&PLAYER_UP))*1.4f;
  else {p->vy+=0.16f;if(p->vy>8)p->vy=8;}
  p->on_ground=0;axis_move(p,w,p->vx,0);axis_move(p,w,p->vy,1);
- if(p->on_ladder)p->motion=PLAYER_CLIMB;
+ try_ledge(p,w,dir);
+ if(p->hanging)p->motion=PLAYER_HANG;
+ else if(p->on_ladder)p->motion=PLAYER_CLIMB;
  else if(p->ducking)p->motion=PLAYER_DUCK;
  else if(!p->on_ground)p->motion=p->vy<0?PLAYER_RISE:PLAYER_FALL;
  else if(dir)p->motion=PLAYER_WALK;
  else p->motion=(input&PLAYER_UP)?PLAYER_LOOK:PLAYER_STAND;
 }
 const char *player_motion_name(PlayerMotion m){
- const char *names[]={"STAND","WALK","RISE","FALL","DUCK","CLIMB","LOOK"};
- return m>=PLAYER_STAND&&m<=PLAYER_LOOK?names[m]:"INVALID";
+ const char *names[]={"STAND","WALK","RISE","FALL","DUCK","CLIMB","LOOK","HANG"};
+ return m>=PLAYER_STAND&&m<=PLAYER_HANG?names[m]:"INVALID";
 }

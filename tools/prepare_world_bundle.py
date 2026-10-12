@@ -12,7 +12,7 @@ def main():
     args=p.parse_args()
     sources={"intro-world.vwi":args.packet,"intro-terrain.png":args.terrain}
     for cls in ("knight","rogue","mage"):
-        for anim in ("stand","walk","jump","fall","duck","climb","lookup"):
+        for anim in ("stand","walk","jump","fall","duck","climb","lookup","hang"):
             sources[f"{cls}/{anim}.png"]=args.assets/"gfx"/"classes"/cls/"1"/(anim+".png")
     for src in sources.values():
         if not src.is_file():raise FileNotFoundError(src)

@@ -50,3 +50,6 @@ La entrega actual 013 conserva la misma aplicación y separa entregas/logs: [ins
 
 
 **Entrega vigente: 016.** VPK sin recursos comerciales, mundo externo, pausa START y corrección de aterrizajes. Sin métricas integradas. [Detalles](docs/ITERATION16.md).
+
+
+**Entrega vigente: 017.** Primera adaptación de bordes, recursos hang externos opcionales. [Instalación y alcance](docs/ITERATION17.md). Objetivo ampliado al mundo completo; generación, entidades y combate siguen pendientes.

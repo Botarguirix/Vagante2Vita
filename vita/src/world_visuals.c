@@ -2,11 +2,11 @@
 #include "resources.h"
 #include <stdio.h>
 #include <string.h>
-static Texture terrain,sprites[7];
+static Texture terrain,sprites[8];
 static int cached_class=-1;
 static uint32_t terrain_full[640*384],terrain_low[320*192];
 static void pixel(uint32_t *dst,const unsigned char *src);
-void free_world_visuals(void){free_texture(&terrain);for(int i=0;i<7;i++)free_texture(&sprites[i]);cached_class=-1;}
+void free_world_visuals(void){free_texture(&terrain);for(int i=0;i<8;i++)free_texture(&sprites[i]);cached_class=-1;}
 int load_world_visuals(const char *directory,int player_class,FILE *log){
  if(player_class<0||player_class>=3)return 0;
  if(cached_class==player_class&&terrain.rgba)return 1;
@@ -23,6 +23,10 @@ int load_world_visuals(const char *directory,int player_class,FILE *log){
   uint32_t color=0xff201810;pixel(&color,terrain.rgba+4*(y*640+x));
   terrain_full[y*640+x]=color;
   if(!(x&1)&&!(y&1))terrain_low[y/2*320+x/2]=color;
+ }
+ snprintf(path,sizeof(path),"%s/%s/hang.png",directory,classes[player_class]);
+ if(!load_png_file(&sprites[7],path,log)||sprites[7].w%24||sprites[7].h%24){
+  free_texture(&sprites[7]);if(log)fprintf(log,"WORLD_OPTIONAL hang_sprite=0 fallback=climb\n");
  }
  cached_class=player_class;if(log)fprintf(log,"WORLD_VISUALS ready=1 class=%d terrain_cached=1 dynamic_lights=0\n",player_class);return 1;
  invalid:if(log)fprintf(log,"WORLD_VISUALS ready=0 error=missing_or_invalid_png\n");free_world_visuals();return 0;
@@ -44,7 +48,7 @@ void draw_world(uint32_t *p,const World *w,const NativePlayer *player,int reduct
   const uint32_t *cached=d==2?terrain_low:terrain_full;
   memcpy(p,cached+(camera/d)*width,(size_t)width*height*sizeof(*p));
  }else for(int i=0;i<width*height;i++)p[i]=0xff201810;
- Texture *t=&sprites[player->motion];if(!t->rgba)return;
+ Texture *t=&sprites[player->motion];if(player->motion==PLAYER_HANG&&!t->rgba)t=&sprites[PLAYER_CLIMB];if(!t->rgba)return;
  int cols=t->w/24,frames=cols*(t->h/24);if(frames>8)frames=8;if(frames<1)return;
  unsigned frame=(player->ticks/7)%(unsigned)frames;
  if(player->motion==PLAYER_RISE||player->motion==PLAYER_FALL||player->motion==PLAYER_DUCK)frame=0;

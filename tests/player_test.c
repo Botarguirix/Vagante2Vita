@@ -25,6 +25,21 @@ int main(int argc,char **argv){
  assert(player_spawn(&p,&w,0));for(int i=0;i<5;i++)player_step(&p,&w,0);y=p.y;
  for(int i=0;i<10;i++)player_step(&p,&w,PLAYER_UP);assert(p.on_ladder&&p.y<y-10);
  player_step(&p,&w,PLAYER_JUMP);assert(!p.on_ladder&&p.vy<0);
+ /* Ledge grab, blocked mantle, clear mantle, release and both orientations. */
+ w=flat();w.tiles[18*40+20].type=1;world_collision_flags(&w);
+ assert(player_spawn(&p,&w,0));p.x=312;p.y=288;p.on_ground=0;p.vy=0;
+ player_step(&p,&w,PLAYER_RIGHT);assert(p.hanging&&p.motion==PLAYER_HANG);
+ for(int i=0;i<30;i++)player_step(&p,&w,0);assert(p.hanging&&p.vy==0);
+ w.tiles[17*40+20].type=1;world_collision_flags(&w);
+ player_step(&p,&w,PLAYER_UP);assert(p.hanging&&!player_overlaps_solid(&p,&w));
+ w.tiles[17*40+20].type=0;world_collision_flags(&w);
+ player_step(&p,&w,PLAYER_UP);assert(!p.hanging&&p.on_ground&&p.x==320&&p.y==276);
+ assert(player_spawn(&p,&w,0));p.x=336;p.y=288;p.on_ground=0;
+ player_step(&p,&w,PLAYER_LEFT);assert(p.hanging&&p.facing==-1);
+ player_step(&p,&w,PLAYER_DOWN);assert(!p.hanging&&p.hang_cooldown);
+ assert(player_spawn(&p,&w,0));p.x=312;p.y=288;p.on_ground=0;
+ player_step(&p,&w,PLAYER_RIGHT);assert(p.hanging);
+ player_step(&p,&w,PLAYER_JUMP);assert(!p.hanging&&p.vy<0&&p.vx<0);
  if(argc==2){assert(world_load(&w,argv[1],stdout));assert(player_spawn(&p,&w,0));
   for(int i=0;i<300;i++){unsigned input=i<130?PLAYER_RIGHT:PLAYER_LEFT;if(i==50||i==180)input|=PLAYER_JUMP;player_step(&p,&w,input);assert(isfinite(p.x)&&isfinite(p.y)&&!player_overlaps_solid(&p,&w));}
  }

@@ -1,3 +1,20 @@
+# Estado vigente: iteración 017 y alcance ampliado
+
+Primera adaptación de agarre/subida/suelta/salto de bordes, aún sin paridad PC
+completa. Recursos externos; VPK limpio y sin métricas internas.
+[Controles y validación](ITERATION17.md).
+
+## Objetivo del mundo completo
+
+1. Recuperar generación por actos y semilla desde generateLevel y sus llamadas.
+2. Cargador de habitaciones de tamaños distintos y enlaces entre habitaciones.
+3. Entidades/interacciones y transición INTRO al primer piso.
+4. Combate, objetos, equipo, atributos derivados y progreso.
+5. Ampliar actos, variantes, enemigos/jefes y guardado con validación física.
+
+No se considera completo por mostrar más mapas: cada transición, movimiento
+y sistema debe ejecutarse y verificarse. El estado actual es una intro parcial.
+
 # Estado vigente: iteración 016
 
 015 confirma recorrido físico del mundo con Knight/Rogue y ~58–59 FPS.
