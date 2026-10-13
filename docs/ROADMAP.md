@@ -1,3 +1,14 @@
+# Avance de reconstrucción 029 (VPK vigente 025)
+
+Sorteos float32 y barajado de la compilación Windows recuperados. Salas secretas
+y pedestales integrados después del tesoro, antes de seleccionar plantillas.
+42 pruebas Python pasan; 4000 resultados decimales coinciden bit a bit con
+referencia C++ de redondeo. 300 grafos con recursos privados: 12000 selecciones
+sin fallos de unión local. [Evidencia y límites](GENERATION_RECOVERY.md).
+Pendientes: inicializar tiles y entidades, bordes, sellado de secretos,
+entrada/salida, recorribilidad global, transición y juego completo.
+El VPK sigue siendo 025; esta recuperación no se presenta como piso jugable.
+
 # Avance de reconstrucción 028 (VPK vigente 025)
 
 Etapa de tesoro cerca de salida recuperada. Selector geométrico por columnas,

@@ -77,3 +77,8 @@ La entrega actual 013 conserva la misma aplicación y separa entregas/logs: [ins
 
 
 **Entrega vigente: 025.** Pruebas automatizadas del VPK nativo en una instancia aislada de Vita3K, logs por ejecución y perfil genérico de teclado. [Uso y límites](docs/ITERATION25.md). El mundo completo sigue pendiente.
+
+**Reconstrucción 029.** Generación ACT_ONE recuperada hasta secretos, pedestales
+y selección de salas simples; recursos privados externos. [Pruebas, comandos
+y pendientes](docs/GENERATION_RECOVERY.md). Aún falta montar el piso y validar
+su recorrido; no hay un VPK nuevo para esta recuperación.

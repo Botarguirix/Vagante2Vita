@@ -258,3 +258,90 @@ Semilla 12345: tesoros (2,2), (6,2), (2,0) para pisos 0/1/2; intentos 1/8/2.
 No son mapas completos ni casos contrastados con ejecución PC. VPK vigente
 025. Pendiente: randFloat y shuffle originales, secretos/pedestales, montaje
 final de tiles/entidades y entrada/salida, recorribilidad global y transición.
+
+## Recuperación 029: sorteos decimales, secretos y pedestales
+
+tools/generation_random.py reproduce los adaptadores de esta compilación:
+randFloat 0x0041ca10 llama generate_canonical en 0x0041c980. La instrucción
+log2f(2^32), división de 24 por ese resultado y ceil determinan una extracción
+MT. El uint32 se convierte a float32 antes de dividir por float32(2^32).
+Se verificaron constantes PE: 0x00b204c4=24, 0x00b1ef4c=1,
+0x00b20820=2^32, tabla double 0x00b21950/58=0/2^32.
+No aparece una corrección hacia el anterior representable: UINT32_MAX redondea
+a 2^32 y devuelve 1.0. No se sustituye por random.random ni por una biblioteca
+moderna cuyo tratamiento del extremo o consumo pueda ser diferente.
+
+shuffle 0x004e80e0 avanza i=1..N-1, sortea j en [0,i] y permuta ambos elementos,
+incluyendo consumo para j==i. _Rng_from_urng 0x00446930 usa palabras completas
+uint32 y rechazo de la cola sobrante antes de módulo. bound=1 consume cero;
+una potencia de dos acepta UINT32_MAX. Esto difiere de game_int (low31).
+Todas las etapas comparten el mismo MT y reanudan comprobando su estado.
+
+tools/floor_special_rooms.py añade las dos etapas siguientes al tesoro.
+0x0067e0d0–0x0067e131 confirma que se sortea 1 o 2 secretos con game_int,
+se consume randFloat siempre y se pide cero si el float convertido a double
+es menor que la constante double 0.33 (0x00b201c8).
+
+addSecretRooms 0x0068f650 y su predicado 0x0068f8b0 enumeran casillas vacías
+por columna, después fila. Vecinos: izquierda antes que derecha; deben tener
+enlaces, no tener ya enlace hacia la casilla, ni flags tienda/tesoro/pedestal.
+El act almacenado en Room (confirmado en constructor 0x00754870) añade
+exclusión de brightSky solamente para act==1, no ACT_ONE==0.
+Con pedido cero se vuelve inmediatamente, sin enumerar ni barajar candidatos.
+En los demás casos se baraja toda la lista inicial, se toma del frente y se
+vuelve a calcular/barajar sus vecinos antes de elegir el primero. Las casillas
+restantes no se vuelven a enumerar; un secreto recién creado puede convertirse
+en vecino de otro candidato. isSecret se conserva como metadato separado;
+no es un bit que cambie el pool de room_type.
+
+addBookPedestalRooms 0x0068fae0 obtiene tipos de la base que tienen BOOK=0x4000,
+quitando ese bit con getAllTypesOfActWithBitSet 0x0075f7a0. Si no hay tipos,
+no baraja; si los hay, baraja las 40 casillas en orden inicial columna/fila,
+incluso si se pide cero. Después omite entrada y salida. Una sala conectada
+puede recibir BOOK si su tipo actual está en el conjunto, y no tiene flags
+tienda/tesoro/pedestal. No se excluye isSecret en esa comprobación.
+
+Para casillas vacías se preservan dos comprobaciones asimétricas confirmadas
+por ensamblador 0x0068fd33–0x0068fe65: el vecino derecho se intenta si existe
+tipo base 2 en el conjunto; el vecino izquierdo si existe base 0. Las conexiones
+resultantes son RIGHT=4 y LEFT=1 respectivamente. No se corrigen esos literales
+por intuición. Se excluyen vecinos tienda/tesoro/pedestal. ACT_ONE privado tiene
+base 2 y plantillas BOOK|4, de modo que la rama derecha puede crear una sala
+adicional. La izquierda no se habilita con base 1. Si una futura base de datos
+produce un tipo sin pool, el selector conserva su error explícito.
+
+### Validación y alcance
+
+42 pruebas Python pasan. Las 13 nuevas comprueban redondeo al extremo 1.0,
+rechazo del uint32 máximo para bound=3, aceptación para bound=4, consumo de
+auto-permutaciones, ambos lados de la frontera float32 próxima a 0.33,
+pedidos cero, candidatos insuficientes, vecinos recalculados, exclusiones,
+salas existentes, reglas literales de salas nuevas y enlaces recíprocos.
+tests/generation_float_reference.cpp contrasta la conversión con compilador
+C++ del host y std::mt19937: 4000 float32 coinciden bit a bit para semillas
+0, 1, 5489 y UINT32_MAX. Esta referencia comprueba el adaptador numérico;
+no ejecuta Vagante ni certifica paridad de un piso completo.
+
+Se probaron 300 grafos (100 semillas × 3 pisos) con rooms.json del usuario:
+12000 selecciones, cero fallos geométricos locales; máximo 12 intentos en una
+casilla. Secretos colocados: cero en 95 casos, uno en 101 y dos en 104.
+Pedestales: 172 en habitaciones existentes y 128 en nuevas horizontales.
+Estos conteos no son una prueba de probabilidades estadísticas ni de que el
+personaje pueda recorrer el piso. Los datos y UID quedan en informes privados.
+La selección ahora consume primero secretos y pedestales; se retira la
+limitación de ejecución anticipada de 028 para estos informes nuevos.
+
+Semilla 12345, pisos 0/1/2: 1/0/2 secretos, un pedestal cada uno;
+404/213/230 extracciones antes de selección, 444/253/271 después.
+El informe mantiene floor_complete=false y pc_runtime_parity_verified=false.
+Quedan initRoom y modificaciones de tiles, entidades, bordes, sellado de
+secretos, agua, entrada/salida, validación global/regeneración y transición.
+No se emite VWI ni se reemplaza la intro del VPK 025 con un grafo incompleto.
+
+```powershell
+python tools/floor_special_rooms.py _local/assets/rooms.json --seed 12345 --floor 0 --output _local/generation029/special-floor0.private.json
+python -m unittest discover -s tests -v
+```
+
+La recuperación 029 conserva código propio, fuente, hashes y validación aparte.
+El VPK instalable sigue siendo 025, con todos los recursos originales externos.
