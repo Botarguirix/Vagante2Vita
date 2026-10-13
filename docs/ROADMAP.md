@@ -1,3 +1,14 @@
+# Avance de reconstrucción 030 (VPK vigente 025)
+
+ACT_ONE ya se ensambla como grids de 80×40 tiles con cinco capas gráficas y
+ubicaciones/variables de entidades originales, sin redondear coordenadas
+fraccionarias. Borde cerrado y candidatos de entrada con camino hacia enlace
+recuperados. 48 pruebas pasan; 300 layouts privados, 960000 tiles comprobados.
+[Evidencia y límites](GENERATION_RECOVERY.md). Los candidatos todavía se
+analizan antes del sellado de secretos y de crear entidades; no son entradas
+definitivas. Faltan esas etapas, agua, salida, recorrido global/regeneración,
+transición y juego completo. No se ha generado otro VPK aún.
+
 # Avance de reconstrucción 029 (VPK vigente 025)
 
 Sorteos float32 y barajado de la compilación Windows recuperados. Salas secretas

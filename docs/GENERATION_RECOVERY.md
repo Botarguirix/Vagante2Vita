@@ -345,3 +345,83 @@ python -m unittest discover -s tests -v
 
 La recuperación 029 conserva código propio, fuente, hashes y validación aparte.
 El VPK instalable sigue siendo 025, con todos los recursos originales externos.
+
+## Recuperación 030: montaje de tiles y ubicaciones de entidades
+
+tools/floor_layout.py reanuda secretos/pedestales, selecciona los 40 UID por
+las reglas anteriores y monta un grid privado 80×40, 3200 tiles, ACT_ONE.
+Cada tile conserva sus seis campos JSON: tipo y cinco capas gráficas.
+El traslado usa origen (roomX×10, roomY×8), como initRoom 0x00655be0.
+Se copia por valor para que modificaciones de una instancia no alteren la
+plantilla ni otras instancias del mismo UID. La rutina original también
+propaga minLight y otros miembros no serializados: iluminación todavía
+pendiente, no se afirma reconstrucción completa de Tile ni de initRoom.
+
+addEdgeBoundary 0x0068a4b0 para ACT_ONE establece tipo 1 en la primera/última
+fila y columna, conservando índices gráficos. Se recupera esa operación sin
+inventar una habitación de relleno: incluso tipo 0 se obtiene de su pool
+original. En las 300 muestras el borde ya era sólido y no cambió ningún tipo;
+la prueba sintética abierta comprueba que el cierre funciona cuando hace falta.
+
+Las posiciones declaradas en entidades se mantienen con sus variables y UID de
+origen. Level::createRoomEntities 0x0064aaf0 recorre filas antes que columnas;
+Room::createEntities 0x0075a830 suma origen en píxeles (room×dimensión×16) a
+coordenadas float32 locales. La base contiene un Chest con Y=68.5: no se puede
+convertir todo a int16 sin perder precisión. world_pixel usa la suma float32;
+definition conserva los parámetros JSON originales. Esto prepara ubicaciones,
+no construye entidades, inventario, trampas, cofres ni objetos aleatorios.
+No se convierte al VWE1 actual, que solo implementa decorado limitado.
+
+### Candidatos de entrada: regla recuperada, ejecución final pendiente
+
+tilePathsToEdgeOfRoom 0x0065b8a0 rechaza sólidos y el borde exterior del nivel,
+y busca por cuatro vecinos no sólidos dentro de la habitación y un tile fuera
+de su perímetro. Puede salir por un lado con enlace correspondiente; también
+consulta bits alternativos 0x10/20/40/80. Se verificó el paso +/-1 en ensamblador
+0x0065bbc0–0x0065bc2c. El helper se limita a salas simples y ACT_ONE cerrado;
+no implementa tutorial, tamaños dobles ni mundos de cielo/laterales abiertos.
+El flood mide conectividad de tiles; no simula tamaño, salto ni física de jugador.
+
+findRandomAboveGroundTiles 0x0065a9a0 recorre columna/fila y requiere tile no
+sólido, camino al enlace y soporte sólido debajo. Los tipos 1 y 7 son sólidos,
+como generateCollisionFlags 0x00656cd0; plataforma 6 no cuenta como sólido.
+Si el tile o sus vecinos horizontales son agua (9), se guarda en grupo aparte.
+El grupo seco se prefiere cuando no está vacío; el original baraja solamente
+el grupo elegido con shuffle recuperado en 029. Este análisis devuelve las
+listas sin barajar y sin consumir RNG, porque esa llamada ocurre después de
+display, sellado, agua y creación de entidades. No se atribuyen los candidatos
+de esta etapa temprana a la entrada definitiva ni se genera un VWI con un
+punto escogido arbitrariamente. La salida requiere otro predicado y ordenación.
+
+### Pruebas y estado
+
+48 pruebas Python pasan. Las seis nuevas cubren copia independiente de capas,
+cierre sin borrar índices, orden/offset float32 de entidades con parámetros
+anidados, rechazo de duplicados/dimensiones dobles/UID ausente/coordenadas
+inválidas, cuatro enlaces y sus bits alternativos, componente encerrado,
+agua cercana y plataforma que no sirve como soporte sólido.
+
+Con la base original se montaron 300 layouts (100 semillas × 3 pisos),
+12000 habitaciones y 960000 tiles. Todas las muestras tienen borde sólido,
+ubicaciones dentro de 1280×640 píxeles y candidatos de entrada no vacíos.
+298 muestras tienen candidatos secos y 2 solamente cerca de agua.
+Ubicaciones acumuladas: Chest 3936, Spikes 4086, Doodad 1924, DartTrap 598,
+BoulderTrap 406, Boulder 257, BreakableWall 163 y BoulderBlocker 13.
+No se descarta ninguna categoría por no tener todavía lógica en Vita.
+Semilla 12345: 44/29/45 ubicaciones de entidades para pisos 0/1/2.
+
+Los JSON privados marcan entities_instantiated=false, secret_sealing_implemented=false,
+water_simulated=false, entrance_exit_placed=false y floor_complete=false.
+Faltan inicialización gráfica/iluminación, sellado con paredes rompibles,
+agua, entidades funcionales, entrada/salida, prueba global y regeneración,
+transición y juego completo. El archivo privado de layout contiene datos
+originales y no se publica en GitHub ni se incluye en el VPK.
+
+```powershell
+python tools/floor_layout.py _local/assets/rooms.json --seed 12345 --floor 0 --output _local/generation030/floor0-layout.private.json
+python -m unittest discover -s tests -v
+```
+
+Recuperación 030 se conserva aparte con fuente, resultados y hashes.
+VPK instalable vigente 025; no se aprueba rendimiento físico a partir de estas
+pruebas de Python ni se entrega el layout parcial como un primer piso jugable.
