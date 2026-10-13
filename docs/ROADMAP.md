@@ -1,3 +1,11 @@
+# Avance de reconstrucción 027 (VPK vigente 025)
+
+Ramas con ciclos y etapa de tienda ACT_ONE recuperadas, preservando sorteos,
+límites y tipos originales. 300 grafos conectados y tipos disponibles en la
+base del usuario; 22 pruebas pasan. [Evidencia y comandos](GENERATION_RECOVERY.md).
+Faltan tesoros, salas especiales restantes, selección geométrica y montaje;
+todavía no se ha generado el primer piso jugable ni comprobado paridad PC.
+
 # Avance de reconstrucción 026 (VPK vigente 025)
 
 Motor MT19937 y distribución original contrastados con el PE; camino principal

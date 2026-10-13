@@ -145,3 +145,56 @@ entrada/salida y transformación final. Después debe conectarse al runtime y
 probar transición desde INTRO conservando personaje. VPK vigente 025: no se
 publica un ejecutable idéntico como revisión nueva mientras solo cambia el
 preparador. Recuperación 026 se conserva aparte con fuente, informe y validación.
+
+## Recuperación 027: ramas y tienda ACT_ONE
+
+Se añade tools/floor_room_graph.py sobre el estado RNG al final del camino
+principal. La etapa de ramas usa orden de sorteos izquierda/derecha/arriba/abajo,
+distinto del orden izquierda/arriba/derecha/abajo del camino. Sus bits de enlace
+siguen siendo LEFT=1, UP=2, RIGHT=4, DOWN=8. Se preservan las llamadas: dos
+coordenadas sobre toda la cuadrícula 8×5; dirección solo para fuente ya enlazada;
+otro entero si el vecino de destino ya está enlazado. No se filtran primero
+candidatos válidos: los sorteos fallidos también cuentan y consumen el RNG.
+
+La comparación en 0x0067d84e–0x0067d86b confirma random % 20 < 7 para aceptar
+un enlace a habitación ya conectada. Permite ciclos y también intentos sobre
+un enlace que ya existe. Vecino nuevo incrementa numRooms solo si queda sitio
+hasta ancho×alto de región activa. Los límites de región se comprueban antes
+ de la probabilidad. 0x0067d3a7–0x0067d3c3 confirma que el bucle termina cuando
+cumple el límite de intentos (área×4) y además alcanza al menos nueve habitaciones
+o llega al máximo de región. No se fuerza llenar toda la región ni se sustituye
+por un árbol sin ciclos. No se incluyen aquí las ramas específicas de otros actos.
+
+La etapa de tienda elige una casilla no enlazada de la cuadrícula completa.
+Necesita vecino horizontal conectado; prueba derecha antes que izquierda.
+Añade los enlaces recíprocos y ShopRoom (0x100); los tipos resultantes son 260
+(RIGHT+SHOP) o 257 (LEFT+SHOP), ambos con plantillas originales en ACT_ONE.
+Genera una tienda. Se verifica la regla en el bloque 0x0067db2b–0x0067dcf8.
+La exclusión de vecino treasureRoom está presente en el original; en este orden
+los tesoros aún no están marcados. No se elige arte de tienda ni se inventa un NPC.
+
+### Validación y siguiente etapa
+
+22 pruebas Python pasan. Cinco nuevas cubren umbral de ciclos 6/7, vecino nuevo,
+máximo de habitaciones, borde, fuente vacía sin sorteo de dirección, preferencia
+horizontal de tienda y casos de grafo conectado. Se probaron 300 grafos (100
+semillas en cada piso ACT_ONE): preservan todos los enlaces principales, extremos,
+enlaces recíprocos, conectividad de las habitaciones enlazadas y conteo exacto
+de extracciones. En esos 300 casos, todos los tipos solicitados existen en
+rooms.json de la copia del usuario. Eso no prueba que las plantillas elegidas
+sean compatibles geométricamente, ni que el grafo coincida con un piso PC real.
+Se conserva pc_runtime_parity_verified=false y floor_complete=false.
+
+```powershell
+python tools/floor_room_graph.py --seed 12345 --floor 0 --output _local/generation027/room-graph-floor0-seed12345.json
+python -m unittest discover -s tests -v
+```
+
+Semilla 12345: pisos 0/1/2 tienen respectivamente 9/9/10 habitaciones tras
+ramas, más una tienda; consumen 356/156/178 valores hasta esta etapa. Tesoros,
+pedestales, transformaciones de habitaciones, selección con reintentos y montaje
+de tiles/entidades siguen pendientes. Los safeguards del preparador abortan con
+error tras 100000 intentos; no se atribuye ese límite al juego original.
+
+Se conserva recuperación 027 aparte. VPK vigente 025: no cambia el juego mostrado
+en Vita3K ni se entrega un mapa parcial como si fuera el primer piso completo.
