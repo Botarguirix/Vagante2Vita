@@ -1,3 +1,11 @@
+# Avance de reconstrucción 028 (VPK vigente 025)
+
+Etapa de tesoro cerca de salida recuperada. Selector geométrico por columnas,
+frecuencias y reintentos implementado para salas simples. 300 análisis con
+plantillas originales sin fallos de unión local; 29 pruebas pasan.
+[Evidencia y límites](GENERATION_RECOVERY.md). Secretos y pedestales todavía
+alterarán la selección definitiva; primer piso jugable aún no generado.
+
 # Avance de reconstrucción 027 (VPK vigente 025)
 
 Ramas con ciclos y etapa de tienda ACT_ONE recuperadas, preservando sorteos,

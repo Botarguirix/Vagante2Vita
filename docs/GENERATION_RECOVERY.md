@@ -198,3 +198,63 @@ error tras 100000 intentos; no se atribuye ese límite al juego original.
 
 Se conserva recuperación 027 aparte. VPK vigente 025: no cambia el juego mostrado
 en Vita3K ni se entrega un mapa parcial como si fuera el primer piso completo.
+
+## Recuperación 028: tesoro y selector geométrico
+
+Se añade tools/floor_treasure.py. Después de la tienda se coloca una sala de
+tesoro horizontal (TREASURE 0x200 + LEFT/RIGHT), con vecino conectado que no
+sea tienda, y prioridad derecha antes que izquierda. Se cuentan primero casillas
+vacías con vecinos válidos; si no hay candidatos no se consume RNG para buscar.
+La búsqueda empieza alrededor de la salida: radio X/Y=1, amplitud=2, offsets
+aleatorios [-radio, radio-1], y coordenadas limitadas a cuadrícula 8×5.
+
+0x0067dd88–0x0067ddc7 confirma conteo/exclusión de tiendas. 0x0067dea2–0x0067ded6
+confirma que el radio aumenta cuando contador==radioX×radioY×2, después de
+sortear la casilla y antes de validarla. El contador se reinicia, radio X crece
+hasta 8 e Y hasta 5, amplitudes aumentan en dos. No se sustituye por selección
+uniforme sobre una lista prefiltrada. La casilla de esa iteración conserva el
+sorteo con el radio anterior. Los enlaces y flag treasureRoom se asignan en
+0x0067df7e. Se preservan todas las extracciones, incluidas casillas repetidas,
+ya enlazadas, recortadas al borde o descartadas por tienda.
+
+También se añade tools/floor_room_selection.py con las reglas de salas simples
+de randomizeRooms 0x0075ed40: recorre columnas y después filas; candidatos se
+seleccionan por mínima frecuencia; cada elección incrementa frecuencia antes
+de validación. Enlace izquierdo exige alguna apertura común entre bordes,
+con tipo 1 como sólido; enlace superior usa roomsFitVertically recuperado.
+La comprobación no se aplica si el borde no tiene ese enlace o está en el límite
+de la cuadrícula. Tamaños dobles aún no admitidos por este selector.
+
+Tras 21 elecciones incompatibles, el original conserva el último candidato y
+registra advertencia: se reproduce la retención con geometry_compatible=false y
+retained_after_retry_limit=true. No se declara válido por terminar el bucle.
+Si falta el pool solicitado, este preparador falla explícitamente: aún no se
+reproduce el fallback de habitación vacía del original. La función no monta
+piso ni implementa su regeneración final al fallar recorribilidad global.
+
+### Validación
+
+29 pruebas Python pasan. Cuatro nuevas cubren exclusión de tienda, prioridad,
+radio ampliado tras la tercera muestra inicial, cero sorteos si no hay
+candidatos y 300 grafos con tesoro. Tres pruebas del selector cubren orden de
+recorrido, abertura horizontal, soporte/altura vertical, frecuencia de intentos
+rechazados y candidato retenido tras alcanzar límite.
+
+Se probó el selector con 300 grafos y rooms.json originales: 12000 colocaciones;
+ninguno de los 300 casos agotó reintentos con geometría incompatible. Solo
+comprueba uniones locales de salas, no desplazamiento completo de un jugador.
+La selección se ejecutó anticipadamente para probar el componente: falta
+consumir antes las etapas de secretos y pedestales, por lo que esos UID no se
+atribuyen a la salida final original con esa semilla. Informes privados marcan
+analysis_only_early_selection=true y secret_and_pedestal_rng_not_consumed=true.
+Los JSON de análisis con UID permanecen fuera de GitHub.
+
+```powershell
+python tools/floor_treasure.py --seed 12345 --floor 0 --output _local/generation028/treasure-floor0.json
+python -m unittest discover -s tests -v
+```
+
+Semilla 12345: tesoros (2,2), (6,2), (2,0) para pisos 0/1/2; intentos 1/8/2.
+No son mapas completos ni casos contrastados con ejecución PC. VPK vigente
+025. Pendiente: randFloat y shuffle originales, secretos/pedestales, montaje
+final de tiles/entidades y entrada/salida, recorribilidad global y transición.
