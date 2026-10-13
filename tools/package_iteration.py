@@ -23,6 +23,7 @@ def main():
     p.add_argument('--menu-archive',type=pathlib.Path,help='Optional private menu-only archive, never committed')
     p.add_argument("--world-data-dir",type=pathlib.Path,help="Private prepared world directory; never committed")
     p.add_argument("--validation-log",type=pathlib.Path,help="Optional native validation output")
+    p.add_argument("--emulator-validation-dir",type=pathlib.Path,help="Private native emulator run report directory")
     args=p.parse_args()
     if len(args.iteration)!=3 or not args.iteration.isdigit():p.error('Use three digits')
     root=pathlib.Path(__file__).resolve().parent.parent
@@ -47,6 +48,7 @@ def main():
         shutil.copyfile(args.vpk,dest/args.vpk.name)
         shutil.copyfile(args.build_log,dest/'build.log')
         if args.validation_log:shutil.copyfile(args.validation_log,dest/'validation.log')
+        if args.emulator_validation_dir:shutil.copytree(args.emulator_validation_dir,dest/'emulator')
         (dest/'source.zip').write_bytes(git('archive','--format=zip','HEAD'))
         shutil.copyfile(root/'docs/ROADMAP.md',dest/'ROADMAP.md')
         if args.menu_archive:

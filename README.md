@@ -74,3 +74,6 @@ La entrega actual 013 conserva la misma aplicación y separa entregas/logs: [ins
 
 
 **Entrega vigente: 024.** Cargador VWI2 de tamaño variable, cámara en dos ejes y menor duplicación de terreno en memoria. Conserva la intro original; primer piso aún sin ensamblar. [Instalación, pruebas y límites](docs/ITERATION24.md).
+
+
+**Entrega vigente: 025.** Pruebas automatizadas del VPK nativo en una instancia aislada de Vita3K, logs por ejecución y perfil genérico de teclado. [Uso y límites](docs/ITERATION25.md). El mundo completo sigue pendiente.

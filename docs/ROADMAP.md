@@ -1,3 +1,10 @@
+# Estado vigente: iteración 025
+
+VPK ejecutado y validado automáticamente en Vita3K con secuencia externa,
+instancia/datos separados y logs por ejecución. Perfil genérico de teclado
+aplicado al emulador principal. [Uso, resultados y alcance](ITERATION25.md).
+La intro original se conserva; generación y juego completo continúan pendientes.
+
 # Estado vigente: iteración 024
 
 VWI2 admite dimensiones/entrada/salida variables; cámara horizontal y vertical,

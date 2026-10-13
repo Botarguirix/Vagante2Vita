@@ -14,6 +14,7 @@
 #include "session_log.h"
 #include "world_visuals.h"
 #include "native_ui.h"
+#include "input_replay.h"
 static World world;
 static NativePlayer player;
 unsigned int _newlib_heap_size_user = 16 * 1024 * 1024;
@@ -90,6 +91,12 @@ int main(void){
  if(!loaded){if(log)fprintf(log,"SOURCE archive=data.vra\n");loaded=load_resources("ux0:data/Vagante2Vita/data.vra",log);}
  else if(log)fprintf(log,"SOURCE archive=menu-only.vra scope=menu_only origin_not_rehashed_on_vita\n");
  if(log){fprintf(log,"LOAD complete=%d load_us=%llu\n",loaded,(unsigned long long)(sceKernelGetSystemTimeWide()-start));fflush(log);}
+ InputReplay replay={0};
+ const char *replay_path="ux0:data/Vagante2Vita/autotest.vts";
+ if(replay_load(&replay,replay_path,log)){
+  char consumed[300];snprintf(consumed,sizeof(consumed),"%s.replay",log_path);
+  if(!log||rename(replay_path,consumed)){replay.active=0;if(log)fprintf(log,"AUTOTEST enabled=0 error=consume_failed\n");}
+ }
  Menu menu={0};log_state(log,&menu,0);
  unsigned previous=0;int buffer_index=0,paused=0,character=0,character_page=0,display_error=0,reduction=2,lightweight=1;
  const char *labels[]={"NEW GAME","PLAY ONLINE","OPTIONS","EXIT GAME"};
@@ -97,7 +104,10 @@ int main(void){
  uint64_t state_log_time=last_tick;
  sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
  for(;;){
-  SceCtrlData pad;memset(&pad,0,sizeof(pad));sceCtrlPeekBufferPositive(0,&pad,1);
+  if(replay.done){if(log)fprintf(log,"AUTOTEST sequence_consumed=1 final_screen=%s assertions_pending_on_host=1\n",menu_screen_name(menu.screen));break;}
+  SceCtrlData pad;memset(&pad,0,sizeof(pad));pad.lx=pad.ly=pad.rx=pad.ry=128;
+  sceCtrlPeekBufferPositive(0,&pad,1);
+  if(replay.active){pad.buttons=replay_buttons(&replay);pad.lx=pad.ly=pad.rx=pad.ry=128;}
   unsigned pressed=pad.buttons&~previous;previous=pad.buttons;
   if((pad.buttons&(SCE_CTRL_START|SCE_CTRL_SELECT))==(SCE_CTRL_START|SCE_CTRL_SELECT))break;
   if(!loaded&&(pressed&SCE_CTRL_START))break;
@@ -164,7 +174,9 @@ int main(void){
   unsigned old_arrows=player.arrows.fired,old_impacts=player.arrows.impacts,old_bow_frame=player.bow.keyframe,old_bow_active=player.bow.active;
   unsigned old_attack_serial=player.melee.serial,old_attack_frame=player.melee.keyframe,old_attack_active=player.melee.active;
   PlayerMotion old_motion=player.motion;unsigned old_input=player.previous;
+  uint64_t replay_before=menu.total_ticks;
   while(accumulator>=16667){if(loaded){menu_tick(&menu);if(menu.screen==MENU_WORLD&&!paused&&!character)player_step(&player,&world,player_buttons(&pad));}accumulator-=16667;}
+  replay_advance(&replay,(unsigned)(menu.total_ticks-replay_before));
   if(log&&menu.screen==MENU_WORLD&&(old_motion!=player.motion||old_input!=player.previous)){
    fprintf(log,"PLAYER_EVENT tick=%u motion=%s input=%u x=%.3f y=%.3f vx=%.3f vy=%.3f contacts=%u\n",player.ticks,player_motion_name(player.motion),player.previous,player.x,player.y,player.vx,player.vy,player.contacts);
   }
@@ -219,5 +231,7 @@ int main(void){
  }
  if(log){fprintf(log,"EXIT normal=%d screen=%s display_error=%d\n",display_error==0,menu_screen_name(menu.screen),display_error);fclose(log);}
  scene_free_cache();free_world_visuals();free_resources();sceDisplaySetFrameBuf(NULL,SCE_DISPLAY_SETBUF_NEXTFRAME);sceDisplayWaitVblankStart();
- sceKernelFreeMemBlock(block);sceKernelExitProcess(0);return 0;
+ /* The process manager reclaims CDRAM at process exit. Keep the final
+    framebuffer alive through display/emulator teardown. */
+ sceKernelExitProcess(0);return 0;
 }
