@@ -1,3 +1,11 @@
+# Avance de reconstrucción 026 (VPK vigente 025)
+
+Motor MT19937 y distribución original contrastados con el PE; camino principal
+ACT_ONE reconstruido para floorIndex 0–2, preservando consumos aleatorios.
+Selector por menor uso recuperado, incluidos intentos geométricos rechazados.
+[Comandos y evidencia](GENERATION_RECOVERY.md). Aún faltan ramas, salas especiales,
+ensamblado y transición; no hay primer piso nuevo jugable ni equivalencia PC probada.
+
 # Estado vigente: iteración 025
 
 VPK ejecutado y validado automáticamente en Vita3K con secuencia externa,

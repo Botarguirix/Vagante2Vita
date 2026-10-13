@@ -76,3 +76,72 @@ Vita: el VPK vigente sigue siendo 023, y no se presenta un VPK idéntico como
 una nueva versión jugable. El siguiente cambio de runtime debe admitir 80×40
 sin inflar toda la caché a escala de actos futuros, y después conectar el
 ensamblado de habitaciones y la transición de INTRO preservando personaje.
+
+## Recuperación 026: RNG y etapa de camino principal ACT_ONE
+
+Se contrastó el código del PE local, no solo los tipos del pseudocódigo:
+
+- 0x0067c539 llama seed 0x004ec020, que escribe el motor global 0x00b80c00.
+- 0x0041cce0 lee límites globales en 0x00b81f88/0x00b81f8c. Los bytes
+  iniciales del PE son 0 y 2147483647; devuelve MT19937 modulo 2^31.
+  No equivale a tomar los 31 bits altos de la salida.
+- 0x0067ccb6 y 0x0067cccf consumen dos enteros en ACT_ONE por intento.
+  El segundo sustituye la dirección del primero. No simplificar a una llamada.
+- Node 0x0067bdc0 inicia lados intentados por borde de región, orden
+  izquierda/arriba/derecha/abajo. Se rota en ese orden para buscar lado libre.
+- El conjunto de nodos visitados representa la pila activa. Al retroceder
+  se retira el nodo; no es un conjunto permanente de celdas visitadas.
+- Al alcanzar objetivo, se consume otro entero antes de materializar los enlaces
+  recíprocos de la cadena de padres. Debe conservarse para etapas posteriores.
+
+Las coordenadas de esta etapa usan cuadrícula 8×5. Para floorIndex 0, región
+activa origen (2,0), tamaño 3×4, entrada Y=0, salida Y=3 y X aleatoria de 2 a 4.
+Para floorIndex 1, origen (1,1), tamaño 5×3, entrada X=1 y salida X=5, Y aleatoria
+1 a 3. Para floorIndex 2, origen (2,0), tamaño 3×5, entrada Y=4, salida Y=0, X
+aleatoria 2 a 4. Cada caso consume dos valores para las coordenadas variables.
+La separación mínima de tres ya se cumple con esas coordenadas fijas; no se
+activa el bucle de reselección inicial en estos tres casos. La semilla aquí
+es param_4 de generateLevel, no una semilla de campaña cuyo mapeo aún falta.
+
+tools/floor_main_path.py reconstruye solamente esa etapa, emite enlaces de
+habitaciones y conserva número de extracciones y hash de estado propio del RNG.
+No emite VWI2, terreno, entidades ni un piso jugable. El hash usa la representación
+canónica del MT del preparador, no un volcado de la disposición C++ de Windows.
+Un límite de análisis de 100000 intentos aborta con error en vez de entregar un
+resultado parcial; ese límite no se atribuye al juego original.
+
+RoomDatabase::getRandomRoom 0x0075f250 selecciona el nivel de menor frecuencia,
+conservando orden del vector, y toma random % cantidad. randomizeRooms
+0x0075ed40 incrementa la frecuencia antes de comprobar geometría: también
+cuentan intentos rechazados. choose_least_used implementa ese selector, pero
+no llama aún al ensamblador ni reproduce sus reintentos, salas especiales o
+variantes. Los constructores de Level/Room y generateDisplayIndices inspeccionados
+entre selección de coordenadas y búsqueda no añaden consumos aleatorios para
+estas habitaciones vacías; Room inicia UID vacío.
+
+### Validación y alcance
+
+Diecisiete pruebas Python pasan. Se comprobaron 300 caminos (100 semillas por
+piso) con límites, ausencia de ciclos, extremos, enlaces recíprocos y reproducción
+estable. Cinco pruebas nuevas también cubren referencia del RNG, distribución,
+marcas de borde, parámetros y actualización de frecuencia de intentos.
+El test independiente tests/mt_reference.cpp usa std::mt19937: coinciden 1000
+valores por cada semilla 0, 1, 5489 y 4294967295, cruzando límites de bloque.
+Esto valida la secuencia matemática del motor, no la salida completa del piso
+original ejecutándose. Los informes indican pc_runtime_parity_verified=false.
+
+```powershell
+python tools/floor_main_path.py --seed 12345 --floor 0 --output _local/generation026/main-path-floor0-seed12345.json
+python -m unittest discover -s tests -v
+```
+
+Para la semilla 12345 se obtuvieron caminos de 6, 7 y 7 habitaciones en pisos
+0, 1 y 2, con 15, 15 y 35 extracciones. Es una muestra de la etapa reconstruida,
+no un caso de equivalencia PC ni una nueva mazmorra instalada en Vita.
+
+Pendiente inmediato: ramas y salas especiales posteriores al camino principal;
+selección con comprobaciones horizontal/vertical; montaje de tiles y entidades;
+entrada/salida y transformación final. Después debe conectarse al runtime y
+probar transición desde INTRO conservando personaje. VPK vigente 025: no se
+publica un ejecutable idéntico como revisión nueva mientras solo cambia el
+preparador. Recuperación 026 se conserva aparte con fuente, informe y validación.
