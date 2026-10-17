@@ -29,6 +29,26 @@ int main(void){
   if(enemy_types[n]==10){assert(contact_damage>=1&&contact_damage<=6);assert(enemy->contact_cooldown==30);}
   else {assert(contact_damage==0);assert(enemy->contact_cooldown==0);}
  }
+ /* Spider runs the recovered 20-frame tell, launches with the native
+    angle/speed ranges, and stays attack-active until its tile landing. */
+ World spider_ai;memset(&spider_ai,0,sizeof(spider_ai));
+ spider_ai.ready=1;spider_ai.width=40;spider_ai.height=24;spider_ai.entity_count=1;
+ for(int tx=0;tx<40;tx++)spider_ai.tiles[7*40+tx].solid=1;
+ WorldEntity *active_spider=&spider_ai.entities[0];active_spider->kind=24;
+ active_spider->subtype=14;active_spider->hp=10;active_spider->x_q8=100*256;
+ active_spider->y_q8=104*256;
+ world_enemies_step(&spider_ai,130,100,6,12,NULL);
+ assert(active_spider->spider_jump_tell==20&&!active_spider->spider_jumping);
+ for(unsigned tick=0;tick<20;tick++)world_enemies_step(&spider_ai,130,100,6,12,NULL);
+ assert(active_spider->spider_jump_tell==0&&active_spider->spider_jumping);
+ assert(active_spider->vx>.2f&&active_spider->vx<2.0f&&active_spider->vy<0.0f);
+ active_spider->x_q8=130*256;active_spider->y_q8=100*256;
+ unsigned active_spider_damage=world_enemies_contact_damage(&spider_ai,130,100,6,12);
+ assert(active_spider_damage>=5&&active_spider_damage<=10);
+ for(unsigned tick=0;tick<100&&active_spider->spider_jumping;tick++)
+  world_enemies_step(&spider_ai,200,200,6,12,NULL);
+ assert(!active_spider->spider_jumping&&active_spider->spider_recovery==30);
+ assert(active_spider->y_q8==104*256);
  /* Spider::doCollision gates jump contact by speed and per-target cooldown. */
  World spider_contact;memset(&spider_contact,0,sizeof(spider_contact));
  spider_contact.entity_count=1;WorldEntity *spider_enemy=&spider_contact.entities[0];
@@ -42,7 +62,7 @@ int main(void){
  assert(spider_damage>=5&&spider_damage<=10&&spider_enemy->contact_cooldown==30);
  assert(world_enemies_contact_damage(&spider_contact,100,100,1,1)==0);
  for(unsigned tick=0;tick<30;tick++)world_enemies_step(&spider_contact,200,200,1,1,NULL);
- spider_enemy->x_q8=100*256;spider_enemy->y_q8=100*256;spider_enemy->vx=.2f;
+ spider_enemy->x_q8=100*256;spider_enemy->y_q8=100*256;spider_enemy->vx=.2f;spider_enemy->spider_jumping=1;
  assert(world_enemies_contact_damage(&spider_contact,100,100,1,1)>=5);
  /* Goblin uses the original 16-frame tell and goblin-stab polygon, not body
     contact. The script's 0..1 shape multiplier scales its 5..9 damage roll. */

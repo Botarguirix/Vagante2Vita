@@ -1,5 +1,17 @@
 # Estado de reconstrucción (17 de octubre de 2026)
 
+La iteración 098 añade al runtime el aviso, impulso, colisión con tiles y
+aterrizaje del salto de Spider. Ghidra aporta el ángulo `1.256637 + U·0.1`,
+rapidez `3 + 2·U`, gravedad 0.16 y el aviso cercano de 20 ticks. CTest pasa
+12/12, incluido un ciclo de salto, daño por contacto durante el aire y
+aterrizaje. Estos cambios ya están empaquetados en el VPK 00.97. Las rutas
+físicas de los tres pisos alcanzan sus salidas y la entrega privada 097
+valida, pero el replay de campaña en Vita3K termina con `0xC0000005` antes de
+crear sesión o log nativo. La selección completa de estados de IA, telaraña,
+paridad de generación, transiciones jugables y validación en Vita3K/hardware
+siguen pendientes; `campaign_complete=false`. Véase
+[ITERATION98.md](ITERATION98.md).
+
 La validación 097 regeneró con el simulador actual los proofs físicos v3 de
 los pisos 0–2; las rutas llegan a sus salidas en 1,741, 736 y 375 ticks. La
 entrega privada 096 valida 113 archivos y genera un replay de campaña de 545

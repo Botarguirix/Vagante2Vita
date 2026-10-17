@@ -104,6 +104,72 @@ static void goblin_attack_step(World *w,WorldEntity *e,float dx,float dy){
   e->goblin_prep_timer=attack->windup;
 }
 
+static int spider_rect_solid(const World *w,float x,float y,float width,float height){
+ int left=(int)floorf(x/16.0f),right=(int)floorf((x+width-.001f)/16.0f);
+ int top=(int)floorf(y/16.0f),bottom=(int)floorf((y+height-.001f)/16.0f);
+ for(int ty=top;ty<=bottom;ty++)for(int tx=left;tx<=right;tx++)
+  if(world_solid(w,tx,ty))return 1;
+ return 0;
+}
+
+static int spider_move_axis(const World *w,float *x,float *y,float amount,
+                            float width,float height,int vertical){
+ if(fabsf(amount)<.0001f)return 0;
+ unsigned steps=(unsigned)ceilf(fabsf(amount));float delta=amount/(float)steps;
+ int landed=0;
+ for(unsigned i=0;i<steps;i++){
+  float nx=*x+(vertical?0.0f:delta),ny=*y+(vertical?delta:0.0f);
+  if(!spider_rect_solid(w,nx,ny,width,height)){*x=nx;*y=ny;continue;}
+  if(vertical&&delta>0.0f){int row=(int)floorf((ny+height-.001f)/16.0f);*y=row*16.0f-height;landed=1;}
+  else if(vertical&&delta<0.0f){int row=(int)floorf(ny/16.0f);*y=(row+1)*16.0f;}
+  return landed;
+ }
+ return landed;
+}
+
+/* Spider::runAI sets ACT_JUMP after a 20/30-frame tell. At launch its
+ * native constants are angle 1.256637 + U*0.1 and speed 3 + U*2,
+ * U uniform on [0,1] (Ghidra listing 0x007b18a0 and data at 0x00b81f90).
+ * Entity movement uses the shared 0.16 gravity seen in player/world physics. */
+static void spider_step(World *w,WorldEntity *e,float px,float py,float pw,float ph,
+                        float body_w,float body_h){
+ float x=e->x_q8/256.0f,y=e->y_q8/256.0f;
+ float dx=px+pw*.5f-(x+body_w*.5f),dy=py+ph*.5f-(y+body_h*.5f);
+ int support=(int)floorf((y+body_h+.5f)/16.0f);
+ int grounded=world_solid(w,(int)floorf((x+body_w*.5f)/16.0f),support);
+ if(e->spider_recovery)e->spider_recovery--;
+ if(e->spider_jump_tell){
+  e->vx*=.5f;
+  e->spider_jump_tell--;
+  if(!e->spider_jump_tell){
+   float u_angle=(float)(next_contact_random(e)>>8)*(1.0f/16777216.0f);
+   float u_speed=(float)(next_contact_random(e)>>8)*(1.0f/16777216.0f);
+   float angle=1.256637096f+u_angle*.1f;
+   float speed=3.0f+2.0f*u_speed;
+   float direction=dx<0.0f?-1.0f:1.0f;
+   e->vx=cosf(angle)*speed*direction;e->vy=-sinf(angle)*speed;
+   e->spider_jumping=1;
+  }
+ }else if(!e->spider_jumping&&!e->spider_recovery&&grounded&&
+          fabsf(dx)>=16.0f&&fabsf(dx)<64.0f&&fabsf(dy)<32.0f){
+  /* The close-range native branch sets jumpTellFrames to 0x14. */
+  e->spider_jump_tell=20;e->vx*=.5f;
+ }else if(!e->spider_jumping&&!e->spider_jump_tell&&grounded&&fabsf(dx)<88.0f&&fabsf(dy)<30.0f){
+  e->vx+=dx>0.0f?.035f:-.035f;if(e->vx>.7f)e->vx=.7f;if(e->vx<-.7f)e->vx=-.7f;
+ }else if(!e->spider_jumping){
+  e->vx*=.94f;if(fabsf(e->vx)<.04f)e->vx=0.0f;
+ }
+
+ int landed=spider_move_axis(w,&x,&y,e->vx,body_w,body_h,0);
+ (void)landed;
+ if(e->vy<8.0f)e->vy+=.16f;
+ if(e->vy>8.0f)e->vy=8.0f;
+ landed=spider_move_axis(w,&x,&y,e->vy,body_w,body_h,1);
+ if(landed){e->vy=0.0f;if(e->spider_jumping){e->spider_jumping=0;e->spider_recovery=30;}}
+ e->x_q8=(int32_t)lrintf(x*256.0f);e->y_q8=(int32_t)lrintf(y*256.0f);
+ e->x=(int16_t)x;e->y=(int16_t)y;
+}
+
 void world_enemies_step(World *w,float px,float py,float pw,float ph,const MeleeState *attack){
  for(unsigned i=0;i<w->entity_count;i++){
   WorldEntity *e=&w->entities[i];if(e->kind!=24||e->hp<=0)continue;
@@ -117,6 +183,7 @@ void world_enemies_step(World *w,float px,float py,float pw,float ph,const Melee
   if(damage>0&&!e->cooldown&&attack->serial!=e->hit_attack_serial){
    e->hp-=damage;e->hit_attack_serial=attack->serial;e->cooldown=12;if(e->hp<=0){e->hp=0;continue;}
   }
+  if(e->subtype==14){spider_step(w,e,px,py,pw,ph,body_w,body_h);continue;}
   if(e->subtype==9&&(e->goblin_prep_timer||e->goblin_swing_frame))e->vx*=.8f;
   else if(fabsf(dx)<88&&fabsf(dy)<30){e->vx+=dx>0?.035f:-.035f;if(e->vx>.7f)e->vx=.7f;if(e->vx<-.7f)e->vx=-.7f;}
   else {e->vx*=.94f;if(fabsf(e->vx)<.04f)e->vx=0;}
