@@ -42,7 +42,7 @@ int main(void){
  assert(spider_damage>=5&&spider_damage<=10&&spider_enemy->contact_cooldown==30);
  assert(world_enemies_contact_damage(&spider_contact,100,100,1,1)==0);
  for(unsigned tick=0;tick<30;tick++)world_enemies_step(&spider_contact,200,200,1,1,NULL);
- spider_enemy->x_q8=100*256;spider_enemy->y_q8=100*256;
+ spider_enemy->x_q8=100*256;spider_enemy->y_q8=100*256;spider_enemy->vx=.2f;
  assert(world_enemies_contact_damage(&spider_contact,100,100,1,1)>=5);
  /* Goblin uses the original 16-frame tell and goblin-stab polygon, not body
     contact. The script's 0..1 shape multiplier scales its 5..9 damage roll. */
@@ -126,7 +126,7 @@ int main(void){
  unsigned char enemies[]={'V','W','E','3',1,0,16,0,24,9,0,0,0,16,0,0,0,32,0,0,0,0,0,0};
  write(f,enemies,sizeof(enemies));assert(world_load_enemies(&w,path,NULL));assert(w.entity_count==2&&w.entities[0].kind==24&&w.entities[0].subtype==9&&w.entities[0].hp==2.0f&&w.entities[1].kind==16);
  assert(world_load_enemies(&w,path,NULL));assert(w.entity_count==2);
- unsigned char spider[]={'V','W','E','3',1,0,16,0,24,14,0,0,0,16,0,0,0,32,0,0,0,1,0,0,0};
+ unsigned char spider[]={'V','W','E','3',1,0,16,0,24,14,0,0,0,16,0,0,0,32,0,0,0,1,0,0};
  assert(world_load_enemies(&w,path,NULL));
  write(f,spider,sizeof(spider));assert(world_load_enemies(&w,path,NULL));
  assert(w.entities[0].kind==24&&w.entities[0].subtype==14);

@@ -1,5 +1,14 @@
 # Estado de reconstrucción (17 de octubre de 2026)
 
+La validación 097 regeneró con el simulador actual los proofs físicos v3 de
+los pisos 0–2; las rutas llegan a sus salidas en 1,741, 736 y 375 ticks. La
+entrega privada 096 valida 113 archivos y genera un replay de campaña de 545
+segmentos/3,184 ticks con `player_step` en los tres pisos. CMake/CTest en Ubuntu
+pasa 12/12 tests. El smoke automatizado de campaña con VPK 00.96 vuelve a
+terminar con `0xC0000005` antes de crear sesión o log nativo en Vita3K. La
+campaña sigue sin validación dentro del emulador y `campaign_complete=false`.
+Véase [ITERATION97.md](ITERATION97.md).
+
 La iteración 096 compila una regla de contacto de Spider recuperada con
 Ghidra: solo durante el estado de salto y con rapidez mínima 0.2, causa 5–10
 de daño y evita repetir el golpe al mismo objetivo durante 30 ticks. El estado
