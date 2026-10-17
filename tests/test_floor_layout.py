@@ -4,6 +4,7 @@ from tools.floor_layout import (assemble_tiles, close_act_one_border, solid,
                                 tile_paths_to_room_edge, above_ground_candidates,
                                 repair_provisional_route_support,
                                 act_one_room_monster_budget, act_one_enemy_type_for_roll,
+                                act_one_lurker_geometry_supported,
                                 provisional_enemies,
                                 consume_spellbook_rng,
                                 consume_placed_entity_rng,
@@ -42,6 +43,20 @@ class FloorLayoutTests(unittest.TestCase):
         for invalid in (-1, 100, True, 1.0):
             with self.assertRaises(ValueError):
                 act_one_enemy_type_for_roll(invalid)
+
+    def test_act_one_lurker_roll_respects_native_neighbor_solidity_filter(self):
+        tiles = [[[0] for _ in range(5)] for _ in range(5)]
+        self.assertTrue(act_one_lurker_geometry_supported(tiles, 2, 2))
+
+        tiles[1][2][0] = 1
+        self.assertFalse(act_one_lurker_geometry_supported(tiles, 2, 2))
+        tiles[1][2][0] = 0
+
+        tiles[2][1][0] = 1
+        tiles[2][3][0] = 7
+        self.assertFalse(act_one_lurker_geometry_supported(tiles, 2, 2))
+        tiles[2][3][0] = 0
+        self.assertTrue(act_one_lurker_geometry_supported(tiles, 2, 2))
 
     def test_provisional_enemy_spawns_obey_recovered_room_weight_cap(self):
         from tools.floor_main_path import MT19937

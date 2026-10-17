@@ -59,6 +59,12 @@ def act_one_enemy_type_for_roll(roll, *, lurker_geometry_supported=True):
     return 11 if lurker_geometry_supported else None  # TYPE_LURKER (15%)
 
 
+def act_one_lurker_geometry_supported(tiles, x, y):
+    """Mirror addRandomEnemies' three Level::isSolid checks for a Lurker roll."""
+    return not solid(tiles, x, y - 1) and not (
+        solid(tiles, x - 1, y) and solid(tiles, x + 1, y))
+
+
 def consume_spellbook_rng(rng, floor_index):
     """Consume the recovered Item/Skill draws for one empty book pedestal."""
     draws_before = rng.draws
@@ -408,7 +414,6 @@ def provisional_enemies(tiles, room_types, placements, spec, rng, entrance, goal
         from floor_tile_path import orthogonal_tile_path
     rw, rh = spec['width'], spec['height']
     room_budget = act_one_room_monster_budget(floor_index, new_game_plus)
-    room_spawn_cap = math.ceil(room_budget)
     enemies = []
     for room in placements:
         room_type = room['room_type']
@@ -431,11 +436,19 @@ def provisional_enemies(tiles, room_types, placements, spec, rng, entrance, goal
             continue
         # The recovered room budget caps total spawn weight, but native
         # candidate filters, shuffle order, and RNG interleaving remain partial.
-        for budget_slot in range(min(room_spawn_cap, len(candidates))):
+        # A rejected Lurker roll consumes this candidate and the native loop
+        # continues until the weight budget is met or candidates are exhausted.
+        room_weight = 0.0
+        budget_slot = 0
+        candidate_attempt = 0
+        while candidates and room_weight < room_budget:
             candidate_index = rng.raw() % len(candidates)
             x, y = candidates.pop(candidate_index)
             roll = rng.raw() % 100
-            subtype = act_one_enemy_type_for_roll(roll)
+            lurker_supported = act_one_lurker_geometry_supported(tiles, x, y)
+            subtype = act_one_enemy_type_for_roll(
+                roll, lurker_geometry_supported=lurker_supported)
+            candidate_attempt += 1
             if subtype is None:
                 continue
             enemies.append(dict(kind='enemy', subtype=subtype,
@@ -443,7 +456,10 @@ def provisional_enemies(tiles, room_types, placements, spec, rng, entrance, goal
                                 room=[rx, ry], spawn_model='provisional_act_one',
                                 room_monster_budget=room_budget,
                                 room_budget_slot=budget_slot,
+                                candidate_attempt=candidate_attempt,
                                 native_parity=False))
+            room_weight += 1.0
+            budget_slot += 1
     return enemies
 
 

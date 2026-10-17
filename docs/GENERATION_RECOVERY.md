@@ -1031,3 +1031,28 @@ bundle valida 108 archivos y 56 imágenes, y pasan 165 pruebas Python. Los
 rollos siguen usando el RNG provisional del generador; la geometría que filtra
 Lurkers, el barajado nativo y el orden real de candidatos aún no se modelan
 completamente. `floor_complete` y `campaign_complete` continúan falsos.
+
+## Recuperación 073: filtro geométrico de Lurker
+
+La rama ACT_ONE de `LevelGenerator::addRandomEnemies` (`0x0068e08f`–
+`0x0068e0eb`) comprueba la geometría solo después de un roll 85–99. Llama a
+`Level::isSolid` (`0x0064b1b0`) para `(x, y-1)`; si hay sólido, descarta ese
+candidato. Después examina `(x-1, y)` y `(x+1, y)`; lo descarta si ambos lados
+son sólidos. Un candidato rechazado no añade peso al presupuesto y el bucle
+continúa con la siguiente celda.
+
+`floor_layout.py` ahora replica esa condición para las celdas internas y sigue
+buscando hasta completar `Room::monstersAllowed` o agotar candidatos. Las
+pruebas cubren techo bloqueado, ambos laterales bloqueados y un lateral libre.
+La entrega privada 089 valida 108 archivos y 56 imágenes; los tres proofs de
+ruta conservan los hashes VWI2/VWE2, y pasan 166 pruebas Python. El modelo
+mantiene candidatos y RNG provisionales, por lo que los 36 enemigos siguen sin
+paridad seed-exact. En el piso 2, sala `[3,0]`, el modelo examinó tres celdas
+para colocar dos enemigos; el paquete VWE3 de ese piso cambió mientras VWI2 y
+VWE2 conservaron sus hashes de prueba.
+
+La iteración 089 recompiló el runtime como VPK 00.89 con VitaSDK Windows
+(830,426 bytes). El preflight del paquete y la replay de campaña de tres pisos
+pasaron, pero el harness con Vita3K 0.2.1.4183 agotó 90 segundos antes de la
+sesión nativa y no produjo logs. La evidencia y el SHA-256 están en
+[ITERATION89.md](ITERATION89.md); no se considera gameplay validado.
