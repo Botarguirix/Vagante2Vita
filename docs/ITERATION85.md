@@ -42,13 +42,13 @@ el replay de campaña se generó con 545 pasos para las rutas de los tres pisos.
 Los recursos corregidos quedaron copiados en
 `_local/vita3k-vagante-dedicated/filesystem/ux0/data/Vagante2Vita/`.
 
-El arnés probó lanzamientos Qt y SDL con OpenGL. En ambos casos el proceso de
-Vita3K quedó sin ventana principal; el intento SDL expiró a los 45 segundos
-antes de crear `session-*.log` (`run-000007/result.json`, etapa
-`before_native_session`, stdout/stderr y log del emulador vacíos). Por tanto,
-esta prueba no evalúa los recursos corregidos ni el recorrido de ACT_ONE. Los
-logs anteriores sí documentan los dos bloqueos de recursos ya corregidos en el
-perfil: primero faltaba `act-one-goblin-attack.vga`, luego
+El arnés probó lanzamientos Qt y SDL con OpenGL, y el modo de consola con VPK
+directo. Los tres procesos quedaron sin ventana principal, sin salida y con
+`vita3k.log` vacío. SDL y consola expiraron a los 45 segundos antes de crear
+`session-*.log` (`run-000007` y `run-000008`, etapa `before_native_session`).
+Por tanto, estos intentos no evalúan los recursos corregidos ni el recorrido de
+ACT_ONE. Los logs anteriores sí documentan los dos bloqueos de recursos ya
+corregidos en el perfil: primero faltaba `act-one-goblin-attack.vga`, luego
 `enemies/goblin/attack.png`. Se requiere un arranque interactivo funcional de
 Vita3K para validar el replay actual y las transiciones; no se declara el mundo
 completo ni jugable todavía.
