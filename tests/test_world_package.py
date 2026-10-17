@@ -67,6 +67,7 @@ class WorldPackageTests(unittest.TestCase):
                 "gfx/traps/boulder_blocker.png","gfx/traps/boulders.png",
                 "gfx/traps/shake_boulder.png",
                 "gfx/doodads/breakable_wall.png",
+                "gfx/scenes/intro/entities/little_firefly.png",
             ):
                 path=assets/rel;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b"art")
             for name in ("counter.png","shop_sign.png","torch.png","decorative_helmet.png",
@@ -119,6 +120,9 @@ class WorldPackageTests(unittest.TestCase):
             self.assertIn("entities/boulders.png",manifest["files"])
             self.assertIn("entities/shake_boulder.png",manifest["files"])
             self.assertIn("entities/breakable_wall.png",manifest["files"])
+            self.assertIn("entities/torch.png",manifest["files"])
+            self.assertIn("entities/flower_1.png",manifest["files"])
+            self.assertIn("entities/little_firefly.png",manifest["files"])
             self.assertIn("enemies/goblin/attack.png",manifest["files"])
             self.assertIn("item-loot.vlt",manifest["files"])
             self.assertIn("items/items.png",manifest["files"])

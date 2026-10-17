@@ -82,6 +82,11 @@ def main():
     if args.act_one:
         sources.update({
             "entities/chest.png":args.assets/"gfx/chest_small.png",
+            # world_visuals loads these three sheets from the flat entities/
+            # directory; the doodad atlas copies below serve tile/entity art.
+            "entities/torch.png":args.assets/"gfx/doodads/torch.png",
+            "entities/flower_1.png":args.assets/"gfx/doodads/flower_1.png",
+            "entities/little_firefly.png":args.assets/"gfx/scenes/intro/entities/little_firefly.png",
             "entities/breakable_wall.png":args.assets/"gfx/doodads/breakable_wall.png",
             "entities/spikes.png":args.assets/"gfx/traps/spikes.png",
             "entities/spikes_broken.png":args.assets/"gfx/traps/spikes_broken.png",

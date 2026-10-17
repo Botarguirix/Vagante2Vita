@@ -52,3 +52,12 @@ corregidos en el perfil: primero faltaba `act-one-goblin-attack.vga`, luego
 `enemies/goblin/attack.png`. Se requiere un arranque interactivo funcional de
 Vita3K para validar el replay actual y las transiciones; no se declara el mundo
 completo ni jugable todavía.
+
+Una auditoría estática adicional encontró que `world_visuals.c` busca `torch`,
+`flower_1` y `little_firefly` directamente bajo `entities/`, mientras el bundle
+ACT_ONE solo copiaba los dos primeros a `entities/doodads/` y omitía la
+luciérnaga. `prepare_world_bundle.py` ahora emite las tres rutas que consume el
+runtime y el arnés las adapta en entregas antiguas. Las aserciones del
+preparador pasan; la entrega privada local valida 108 archivos y ya está
+estagiada. Falta comprobar en una sesión nativa que esta carga visual llega a
+`WORLD_VISUALS ready=1`.

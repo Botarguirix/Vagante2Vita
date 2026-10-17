@@ -201,6 +201,22 @@ $nestedWorld=Join-Path $ResourceDelivery 'world'
    }else{throw "ACT_ONE delivery is missing required enemy attack pose: $family"}
   }
  }
+ # world_visuals expects these optional sheets at entities/<name>.png,
+ # while the package also carries torch/flower under entities/doodads/.
+ foreach($name in @('torch','flower_1')){
+  $flat=Join-Path $actOneDest "entities/$name.png"
+  $nested=Join-Path $ResourceDelivery "entities/doodads/$name.png"
+  if(!(Test-Path -LiteralPath $flat) -and (Test-Path -LiteralPath $nested)){
+   Copy-Item -LiteralPath $nested -Destination $flat -Force
+  }
+ }
+ $firefly=Join-Path $actOneDest 'entities/little_firefly.png'
+ if(!(Test-Path -LiteralPath $firefly)){
+  $packedFirefly=Join-Path $ResourceDelivery 'entities/little_firefly.png'
+  $privateFirefly=Join-Path $repoRoot '_local/assets/gfx/scenes/intro/entities/little_firefly.png'
+  if(Test-Path -LiteralPath $packedFirefly){Copy-Item -LiteralPath $packedFirefly -Destination $firefly -Force}
+  elseif(Test-Path -LiteralPath $privateFirefly){Copy-Item -LiteralPath $privateFirefly -Destination $firefly -Force}
+ }
  $sourceFloors=Join-Path $ResourceDelivery 'floors';$destFloors=Join-Path $actOneDest 'floors'
  if(Test-Path -LiteralPath $sourceFloors){
   New-Item -ItemType Directory -Path $destFloors -Force|Out-Null
