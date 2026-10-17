@@ -986,3 +986,29 @@ compiló VPK: runtime sin cambios y último paquete 00.65. Otros hooks RNG y el
 desempate MSVC de `std::sort` no se han reconstruido; el mapa no es seed-exact.
 El route probe C sigue pendiente por falta de compilador host y el `E_ACCESSDENIED`
 actual de WSL.
+
+## Recuperación 071: presupuesto de enemigos por sala ACT_ONE
+
+La exportación Ghidra `_local/decompiled/0075af50.c` de
+`Room::monstersAllowed` era solo un stub por el retorno XMM. Se contrastó el
+cuerpo con la desensamblación x86 del PE local mediante `objdump`; el PDB sitúa
+`Room::act` en `+0x80`, el campo que la rutina consulta. Para ACT_ONE (`act=0`)
+la rama calcula `float(floorIndex >> 1) + 0.5`, y añade otro `0.5` cuando
+`newGamePlus` es verdadero. `addRandomEnemies` llama a la rutina con el
+`floorIndex` y `newGamePlus` del nivel y pasa `false` como tercer parámetro.
+
+La tabla `MONSTER_SPAWN_WEIGHT` en la inicialización `0x004035f0` da peso 1.0
+a los IDs ACT_ONE Goblin, Bat, Lurker y Slime. De ello se deriva un máximo de
+`ceil(budget)`: 1 enemigo por sala en pisos 0–1 y hasta 2 en el piso 2 (NG+
+añade 0.5 al presupuesto). `floor_layout.py` ahora aplica ese tope al modelo
+de spawns y registra el presupuesto, pero deja `native_parity=false`: el orden
+de barajado, los filtros de tiles, los rollos específicos de superficie y el
+consumo RNG completo de `addRandomEnemies` siguen incompletos.
+
+Con seed 12345, la nueva entrega privada 087 contiene 8, 8 y 20 spawns
+provisionales en los pisos 0–2. Los paquetes VWI2/VWE2 de pisos 1–2 mantienen
+los hashes de los proofs físicos anteriores; solo cambia VWE3 de enemigos. El
+manifiesto valida 108 archivos y el preflight revisa 56 imágenes. La suite
+Python pasa 164 pruebas y 66 subpruebas; los 12 tests C y los recorridos
+físicos registrados en la iteración 086 siguen pasando. `floor_complete` y
+`campaign_complete` permanecen falsos.

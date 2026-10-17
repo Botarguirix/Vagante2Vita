@@ -33,6 +33,19 @@ BOOK_SKILL_SPELL_TIERS = (
 )
 
 
+def act_one_room_monster_budget(floor_index, new_game_plus=False):
+    """Return Room::monstersAllowed's ACT_ONE budget from the local x86 listing."""
+    if type(floor_index) is not int or floor_index not in (0, 1, 2):
+        raise ValueError('ACT_ONE floor index must be 0, 1, or 2')
+    if type(new_game_plus) is not bool:
+        raise ValueError('new_game_plus must be a bool')
+    # Room::monstersAllowed @ 0x0075af50 reads Room::act at +0x80.
+    # The ACT_ONE branch computes (floorIndex >> 1) + 0.5 and adds
+    # another 0.5 for newGamePlus. MONSTER_SPAWN_WEIGHT is 1.0 for
+    # the ACT_ONE monster types, so ceil(budget) is the per-room cap.
+    return float(floor_index >> 1) + 0.5 + (0.5 if new_game_plus else 0.0)
+
+
 def consume_spellbook_rng(rng, floor_index):
     """Consume the recovered Item/Skill draws for one empty book pedestal."""
     draws_before = rng.draws
@@ -373,13 +386,16 @@ def _spawn_geometry(tiles, entrance, *, pixel_offset=(4, 4)):
                 clear=clear, supported=supported, verified=True)
 
 
-def provisional_enemies(tiles, room_types, placements, spec, rng, entrance, goal):
+def provisional_enemies(tiles, room_types, placements, spec, rng, entrance, goal,
+                        floor_index=0, new_game_plus=False):
     """ACT_ONE test spawns; not original room-budget/RNG parity."""
     try:
         from tools.floor_tile_path import orthogonal_tile_path
     except ModuleNotFoundError:
         from floor_tile_path import orthogonal_tile_path
     rw, rh = spec['width'], spec['height']
+    room_budget = act_one_room_monster_budget(floor_index, new_game_plus)
+    room_spawn_cap = math.ceil(room_budget)
     enemies = []
     for room in placements:
         room_type = room['room_type']
@@ -400,15 +416,19 @@ def provisional_enemies(tiles, room_types, placements, spec, rng, entrance, goal
                 candidates.append((x, y))
         if not candidates:
             continue
-        # One test enemy per eligible room, chosen from the recovered ACT_ONE
-        # distribution. The native room budget and RNG sequence are unknown.
-        x, y = candidates[rng.raw() % len(candidates)]
-        roll = rng.raw() % 100
-        subtype = 9 if roll < 40 else 10 if roll < 85 else 11
-        enemies.append(dict(kind='enemy', subtype=subtype,
-                            world_pixel=[x * 16 + 4, y * 16 + 4],
-                            room=[rx, ry], spawn_model='provisional_act_one',
-                            native_parity=False))
+        # The recovered room budget caps total spawn weight, but native
+        # candidate filters, shuffle order, and RNG interleaving remain partial.
+        for budget_slot in range(min(room_spawn_cap, len(candidates))):
+            candidate_index = rng.raw() % len(candidates)
+            x, y = candidates.pop(candidate_index)
+            roll = rng.raw() % 100
+            subtype = 9 if roll < 40 else 10 if roll < 85 else 11
+            enemies.append(dict(kind='enemy', subtype=subtype,
+                                world_pixel=[x * 16 + 4, y * 16 + 4],
+                                room=[rx, ry], spawn_model='provisional_act_one',
+                                room_monster_budget=room_budget,
+                                room_budget_slot=budget_slot,
+                                native_parity=False))
     return enemies
 
 
@@ -603,7 +623,15 @@ def floor_layout(seed, floor_index, database):
     auto_tiles(tiles)
     layout['provisional_enemies'] = provisional_enemies(
         tiles, report['room_types_row_major'], report['room_selection']['placements'],
-        spec, rng, entrance, goal)
+        spec, rng, entrance, goal, floor_index=floor_index)
+    layout['act_one_room_monster_budget'] = dict(
+        floor_index=floor_index,
+        new_game_plus=False,
+        budget_per_room=act_one_room_monster_budget(floor_index),
+        monster_weight=1.0,
+        maximum_spawns_per_room=math.ceil(act_one_room_monster_budget(floor_index)),
+        recovered_function='Room::monstersAllowed@0x0075af50',
+        spawn_selection_still_provisional=True)
     layout['provisional_enemies_instantiated'] = True
     layout['provisional_enemy_spawn_parity'] = False
     # Match player_spawn's native 8x12 pixel body and 4px inset. The

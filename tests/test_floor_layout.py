@@ -3,6 +3,7 @@ import unittest
 from tools.floor_layout import (assemble_tiles, close_act_one_border, solid,
                                 tile_paths_to_room_edge, above_ground_candidates,
                                 repair_provisional_route_support,
+                                act_one_room_monster_budget, provisional_enemies,
                                 consume_spellbook_rng,
                                 consume_placed_entity_rng,
                                 blocked_endpoint_tiles)
@@ -24,6 +25,39 @@ def joined_rooms():
 
 
 class FloorLayoutTests(unittest.TestCase):
+    def test_act_one_room_monster_budget_matches_native_act_branch(self):
+        self.assertEqual([act_one_room_monster_budget(i) for i in range(3)],
+                         [0.5, 0.5, 1.5])
+        self.assertEqual([act_one_room_monster_budget(i, True) for i in range(3)],
+                         [1.0, 1.0, 2.0])
+        for invalid in (-1, 3, True, 1.0):
+            with self.assertRaises(ValueError):
+                act_one_room_monster_budget(invalid)
+
+    def test_provisional_enemy_spawns_obey_recovered_room_weight_cap(self):
+        from tools.floor_main_path import MT19937
+
+        spec = {'width': 10, 'height': 8}
+        tiles = [[[0, -1, -1, -1, -1, -1] for _ in range(30)] for _ in range(24)]
+        for x in range(10, 20):
+            tiles[14][x][0] = 1
+        room_types = [[0, 0, 0] for _ in range(3)]
+        room_types[1][1] = 4
+        placements = [dict(x=1, y=1, room_type=4, uid='spawn-budget-fixture')]
+
+        counts = []
+        for floor_index in range(3):
+            enemies = provisional_enemies(
+                tiles, room_types, placements, spec, MT19937(12345),
+                (0, 0), (29, 23), floor_index=floor_index)
+            counts.append(len(enemies))
+            self.assertTrue(all(enemy['room_monster_budget'] ==
+                                act_one_room_monster_budget(floor_index)
+                                for enemy in enemies))
+            self.assertEqual([enemy['room_budget_slot'] for enemy in enemies],
+                             list(range(len(enemies))))
+        self.assertEqual(counts, [1, 1, 2])
+
     def test_placed_entity_rng_counts_only_recovered_creation_paths_in_source_order(self):
         class CountingRng:
             draws = 0

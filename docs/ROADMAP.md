@@ -340,25 +340,24 @@ Los apartados siguientes conservan el historial de decisiones y pendientes.
 
 # Roadmap hacia Vagante en Vita
 
-## Estado actual: iteración 086
+## Estado actual: iteración 087
 
-GCC host de MSYS2 compila y ejecuta el probe C con la física `player_step`:
-los tres pisos del paquete privado de campaña 085 llegan a su salida con seed
-12345. Los datos de ruta y hashes de las trazas coinciden con los proofs ya
-incluidos en `campaign.json`. Los 12 tests C pasan y la suite Python también
-(162 pruebas, 66 subpruebas). Esta
-repetición valida recorribilidad física de los mapas entregados; no valida
-paridad del generador, campaña completa ni ejecución en el emulador.
+La copia x86/PDB permitió recuperar `Room::monstersAllowed` para ACT_ONE:
+presupuesto 0.5, 0.5 y 1.5 por sala en pisos 0–2. El generador provisional
+usa ese presupuesto como tope por peso de enemigo; el paquete 087 conserva 8,
+8 y 20 spawns provisionales. Los VWI2 y VWE2 de los tres pisos coinciden con
+los hashes de los proofs físicos existentes; los recorridos seed 12345 siguen
+reproducibles. Pasan 12 tests C y la suite Python (164 pruebas, 66 subpruebas).
 
-El VPK 00.86 se compiló con VitaSDK Windows y conserva el ID `VAGV00006`; se
-preparó en el perfil dedicado, pero no se verificó en una sesión de Vita3K. El
-paquete ACT_ONE conserva `campaign_complete=false`. La última evidencia
-automatizada de Vita3K es el intento 00.86/000001, que terminó antes de ventana
-o sesión nativa sin producir logs ni código de salida. La ventana iniciada
-manualmente no está expuesta a esta sesión de automatización.
-Siguen pendientes la generación exacta, la paridad integral de enemigos e
-inventario, jefe y transiciones verificadas en Vita3K/hardware. Véase
-[ITERATION86.md](ITERATION86.md) y [ITERATION85.md](ITERATION85.md).
+El paquete privado 087 valida 108 archivos y el preflight 56 imágenes, pero
+mantiene `campaign_complete=false`: orden de candidatos, filtros/selección de
+enemigos y consumo completo de RNG siguen provisionales. El VPK disponible es
+00.86, compilado con VitaSDK Windows. El intento Vita3K 00.86/000002 preparó la
+replay de 545 pasos y terminó por timeout antes de una sesión nativa, sin
+ventana ni log del emulador. Siguen pendientes paridad completa, jefe,
+transiciones y validación de campaña en Vita3K/hardware. Véase
+[ITERATION87.md](ITERATION87.md), [ITERATION86.md](ITERATION86.md) y
+[GENERATION_RECOVERY.md](GENERATION_RECOVERY.md).
 
 ## Estado después de la iteración 3
 
