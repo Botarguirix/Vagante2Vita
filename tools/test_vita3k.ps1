@@ -188,6 +188,19 @@ $nestedWorld=Join-Path $ResourceDelivery 'world'
   $source=Join-Path $ResourceDelivery $directory
   if(Test-Path -LiteralPath $source){Copy-Item -LiteralPath $source -Destination $actOneDest -Recurse -Force}
  }
+ # Older campaign manifests can contain the four enemy families without the
+ # required attack pose. Restore those private sprites from the last complete
+ # local ACT_ONE delivery so the visual loader can enter the world.
+ foreach($family in @('goblin','bat','lurker','slime')){
+  $attackPose=Join-Path $actOneDest "enemies/$family/attack.png"
+  if(!(Test-Path -LiteralPath $attackPose)){
+   $fallbackPose=Join-Path $repoRoot "_local/delivery-act-one-campaign077/enemies/$family/attack.png"
+   if(Test-Path -LiteralPath $fallbackPose){
+    New-Item -ItemType Directory -Path (Split-Path -Parent $attackPose) -Force|Out-Null
+    Copy-Item -LiteralPath $fallbackPose -Destination $attackPose -Force
+   }else{throw "ACT_ONE delivery is missing required enemy attack pose: $family"}
+  }
+ }
  $sourceFloors=Join-Path $ResourceDelivery 'floors';$destFloors=Join-Path $actOneDest 'floors'
  if(Test-Path -LiteralPath $sourceFloors){
   New-Item -ItemType Directory -Path $destFloors -Force|Out-Null
