@@ -180,7 +180,11 @@ $nestedWorld=Join-Path $ResourceDelivery 'world'
   if(Test-Path -LiteralPath $attackSource){
    & $Python (Join-Path $PSScriptRoot 'prepare_goblin_attack.py') $attackSource $attackPath
    if($LASTEXITCODE -ne 0){throw 'Cannot build the Goblin attack packet from local source data'}
-  }else{throw 'ACT_ONE delivery is missing act-one-goblin-attack.vga and _local/assets/attacks.json is unavailable'}
+  }else{
+   $legacyAttack=Join-Path $repoRoot '_local/delivery-act-one-campaign077/act-one-goblin-attack.vga'
+   if(Test-Path -LiteralPath $legacyAttack){Copy-Item -LiteralPath $legacyAttack -Destination $attackPath -Force}
+   else{throw 'ACT_ONE delivery is missing act-one-goblin-attack.vga and no private source packet is available'}
+  }
  }
  $itemAtlases=Join-Path $ResourceDelivery 'items'
  if(Test-Path -LiteralPath $itemAtlases){Copy-Item -LiteralPath $itemAtlases -Destination $actOneDest -Recurse -Force}
@@ -223,6 +227,52 @@ $nestedWorld=Join-Path $ResourceDelivery 'world'
   Get-ChildItem -LiteralPath $sourceFloors -File|Where-Object {$_.Extension -in @('.vwi','.vwe','.png')}|ForEach-Object {Copy-Item -LiteralPath $_.FullName -Destination $destFloors -Force}
  }
 }else{throw 'ResourceDelivery must contain world/ or an act-one-world.vwi package root'}
+# Apply ACT_ONE path repairs to both package-root deliveries and deliveries
+# already arranged as world/act-one/. Keep old nested packages runnable too.
+$actOneDest=Join-Path $worldDest 'act-one'
+if(Test-Path -LiteralPath (Join-Path $worldDest 'act-one-world.vwi')){$actOneDest=$worldDest}
+if(Test-Path -LiteralPath (Join-Path $actOneDest 'act-one-world.vwi')){
+ $deliveryActOne=Join-Path $ResourceDelivery 'world/act-one'
+ if(!(Test-Path -LiteralPath (Join-Path $deliveryActOne 'act-one-world.vwi'))){
+  if(Test-Path -LiteralPath (Join-Path $ResourceDelivery 'act-one-world.vwi')){$deliveryActOne=$ResourceDelivery}
+  else{$deliveryActOne=Join-Path $ResourceDelivery 'world'}
+ }
+ $attackPath=Join-Path $actOneDest 'act-one-goblin-attack.vga'
+ if(!(Test-Path -LiteralPath $attackPath)){
+  $attackSource=Join-Path $repoRoot '_local/assets/attacks.json'
+  if(Test-Path -LiteralPath $attackSource){
+   & $Python (Join-Path $PSScriptRoot 'prepare_goblin_attack.py') $attackSource $attackPath
+   if($LASTEXITCODE -ne 0){throw 'Cannot build the Goblin attack packet from local source data'}
+  }else{
+   $legacyAttack=Join-Path $repoRoot '_local/delivery-act-one-campaign077/act-one-goblin-attack.vga'
+   if(Test-Path -LiteralPath $legacyAttack){Copy-Item -LiteralPath $legacyAttack -Destination $attackPath -Force}
+   else{throw 'ACT_ONE delivery is missing act-one-goblin-attack.vga and no private source packet is available'}
+  }
+ }
+ foreach($family in @('goblin','bat','lurker','slime')){
+  $attackPose=Join-Path $actOneDest "enemies/$family/attack.png"
+  if(!(Test-Path -LiteralPath $attackPose)){
+   $sourcePose=Join-Path $deliveryActOne "enemies/$family/attack.png"
+   if(!(Test-Path -LiteralPath $sourcePose)){$sourcePose=Join-Path $repoRoot "_local/delivery-act-one-campaign077/enemies/$family/attack.png"}
+   if(Test-Path -LiteralPath $sourcePose){
+    New-Item -ItemType Directory -Path (Split-Path -Parent $attackPose) -Force|Out-Null
+    Copy-Item -LiteralPath $sourcePose -Destination $attackPose -Force
+   }else{throw "ACT_ONE delivery is missing required enemy attack pose: $family"}
+  }
+ }
+ foreach($name in @('torch','flower_1')){
+  $flat=Join-Path $actOneDest "entities/$name.png"
+  $nested=Join-Path $deliveryActOne "entities/doodads/$name.png"
+  if(!(Test-Path -LiteralPath $nested)){$nested=Join-Path $ResourceDelivery "entities/doodads/$name.png"}
+  if(!(Test-Path -LiteralPath $flat) -and (Test-Path -LiteralPath $nested)){Copy-Item -LiteralPath $nested -Destination $flat -Force}
+ }
+ $firefly=Join-Path $actOneDest 'entities/little_firefly.png'
+ if(!(Test-Path -LiteralPath $firefly)){
+  $packedFirefly=Join-Path $deliveryActOne 'entities/little_firefly.png'
+  if(!(Test-Path -LiteralPath $packedFirefly)){$packedFirefly=Join-Path $repoRoot '_local/assets/gfx/scenes/intro/entities/little_firefly.png'}
+  if(Test-Path -LiteralPath $packedFirefly){Copy-Item -LiteralPath $packedFirefly -Destination $firefly -Force}
+ }
+}
 $logDir=Join-Path $data ('logs/iteration'+$Iteration)
 $before=@();if(Test-Path -LiteralPath $logDir){$before=@(Get-ChildItem -LiteralPath $logDir -Filter 'session-*.log'|ForEach-Object {$_.Name})}
 $replay=Join-Path $data 'autotest.vts'
