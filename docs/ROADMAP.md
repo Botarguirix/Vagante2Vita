@@ -1,5 +1,15 @@
 # Estado de reconstrucción (17 de octubre de 2026)
 
+La auditoría de repositorios públicos no encontró un motor Vagante reutilizable.
+`mtolly/vagante-extract` documenta el contenedor VRA, que este proyecto ya
+analiza con su parser propio; no se copió su código. `repentogxm` y `D2Vita`
+sirven como referencias de recompilación, diagnóstico y pruebas, pero sus
+runtimes y licencias no justifican importar módulos al port actual. La build
+Vita3K antigua que había pasado el smoke 025 se probó con el VPK 00.97 y también
+terminó con `0xC0000005` antes de crear sesión nativa. Véanse
+[referencias externas](REFERENCE_REPOSITORIES.md) y
+[iteración 099](ITERATION99.md).
+
 La iteración 098 añade al runtime el aviso, impulso, colisión con tiles y
 aterrizaje del salto de Spider. Ghidra aporta el ángulo `1.256637 + U·0.1`,
 rapidez `3 + 2·U`, gravedad 0.16 y el aviso cercano de 20 ticks. CTest pasa
