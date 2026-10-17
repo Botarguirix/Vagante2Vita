@@ -2,6 +2,7 @@
 import json
 import math
 import struct
+import argparse
 from pathlib import Path
 
 
@@ -36,3 +37,18 @@ def encode(path):
         for vertex in vertices:
             packet.extend(struct.pack('<ff', vertex['x'], vertex['y']))
     return bytes(packet)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('attacks', type=Path, help='Private original attacks.json')
+    parser.add_argument('output', type=Path, help='Output VGA1 packet path')
+    args = parser.parse_args()
+    packet = encode(args.attacks)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_bytes(packet)
+    print(f'GOBLIN_ATTACK bytes={len(packet)} output={args.output}')
+
+
+if __name__ == '__main__':
+    main()

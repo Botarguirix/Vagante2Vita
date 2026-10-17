@@ -171,6 +171,17 @@ $nestedWorld=Join-Path $ResourceDelivery 'world'
   $source=Join-Path $ResourceDelivery $name
   if(Test-Path -LiteralPath $source){Copy-Item -LiteralPath $source -Destination $actOneDest -Force}
  }
+ # Some manually assembled campaign deliveries predate the base ACT_ONE
+ # bundle's Goblin attack packet. Rebuild it from the local private source
+ # data when available; never put that source data in the VPK or Git.
+ $attackPath=Join-Path $actOneDest 'act-one-goblin-attack.vga'
+ if(!(Test-Path -LiteralPath $attackPath)){
+  $attackSource=Join-Path $repoRoot '_local/assets/attacks.json'
+  if(Test-Path -LiteralPath $attackSource){
+   & $Python (Join-Path $PSScriptRoot 'prepare_goblin_attack.py') $attackSource $attackPath
+   if($LASTEXITCODE -ne 0){throw 'Cannot build the Goblin attack packet from local source data'}
+  }else{throw 'ACT_ONE delivery is missing act-one-goblin-attack.vga and _local/assets/attacks.json is unavailable'}
+ }
  $itemAtlases=Join-Path $ResourceDelivery 'items'
  if(Test-Path -LiteralPath $itemAtlases){Copy-Item -LiteralPath $itemAtlases -Destination $actOneDest -Recurse -Force}
  foreach($directory in @('entities','enemies','knight','mage','rogue')){
