@@ -556,10 +556,13 @@ completo el primer mundo. Véase [ITERATION73.md](ITERATION73.md).
 ## Iteración 085 — replay determinista y campaña ACT_ONE
 
 El replay limita la recuperación a un tick de física por cuadro y consume
-segmentos consecutivos correctamente. Los 159 tests Python y 12 tests C del
-runtime pasan. Se regeneraron en WSL las rutas nativas de los tres pisos; el
-paquete privado de campaña valida 100 archivos. Vita3K 0.85 se cerró con
-`0xC0000005` antes de crear un log de sesión, así que no hay validación del
-replay ni de transiciones en emulador. ACT_ONE sigue incompleto; generación
-exacta, paridad de enemigos e inventario, jefe y pruebas en hardware siguen
-pendientes. Véase [ITERATION85.md](ITERATION85.md).
+segmentos consecutivos correctamente. La suite actual pasa 162 tests Python y
+66 subtests; los 12 tests C del runtime pasaron en la ejecución WSL anterior.
+El VPK 0.85 se recompiló con VitaSDK Windows al fallar WSL con
+`E_ACCESSDENIED`; sus siete entradas, incluido `eboot.bin`, coinciden con el
+VPK previo. El paquete privado valida 108 archivos y el preflight comprueba
+56 PNG, los tres pisos y sus entidades/enemigos. Vita3K Qt, SDL y consola
+expiran antes de crear ventana, log o sesión nativa; por ello no se han
+verificado el renderer ni las transiciones. ACT_ONE sigue incompleto:
+generación exacta, paridad de enemigos e inventario, jefe, transiciones nativas
+y pruebas en Vita real siguen pendientes. Véase [ITERATION85.md](ITERATION85.md).
