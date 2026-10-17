@@ -4,6 +4,7 @@
 static unsigned u16(const unsigned char *p){return p[0]|(unsigned)p[1]<<8;}
 static float f32(const unsigned char *p){uint32_t u=p[0]|(uint32_t)p[1]<<8|(uint32_t)p[2]<<16|(uint32_t)p[3]<<24;float f;memcpy(&f,&u,4);return f;}
 static int finite_range(float v,float lo,float hi){return isfinite(v)&&v>=lo&&v<=hi;}
+static int supported_type(unsigned t){return (t>=45&&t<=47)||(t>=49&&t<=61)||(t>=64&&t<=65)||(t>=79&&t<=81)||(t>=85&&t<=87);}
 int melee_load(MeleeDatabase *db,const char *path,FILE *log){
  FILE *f=fopen(path,"rb");if(!f){if(log)fprintf(log,"MELEE_DATA ready=0 error=open path=%s\n",path);return 0;}
  unsigned char h[16],r[32];MeleeDatabase next;memset(&next,0,sizeof(next));
@@ -15,7 +16,7 @@ int melee_load(MeleeDatabase *db,const char *path,FILE *log){
   MeleeDefinition *d=&next.weapons[n];
   d->type=u16(r);d->sprite=u16(r+2);d->duration=u16(r+4);d->flags=u16(r+6);
   d->anchor_x=f32(r+8);d->anchor_y=f32(r+12);d->frame_count=u16(r+16);d->shape_count=u16(r+18);
-  if((d->type!=49&&d->type!=45&&d->type!=79)||d->sprite>=144||d->duration<1||d->duration>120||!d->frame_count||d->frame_count>MELEE_FRAMES||d->shape_count>MELEE_SHAPES||!finite_range(d->anchor_x,0,1)||!finite_range(d->anchor_y,0,1))goto bad;
+  if(!supported_type(d->type)||d->sprite>=144||d->duration<1||d->duration>120||!d->frame_count||d->frame_count>MELEE_FRAMES||d->shape_count>MELEE_SHAPES||!finite_range(d->anchor_x,0,1)||!finite_range(d->anchor_y,0,1))goto bad;
   for(unsigned j=0;j<n;j++)if(next.weapons[j].type==d->type)goto bad;
   for(unsigned i=0;i<d->frame_count;i++){
    if(fread(r,1,32,f)!=32||u16(r+2)<1||u16(r+2)>120||r[4]>1||r[5]>1||u16(r+6))goto bad;
@@ -77,4 +78,15 @@ int melee_hits_rect(const MeleeState *s,float cx,float bottom,float x,float y,fl
   if(contained(p,n,x,y)||contained(p,n,x+w,y)||contained(p,n,x,y+h)||contained(p,n,x+w,y+h))return 1;
   for(unsigned i=0;i<n;i++)if(segment(p[i],p[(i+1)%n],x,y,w,h))return 1;
  }return 0;
+}
+float melee_damage_rect(const MeleeState *s,float cx,float bottom,float x,float y,float w,float h){
+ if(w<=0||h<=0||!melee_frame(s))return 0;
+ float damage=0;
+ for(unsigned j=0;j<s->definition->shape_count;j++){
+  MeleePoint p[MELEE_VERTICES];unsigned n=melee_polygon(s,j,cx,bottom,p);if(!n)continue;
+  int hit=contained(p,n,x,y)||contained(p,n,x+w,y)||contained(p,n,x,y+h)||contained(p,n,x+w,y+h);
+  for(unsigned i=0;!hit&&i<n;i++)hit=segment(p[i],p[(i+1)%n],x,y,w,h);
+  if(hit){const MeleeShape *shape=&s->definition->shapes[j];float candidate=shape->damage_min+(shape->damage_max-shape->damage_min)*.5f;if(candidate>damage)damage=candidate;}
+ }
+ return damage;
 }

@@ -22,7 +22,10 @@ int replay_load(InputReplay *r,const char *path,FILE *log){
 unsigned replay_buttons(const InputReplay *r){return r->active&&!r->done?r->steps[r->index].buttons:0;}
 void replay_advance(InputReplay *r,unsigned ticks){
  if(!r->active||r->done||!ticks)return;
- r->elapsed+=ticks;
- /* Preserve every input edge even if one frame processes several logic steps. */
- if(r->elapsed>=r->steps[r->index].ticks){r->elapsed=0;if(++r->index==r->count){r->done=1;r->active=0;}}
+ while(ticks&&r->active){
+  unsigned remaining=r->steps[r->index].ticks-r->elapsed;
+  if(ticks<remaining){r->elapsed+=ticks;return;}
+  ticks-=remaining;r->elapsed=0;
+  if(++r->index==r->count){r->done=1;r->active=0;}
+ }
 }

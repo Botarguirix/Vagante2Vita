@@ -54,28 +54,36 @@ static int arrow_solid(const World *w,float x,float y){
  for(int ty=top;ty<=bottom;ty++)for(int tx=left;tx<=right;tx++)if(world_solid(w,tx,ty))return 1;
  return 0;
 }
-static void sweep(NativeArrow *a,const World *w,float dx,float dy){
- int n=(int)ceilf(fmaxf(fabsf(dx),fabsf(dy))*2);if(n<1)return;float sx=dx/n,sy=dy/n;
+static void sweep(NativeArrow *a,ArrowPool *pool,World *w,float dx,float dy){
+ int n=(int)ceilf(fmaxf(fabsf(dx),fabsf(dy))*2);if(n<1)n=1;float sx=dx/n,sy=dy/n;
  for(int i=0;i<n;i++){
   float x=a->x+sx,y=a->y+sy;
   if(arrow_solid(w,x,y)){a->stuck=1;a->vx=a->vy=0;a->life=120;return;}
+  for(unsigned j=0;j<w->entity_count;j++){
+   WorldEntity *e=&w->entities[j];if(e->kind!=24||e->hp<=0)continue;
+   float ex=e->x_q8/256.0f,ey=e->y_q8/256.0f;
+   float enemy_w,enemy_h;world_enemy_body(e->subtype,&enemy_w,&enemy_h);
+   if(x+1<=ex||x-1>=ex+enemy_w||y+1<=ey||y-1>=ey+enemy_h)continue;
+   e->hp-=a->damage;if(e->hp<=0){e->hp=0;pool->enemy_kills++;}
+   pool->enemy_hits++;a->active=0;a->vx=a->vy=0;return;
+  }
   a->x=x;a->y=y;
  }
 }
-int arrow_launch(ArrowPool *p,const World *w,float cx,float cy,float x,float y,float vx,float vy,float damage){
- if(!isfinite(cx)||!isfinite(cy)||!isfinite(x)||!isfinite(y)||!isfinite(vx)||!isfinite(vy)||fabsf(vx)>64||fabsf(vy)>64||fabsf(x-cx)>128||fabsf(y-cy)>128||!bounded(damage,0,1))return 0;
+int arrow_launch(ArrowPool *p,World *w,float cx,float cy,float x,float y,float vx,float vy,float damage){
+ if(!isfinite(cx)||!isfinite(cy)||!isfinite(x)||!isfinite(y)||!isfinite(vx)||!isfinite(vy)||fabsf(vx)>64||fabsf(vy)>64||fabsf(x-cx)>128||fabsf(y-cy)>128||!bounded(damage,0,100))return 0;
  for(unsigned i=0;i<ARROW_LIMIT;i++)if(!p->arrows[i].active){
-  NativeArrow a;memset(&a,0,sizeof(a));a.active=1;a.serial=p->fired+1;a.x=cx;a.y=cy;a.vx=vx;a.vy=vy;a.facing=vx<0?-1:1;a.angle=atan2f(vy,fabsf(vx));a.damage_factor=damage;
-  if(arrow_solid(w,cx,cy)){a.stuck=1;a.vx=a.vy=0;a.life=120;}else sweep(&a,w,x-cx,y-cy);
+  NativeArrow a;memset(&a,0,sizeof(a));a.active=1;a.serial=p->fired+1;a.x=cx;a.y=cy;a.vx=vx;a.vy=vy;a.facing=vx<0?-1:1;a.angle=atan2f(vy,fabsf(vx));a.damage=damage;
+  if(arrow_solid(w,cx,cy)){a.stuck=1;a.vx=a.vy=0;a.life=120;}else sweep(&a,p,w,x-cx,y-cy);
   p->arrows[i]=a;p->fired++;if(a.stuck)p->impacts++;return 1;
  }
  return 0;
 }
-void arrows_step(ArrowPool *p,const World *w){
+void arrows_step(ArrowPool *p,World *w){
  for(unsigned i=0;i<ARROW_LIMIT;i++){
   NativeArrow *a=&p->arrows[i];if(!a->active)continue;
   if(a->stuck){if(a->life)a->life--;if(!a->life){a->active=0;p->expired++;}continue;}
   a->vx*=0.99f;a->vy+=0.16f;a->facing=a->vx<0?-1:1;a->angle=atan2f(a->vy,fabsf(a->vx));
-  sweep(a,w,a->vx,a->vy);if(a->stuck)p->impacts++;
+  sweep(a,p,w,a->vx,a->vy);if(a->stuck)p->impacts++;
  }
 }

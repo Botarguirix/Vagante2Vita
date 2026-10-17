@@ -14,6 +14,11 @@ int world_solid(const World *w,int x,int y){
  if((w->open_sky&&y<0)||(w->open_left&&x<0)||(w->open_right&&x>=w->width))return 0;
  return 1;
 }
+int world_goal_touched(const World *w,float left,float top,float width,float height){
+ if(!w||!w->ready||!isfinite(left)||!isfinite(top)||!isfinite(width)||!isfinite(height)||width<=0||height<=0)return 0;
+ float goal_left=(float)w->goal_x*16.0f,goal_top=(float)w->goal_y*16.0f;
+ return left<goal_left+16.0f&&left+width>goal_left&&top<goal_top+16.0f&&top+height>goal_top;
+}
 void world_collision_flags(World *w){
  for(int i=0;i<w->width*w->height;i++){
   WorldTile *t=&w->tiles[i];t->solid=t->type==1||t->type==7;t->platform=t->type==6;t->faces=0;

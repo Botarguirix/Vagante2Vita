@@ -13,7 +13,7 @@ int main(int argc,char **argv){
  char entity_path[512];snprintf(entity_path,sizeof(entity_path),"%s/intro-entities.vwe",argv[2]);
  if(!world_load_entities(&world,entity_path,stdout)||world.entity_count!=22)goto done;
  snprintf(entity_path,sizeof(entity_path),"%s/intro-melee.vwa",argv[2]);
- if(!melee_load(&world.melee,entity_path,stdout)||world.melee.count!=3)goto done;
+ if(!melee_load(&world.melee,entity_path,stdout)||world.melee.count!=12)goto done;
  snprintf(entity_path,sizeof(entity_path),"%s/intro-bow.vwb",argv[2]);
  if(!bow_load(&world.bow,entity_path,stdout))goto done;
  for(int cls=0;cls<3;cls++){

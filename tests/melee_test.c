@@ -22,13 +22,19 @@ int main(void){
  packet(path);f=fopen(path,"r+b");assert(f);assert(fseek(f,6,SEEK_SET)==0);put16(f,4);assert(fclose(f)==0);assert(!melee_load(&db,path,NULL));
  assert(!memcmp(&db,&old,sizeof(db)));assert(remove(path)==0);
 
+ packet(path);f=fopen(path,"r+b");assert(f);assert(fseek(f,16,SEEK_SET)==0);put16(f,46);assert(fclose(f)==0);
+ assert(melee_load(&db,path,NULL)&&melee_find(&db,46));
+ packet(path);f=fopen(path,"r+b");assert(f);assert(fseek(f,16,SEEK_SET)==0);put16(f,62);assert(fclose(f)==0);
+ old=db;assert(!melee_load(&db,path,NULL)&&!memcmp(&db,&old,sizeof(db)));assert(remove(path)==0);
+
  MeleeDefinition d;memset(&d,0,sizeof(d));d.duration=2;d.frame_count=2;d.shape_count=1;
  d.frames[0].duration_factor=d.frames[1].duration_factor=1;d.frames[1].enabled=1;d.frames[1].x=2;d.frames[1].y=-4;
  d.shapes[0].enabled=1;d.shapes[0].count=4;
+ d.shapes[0].damage_min=1;d.shapes[0].damage_max=2;
  d.shapes[0].vertices[0]=(MeleePoint){0,0};d.shapes[0].vertices[1]=(MeleePoint){4,0};d.shapes[0].vertices[2]=(MeleePoint){4,4};d.shapes[0].vertices[3]=(MeleePoint){0,4};
  MeleeState s;memset(&s,0,sizeof(s));assert(melee_start(&s,&d,0,1));assert(!melee_start(&s,&d,0,1));
  assert(!melee_hits_rect(&s,10,20,13,17,1,1));melee_step(&s,0);assert(s.keyframe==0);melee_step(&s,0);assert(s.keyframe==1);
- assert(melee_hits_rect(&s,10,20,13,17,1,1));assert(!melee_hits_rect(&s,10,20,5,17,1,1));
+ assert(melee_hits_rect(&s,10,20,13,17,1,1));assert(melee_damage_rect(&s,10,20,13,17,1,1)==1.5f);assert(!melee_damage_rect(&s,10,20,5,17,1,1));assert(!melee_hits_rect(&s,10,20,5,17,1,1));
  s.facing=-1;assert(melee_hits_rect(&s,10,20,5,17,1,1));assert(!melee_hits_rect(&s,10,20,13,17,1,1));
  s.facing=1;d.frames[1].degrees=90;assert(melee_hits_rect(&s,10,20,9,17,1,1));assert(!melee_hits_rect(&s,10,20,13,17,1,1));
  melee_step(&s,0);melee_step(&s,0);assert(!s.active&&!melee_hits_rect(&s,10,20,9,17,1,1));

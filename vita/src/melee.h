@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <stdio.h>
-#define MELEE_WEAPONS 3
+#define MELEE_WEAPONS 16
 #define MELEE_FRAMES 16
 #define MELEE_SHAPES 4
 #define MELEE_VERTICES 16
@@ -18,3 +18,4 @@ void melee_step(MeleeState *state,int held);
 const MeleeFrame *melee_frame(const MeleeState *state);
 unsigned melee_polygon(const MeleeState *state,unsigned shape,float cx,float bottom,MeleePoint *points);
 int melee_hits_rect(const MeleeState *state,float cx,float bottom,float x,float y,float width,float height);
+float melee_damage_rect(const MeleeState *state,float cx,float bottom,float x,float y,float width,float height);

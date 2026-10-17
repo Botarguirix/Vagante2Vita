@@ -39,11 +39,20 @@ void draw_character_panel(uint32_t *frame,const NativePlayer *player,int page){
       snprintf(line,sizeof(line),"EVASION %.2f PCT CRITICAL %.2f PCT",player->derived.evasion*100,player->derived.critical*100);native_text(frame,120,281,line,0xffffffff);
       snprintf(line,sizeof(line),"AIR %.0f DAMAGE TAKEN %.2f",player->derived.max_air,player->derived.damage_taken_multiplier);native_text(frame,120,318,line,0xffffffff);
      }else if(page==1){
-      native_text(frame,120,168,"STARTING EQUIPMENT",0xffffffff);
-      const char *roles[]={"MELEE","RANGED","AMMO"};
-      for(unsigned n=0;n<player->loadout.item_count;n++){
-       const StartingItem *item=&player->loadout.items[n];snprintf(line,sizeof(line),"%s %s X %d",roles[item->role],starting_item_name(item->type),item->quantity);native_text(frame,120,207+38*n,line,0xffffffff);
+      native_text(frame,120,168,"INVENTORY",0xffffffff);
+      const char *roles[]={"MELEE","RANGED","AMMO","MISC"};
+      unsigned count=player->loadout.item_count;
+      unsigned capacity=sizeof(player->loadout.items)/sizeof(player->loadout.items[0]);
+      if(count>capacity)count=capacity;
+      unsigned visible=count<6?count:6;
+      for(unsigned n=0;n<visible;n++){
+       const StartingItem *item=&player->loadout.items[n];
+       unsigned role=(unsigned)item->role;
+       if(role>=sizeof(roles)/sizeof(roles[0]))role=3;
+       snprintf(line,sizeof(line),"%s %s X %d",roles[role],starting_item_name(item->type),item->quantity);
+       native_text(frame,120,207+32*(int)n,line,0xffffffff);
       }
+      if(count>visible){snprintf(line,sizeof(line),"AND %u MORE ITEMS",count-visible);native_text(frame,120,407,line,0xffaaaaaa);}
      }else{
       native_text(frame,120,168,"STARTING SKILLS",0xffffffff);
       if(!player->loadout.skill_count)native_text(frame,120,207,"NONE",0xffffffff);

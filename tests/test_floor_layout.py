@@ -1,7 +1,11 @@
 from copy import deepcopy
 import unittest
 from tools.floor_layout import (assemble_tiles, close_act_one_border, solid,
-                                tile_paths_to_room_edge, above_ground_candidates)
+                                tile_paths_to_room_edge, above_ground_candidates,
+                                repair_provisional_route_support,
+                                consume_spellbook_rng,
+                                consume_placed_entity_rng,
+                                blocked_endpoint_tiles)
 from test_floor_room_selection import raw
 
 
@@ -20,6 +24,95 @@ def joined_rooms():
 
 
 class FloorLayoutTests(unittest.TestCase):
+    def test_placed_entity_rng_counts_only_recovered_creation_paths_in_source_order(self):
+        class CountingRng:
+            draws = 0
+
+            def game_int(self):
+                self.draws += 1
+                return 0
+
+        definitions = [
+            {'type': kind, 'doodadType': doodad_type, **extra}
+            for kind, doodad_type, extra in (
+                ('Chest', None, {}), ('Spikes', None, {}), ('BreakableWall', None, {}),
+                ('Doodad', 3, {}), ('Doodad', 16, {}), ('Doodad', 14, {}),
+                ('Doodad', 16, {'crateType': 2}), ('DartTrap', None, {}))]
+        locations = [dict(room=[0, 0], source_uid='fixture', source_entity_index=index,
+                          definition=definition)
+                     for index, definition in enumerate(definitions)]
+        rng = CountingRng()
+        report = consume_placed_entity_rng(rng, locations)
+        self.assertEqual(report['draws'], 6)
+        self.assertEqual(report['draws_by_reason'], {
+            'chest_constructor_facing': 1,
+            'spike_variant_roll': 1,
+            'breakable_wall_rotation': 1,
+            'torch_initial_frame': 1,
+            'torch_initial_timer': 1,
+            'random_crate_type': 1,
+        })
+        self.assertEqual([entity['source_entity_index'] for entity in report['per_entity']],
+                         [0, 1, 2, 3, 4])
+        self.assertEqual(report['rng_free_entity_count'], 2)
+        self.assertEqual([(entity['source_entity_index'], entity['kind'], entity['doodad_type'])
+                          for entity in report['rng_free_entities']],
+                         [(6, 'Doodad', 16), (7, 'DartTrap', None)])
+        self.assertEqual(report['deferred_entity_count'], 1)
+        self.assertEqual(report['deferred_entities'][0]['source_entity_index'], 5)
+        self.assertEqual(report['unclassified_entity_count'], 0)
+        self.assertEqual(rng.draws, 6)
+
+    def test_endpoint_blockers_include_rounded_boulders_and_linked_trap_boulders(self):
+        tiles = [[[0, -1, -1, -1, -1, -1] for _ in range(8)] for _ in range(8)]
+        tiles[1][2][0] = 1
+        locations = [
+            dict(world_pixel=[17.2, 32.7],
+                 definition={'type': 'Boulder'}, source_uid='room-boulder',
+                 source_entity_index=0),
+            dict(world_pixel=[33.2, 65.2],
+                 definition={'type': 'BoulderTrap'}, source_uid='room-trap',
+                 source_entity_index=1),
+        ]
+        result = blocked_endpoint_tiles(locations, tiles)
+        self.assertEqual(result['tiles'], {(1, 2), (2, 4), (2, 1)})
+        self.assertEqual([(record['native_type'], record['source'])
+                          for record in result['records']], [
+                              ('H', 'placed_Boulder'),
+                              ('G', 'placed_BoulderTrap'),
+                              ('H', 'boulder_trap_link'),
+                          ])
+
+    def test_spellbook_rng_tracks_skill_tier_guards_and_rand_index_adjustment(self):
+        class ScriptedRng:
+            def __init__(self):
+                self.values = iter((2, 1, 17, 1, 5, 7))
+                self.draws = 0
+
+            def game_int(self):
+                self.draws += 1
+                return next(self.values)
+
+        rng = ScriptedRng()
+        report = consume_spellbook_rng(rng, floor_index=0)
+        self.assertEqual(report['skill_types'], [1, 1, 5])
+        self.assertEqual(report['final_skill_tier'], -1)
+        self.assertEqual(report['final_rand_index'] & 0xf, 5)
+        self.assertEqual(report['draws'], 6)
+        self.assertEqual(rng.draws, 6)
+
+    def test_spawn_geometry_checks_every_pixel_occupied_body_and_footing_cell(self):
+        # A 12px body at local y=12 crosses the boundary into the next tile.
+        from tools.floor_layout import _spawn_geometry
+
+        tiles = [[[0, -1, -1, -1, -1, -1] for _ in range(3)] for _ in range(3)]
+        tiles[1][1][0] = 1
+        geometry = _spawn_geometry(tiles, [1, 0], pixel_offset=(4, 12))
+        self.assertEqual([tile[:2] for tile in geometry['body_tiles']], [[1, 0], [1, 1]])
+        self.assertFalse(geometry['clear'])
+        self.assertEqual(geometry['support_tiles'], [[1, 1, 1]])
+        self.assertTrue(geometry['supported'])
+
     def test_layers_and_source_tiles_preserved_when_border_closes(self):
         room = raw('own', [[0, 0, 0]] * 4)
         room['tiles'][0][1:6] = [1, 2, 3, 4, 5]
@@ -110,6 +203,21 @@ class FloorLayoutTests(unittest.TestCase):
         tiles[2][1][0] = 6
         candidates = above_ground_candidates(tiles, [[4, 1]], SPEC, [0, 0])
         self.assertNotIn([1, 1], candidates['preferred'] + candidates['near_water'])
+
+    def test_provisional_route_repair_adds_platforms_and_ladders_without_overwriting_walls(self):
+        tiles = [[[0, -1, -1, -1, -1, -1] for _ in range(7)] for _ in range(7)]
+        tiles[5][1][0] = 1
+        route = [[1, 4], [2, 4], [2, 3], [3, 3]]
+        report = repair_provisional_route_support(tiles, route)
+        self.assertTrue(report['applied'])
+        self.assertFalse(report['native_generation_parity'])
+        self.assertEqual(tiles[4][2][0], 3)
+        self.assertEqual(tiles[3][2][0], 3)
+        self.assertEqual(tiles[5][2][0], 6)
+        self.assertEqual(tiles[4][3][0], 6)
+        self.assertEqual(tiles[5][1][0], 1)
+        with self.assertRaisesRegex(ValueError, 'solid tile'):
+            repair_provisional_route_support(tiles, [[1, 4], [1, 5]])
 
 
 if __name__ == '__main__':

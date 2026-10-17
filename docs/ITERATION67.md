@@ -1,0 +1,7 @@
+# Iteración 067: draw conocido de los pedestales
+
+Ghidra confirma que `Item::Item` toma un valor de `uniform_int<int>` para inicializar `randIndex`. `generateNewRandomSpellBook` crea ese Item al generar un libro para un `BOOK_PEDESTAL` vacío. El ledger ACT_ONE ahora consume ese draw MT por pedestal y exporta cantidad, draw count y estado posterior. La distribución global corresponde a un entero de 31 bits; en esta implementación, una llamada consume un word del MT.
+
+La semilla 12345, piso 0, tiene un pedestal vacío. `_local/generation067-final2/map-export` registra un constructor draw, entrada `[30,4]`, salida `[36,28]` y ruta de tiles alcanzable. El reporte deja `full_room_entity_rng_reconstructed=false`: después del constructor, el libro recorre hasta cinco asignaciones de skill con guardas dependientes del objeto, y `Item::setSkill` puede consumir otro draw cuando cambia el skill. Con varios pedestales, esos draws se intercalan por libro, por lo que no se adelantan todos los constructores en lote para fingir un estado final exacto.
+
+El barrido ACT_ONE de veinte seeds por cada uno de los tres pisos pasa y verifica los draws de agua y el ledger parcial de pedestales. Suite Python completa: 137 pruebas. El runtime C y el VPK no cambiaron; no se ejecutó Vita3K en esta iteración. El piso continúa provisional hasta reconstruir los draws variables del libro, las entidades bloqueantes G/H, los endpoints con shuffle, los enemigos y el recorrido físico.

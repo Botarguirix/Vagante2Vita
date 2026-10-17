@@ -22,7 +22,7 @@ Solo la presencia de ux0:data/Vagante2Vita/autotest.vts activa InputReplay.
 Sin archivo, el juego lee el mando normalmente. Formato VTS1: magic de cuatro
 bytes, count uint16 y reservado uint16 cero; records de ocho bytes: botones
 uint32 con máscara permitida 0xf3f9, duración uint16 de 1 a 600 ticks y reservado
-uint16 cero. Hasta 128 records y 36000 ticks. Truncado, flags desconocidos y
+uint16 cero. Hasta 1024 records y 36000 ticks. Truncado, flags desconocidos y
 basura final se rechazan, preservando estado. Este archivo es propio de pruebas;
 no contiene recursos del juego.
 
@@ -53,11 +53,11 @@ host posterior, aunque la secuencia del VPK hubiera terminado correctamente.
 ./tools/test_vita3k.ps1 -Action Collect -RunDirectory '<directorio devuelto por Launch>'
 ```
 
-Run (predeterminado) copia el ejecutable/dependencias oficiales ya aportados por el usuario
-y particiones de firmware a _local/vita3k, crea config separada con pref-path
-propio y log-level INFO, instala el VPK en ux0/app/VAGV00006, prepara recursos
-externos y secuencia. No cierra ni modifica la partida/config del emulador
-principal. Las copias del firmware/runtime son privadas e ignoradas por Git.
+El harness toma el runtime base de _local/vita3k y usa por defecto la
+instancia de pruebas _local/vita3k-vagante-clone, con `pref-path` propio,
+log-level INFO, VPK instalado en ux0/app/VAGV00006, recursos externos y replay.
+No usa G:\Vita3k ni cambia la partida/configuración de otro proyecto. Las
+copias del firmware/runtime son privadas e ignoradas por Git.
 Run espera hasta 45 segundos y recoge/verifica logs y código de salida del
 proceso automáticamente. Si sigue vivo, devuelve PID sin terminarlo; Collect
 permite recogerlo después. Launch inicia sin esperar, para inspección manual.
@@ -65,7 +65,7 @@ El sistema de archivos de pruebas se reutiliza sin borrar sesiones anteriores;
 solo una instancia de pruebas puede usarlo simultáneamente.
 
 Cada ejecución conserva run.json, hash del emulador/VPK, input.vts, runtime.log,
-vita3k.log y result.json en _local/vita3k/runs/iterationNNN/run-NNNNNN/.
+vita3k.log y result.json en _local/vita3k-vagante-clone/runs/iterationNNN/run-NNNNNN/.
 Collect rechaza una ejecución todavía viva o ya recogida y exige exactamente
 un nuevo session log. El VPK admite esta automatización también en Vita real
 si se copia expresamente el archivo; el perfil de teclado pertenece a Vita3K.
