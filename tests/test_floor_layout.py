@@ -5,6 +5,7 @@ from tools.floor_layout import (assemble_tiles, close_act_one_border, solid,
                                 repair_provisional_route_support,
                                 act_one_room_monster_budget, act_one_enemy_type_for_roll,
                                 act_one_lurker_geometry_supported,
+                                act_one_shuffled_room_tiles,
                                 provisional_enemies,
                                 consume_spellbook_rng,
                                 consume_placed_entity_rng,
@@ -57,6 +58,17 @@ class FloorLayoutTests(unittest.TestCase):
         self.assertFalse(act_one_lurker_geometry_supported(tiles, 2, 2))
         tiles[2][3][0] = 0
         self.assertTrue(act_one_lurker_geometry_supported(tiles, 2, 2))
+
+    def test_act_one_room_tiles_use_native_x_major_shuffle(self):
+        from tools.floor_main_path import MT19937
+
+        room = {'x': 2, 'y': 1}
+        spec = {'width': 3, 'height': 2}
+        actual_rng = MT19937(123)
+        actual = act_one_shuffled_room_tiles(room, spec, actual_rng)
+        self.assertEqual(actual, [(8, 2), (7, 2), (7, 3), (6, 2), (8, 3), (6, 3)])
+        self.assertEqual(actual_rng.draws, 5)
+        self.assertEqual(len(set(actual)), spec['width'] * spec['height'])
 
     def test_provisional_enemy_spawns_obey_recovered_room_weight_cap(self):
         from tools.floor_main_path import MT19937

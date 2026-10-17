@@ -340,30 +340,27 @@ Los apartados siguientes conservan el historial de decisiones y pendientes.
 
 # Roadmap hacia Vagante en Vita
 
-## Estado actual: iteración 089
+## Estado actual: iteración 090
 
-La desensamblación de `LevelGenerator::addRandomEnemies` recuperó el filtro de
-Lurker: no se instancia con techo sólido o paredes sólidas a ambos lados; al
-rechazarlo, la rutina sigue probando candidatos. El generador Python ahora
-aplica esa regla y sigue hasta llenar el presupuesto. El bundle privado 089
-mantiene 8, 8 y 20 spawns provisionales, y los VWI2/VWE2 coinciden con los
-hashes de proofs de ruta seed 12345. Pasan 166 tests Python; los 12 tests C y
-recorridos físicos previos siguen documentados como evidencia de la iteración
-086.
+La desensamblación de `LevelGenerator::addRandomEnemies` recuperó el orden
+x-major y el uso de `std::shuffle` para salas y celdas candidatas, además del
+roll uniforme de 31 bits. El generador Python ahora aplica esas etapas antes
+de los filtros aproximados y mantiene el filtro geométrico de Lurker. El
+bundle 090 conserva 8, 8 y 20 spawns provisionales; los VWI2/VWE2 aún coinciden
+con proofs de ruta seed 12345. Pasan 167 pruebas Python; las pruebas C y rutas
+físicas previas siguen documentadas en iteración 086.
 
-El paquete privado 089 valida 108 archivos y el preflight 56 imágenes, pero
-mantiene `campaign_complete=false`: selección/orden de candidatos y consumo
-completo de RNG siguen provisionales. El VPK 00.89 se compiló con VitaSDK
-Windows (830,426 bytes; SHA-256
-`008900C3E17DC813018E8984065479B883A531FE6823AA5E7F859EF8C9C8D3D2`). Su
-preflight pasó con el bundle 089 y preparó una replay física de 545
-segmentos/3,184 ticks. Vita3K 0.2.1.4183 agotó 90 segundos sin crear sesión
-nativa ni logs; incluso `--help` lanzado por el harness se queda mudo. La
-interfaz sí abrió por control de escritorio en una sesión anterior, pero la
+El paquete privado 090 valida 108 archivos, tres pisos y 56 imágenes, pero
+mantiene `campaign_complete=false`: los filtros nativos de tiles/entidades y
+el RNG intercalado no están completos. El VPK 00.90 se compiló con VitaSDK
+Windows (830,423 bytes; SHA-256
+`9A42FCC106F769523AD7B6F5C0AF7ECC9D921CD2518A92C8DDAF21E53F0204A9`). El
+preflight preparó una replay de campaña de 545 segmentos/3,184 ticks. Vita3K
+0.2.1.4183 agotó 90 segundos antes de crear sesión nativa o logs. La
 automatización de escritorio no está conectada en esta sesión. Siguen
 pendientes paridad completa, jefe, transiciones y validación de campaña en
-Vita3K/hardware. Véase [ITERATION89.md](ITERATION89.md),
-[ITERATION88.md](ITERATION88.md) y
+Vita3K/hardware. Véase [ITERATION90.md](ITERATION90.md),
+[ITERATION89.md](ITERATION89.md) y
 [GENERATION_RECOVERY.md](GENERATION_RECOVERY.md).
 
 ## Estado después de la iteración 3

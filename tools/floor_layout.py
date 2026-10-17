@@ -65,6 +65,16 @@ def act_one_lurker_geometry_supported(tiles, x, y):
         solid(tiles, x - 1, y) and solid(tiles, x + 1, y))
 
 
+def act_one_shuffled_room_tiles(room, spec, rng):
+    """Build x-major room coordinates and apply the native Windows shuffle."""
+    rw, rh = spec['width'], spec['height']
+    rx, ry = room['x'], room['y']
+    candidates = [(rx * rw + local_x, ry * rh + local_y)
+                  for local_x in range(rw) for local_y in range(rh)]
+    shuffle(rng, candidates)
+    return candidates
+
+
 def consume_spellbook_rng(rng, floor_index):
     """Consume the recovered Item/Skill draws for one empty book pedestal."""
     draws_before = rng.draws
@@ -415,36 +425,34 @@ def provisional_enemies(tiles, room_types, placements, spec, rng, entrance, goal
     rw, rh = spec['width'], spec['height']
     room_budget = act_one_room_monster_budget(floor_index, new_game_plus)
     enemies = []
-    for room in placements:
+    # addRandomEnemies starts with a 31-bit uniform draw, builds the ACT_ONE
+    # room list in x-major order, then shuffles that list once before budgets.
+    rng.game_int()
+    room_order = sorted(placements, key=lambda room: (room['x'], room['y']))
+    shuffle(rng, room_order)
+    for room in room_order:
         room_type = room['room_type']
         if room_type & 0x3000 or room_type == 1:  # special/boss-room exclusion
             continue
         rx, ry = room['x'], room['y']
         if abs(rx - entrance[0] // rw) + abs(ry - entrance[1] // rh) <= 1:
             continue
-        candidates = []
-        for y in range(ry * rh + 1, min((ry + 1) * rh - 1, len(tiles) - 1)):
-            for x in range(rx * rw + 1, min((rx + 1) * rw - 1, len(tiles[0]) - 1)):
-                if solid(tiles, x, y) or solid(tiles, x, y + 1):
-                    continue
-                if not tile_paths_to_room_edge(tiles, room_types, spec, x, y):
-                    continue
-                if any(abs(x - px) + abs(y - py) < 5 for px, py in (entrance, goal)):
-                    continue
-                candidates.append((x, y))
-        if not candidates:
-            continue
-        # The recovered room budget caps total spawn weight, but native
-        # candidate filters, shuffle order, and RNG interleaving remain partial.
-        # A rejected Lurker roll consumes this candidate and the native loop
-        # continues until the weight budget is met or candidates are exhausted.
+        candidates = act_one_shuffled_room_tiles(room, spec, rng)
+        # Coordinates are consumed in the shuffled vector order. These
+        # eligibility gates still approximate the native tile/entity filters.
         room_weight = 0.0
         budget_slot = 0
         candidate_attempt = 0
-        while candidates and room_weight < room_budget:
-            candidate_index = rng.raw() % len(candidates)
-            x, y = candidates.pop(candidate_index)
-            roll = rng.raw() % 100
+        for x, y in candidates:
+            if room_weight >= room_budget:
+                break
+            if solid(tiles, x, y) or solid(tiles, x, y + 1):
+                continue
+            if not tile_paths_to_room_edge(tiles, room_types, spec, x, y):
+                continue
+            if any(abs(x - px) + abs(y - py) < 5 for px, py in (entrance, goal)):
+                continue
+            roll = rng.game_int() % 100
             lurker_supported = act_one_lurker_geometry_supported(tiles, x, y)
             subtype = act_one_enemy_type_for_roll(
                 roll, lurker_geometry_supported=lurker_supported)

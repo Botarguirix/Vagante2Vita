@@ -1056,3 +1056,22 @@ La iteración 089 recompiló el runtime como VPK 00.89 con VitaSDK Windows
 pasaron, pero el harness con Vita3K 0.2.1.4183 agotó 90 segundos antes de la
 sesión nativa y no produjo logs. La evidencia y el SHA-256 están en
 [ITERATION89.md](ITERATION89.md); no se considera gameplay validado.
+
+## Recuperación 074: orden de candidatos en ACT_ONE
+
+`LevelGenerator::addRandomEnemies` construye primero las coordenadas de sala en
+orden x-major y aplica `std::shuffle` al vector global. Para cada sala cuyo
+presupuesto es distinto de cero, construye la lista x-major de todas sus
+coordenadas y vuelve a barajarla antes de evaluar celdas. La entrada de la
+función y cada roll usan `uniform_int<int>`, cuyo rango global recuperado es de
+31 bits. `floor_layout.py` ahora sigue este orden con el sampler de Windows ya
+implementado en `generation_random.py`; deja explícitamente provisionales los
+filtros de tile/entidad y los draws intercalados que aún no se reconstruyeron.
+
+La seed 12345 mantiene 8, 8 y 20 spawns; su composición Goblin/Slime/Lurker
+es 4/4/0, 3/3/2 y 8/9/3. Los tres hashes VWI2/VWE2 siguen emparejados con los
+proofs físicos. El bundle privado 090 valida 108 archivos y 56 imágenes; la
+suite pasa 167 pruebas Python. El VPK 00.90 compila, pero Vita3K 0.2.1.4183
+agotó 90 segundos antes del logger nativo. El resultado y los límites están en
+[ITERATION90.md](ITERATION90.md); no se reclama paridad seed-exact ni mundo
+completo.
