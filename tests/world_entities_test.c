@@ -29,6 +29,21 @@ int main(void){
   if(enemy_types[n]==10){assert(contact_damage>=1&&contact_damage<=6);assert(enemy->contact_cooldown==30);}
   else {assert(contact_damage==0);assert(enemy->contact_cooldown==0);}
  }
+ /* Spider::doCollision gates jump contact by speed and per-target cooldown. */
+ World spider_contact;memset(&spider_contact,0,sizeof(spider_contact));
+ spider_contact.entity_count=1;WorldEntity *spider_enemy=&spider_contact.entities[0];
+ spider_enemy->kind=24;spider_enemy->subtype=14;spider_enemy->hp=10;
+ spider_enemy->x_q8=100*256;spider_enemy->y_q8=100*256;spider_enemy->vx=.2f;
+ assert(world_enemies_contact_damage(&spider_contact,100,100,1,1)==0);
+ spider_enemy->spider_jumping=1;spider_enemy->vx=.199f;
+ assert(world_enemies_contact_damage(&spider_contact,100,100,1,1)==0);
+ spider_enemy->vx=-.2f;
+ unsigned spider_damage=world_enemies_contact_damage(&spider_contact,100,100,1,1);
+ assert(spider_damage>=5&&spider_damage<=10&&spider_enemy->contact_cooldown==30);
+ assert(world_enemies_contact_damage(&spider_contact,100,100,1,1)==0);
+ for(unsigned tick=0;tick<30;tick++)world_enemies_step(&spider_contact,200,200,1,1,NULL);
+ spider_enemy->x_q8=100*256;spider_enemy->y_q8=100*256;
+ assert(world_enemies_contact_damage(&spider_contact,100,100,1,1)>=5);
  /* Goblin uses the original 16-frame tell and goblin-stab polygon, not body
     contact. The script's 0..1 shape multiplier scales its 5..9 damage roll. */
  World goblin_world;memset(&goblin_world,0,sizeof(goblin_world));

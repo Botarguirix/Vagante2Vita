@@ -141,6 +141,9 @@ unsigned world_enemies_contact_damage(World *w,float px,float py,float pw,float 
   float ex=e->x_q8/256.0f,ey=e->y_q8/256.0f;
   if(e->subtype==10&&!e->contact_cooldown&&px<ex+body_w&&px+pw>ex&&py<ey+body_h&&py+ph>ey){
    e->contact_cooldown=30;damage+=1u+next_contact_random(e)%6u;
+  }else if(e->subtype==14&&!e->contact_cooldown&&e->spider_jumping&&
+           fabsf(e->vx)>=0.2f&&px<ex+body_w&&px+pw>ex&&py<ey+body_h&&py+ph>ey){
+   e->contact_cooldown=30;damage+=5u+next_contact_random(e)%6u;
   }else if(e->subtype==9&&!e->goblin_hit){
    const GoblinAttackFrame *frame=goblin_attack_frame(&w->goblin_attack,e);
    if(frame&&goblin_attack_hits_player(frame,e,body_w,body_h,px,py,pw,ph)){

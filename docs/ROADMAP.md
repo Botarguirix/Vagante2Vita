@@ -1,5 +1,14 @@
 # Estado de reconstrucción (17 de octubre de 2026)
 
+La iteración 096 compila una regla de contacto de Spider recuperada con
+Ghidra: solo durante el estado de salto y con rapidez mínima 0.2, causa 5–10
+de daño y evita repetir el golpe al mismo objetivo durante 30 ticks. El estado
+de salto aún no lo activa la IA del runtime, por lo que esta regla no equivale
+a Spider jugable. El VPK 00.96 compila y el test C compila con advertencias
+estrictas para ARM; las 170 pruebas Python pasan. No se pudo ejecutar el test C
+host porque no hay compilador de escritorio ni CMake disponible, y Vita3K sigue
+fallando antes de crear una sesión. Véase [ITERATION96.md](ITERATION96.md).
+
 La recuperación 094 regenera con WSL los proofs físicos de los tres pisos
 usando el fingerprint actual del simulador: 1,741, 736 y 375 ticks; las tres
 rutas alcanzan su salida. El paquete privado `_local/delivery-act-one-campaign094`
