@@ -1,5 +1,17 @@
 # Estado de reconstrucción (17 de octubre de 2026)
 
+La recuperación 094 regenera con WSL los proofs físicos de los tres pisos
+usando el fingerprint actual del simulador: 1,741, 736 y 375 ticks; las tres
+rutas alcanzan su salida. El paquete privado `_local/delivery-act-one-campaign094`
+valida 113 archivos, 3 pisos y 66 imágenes, y produce el replay de campaña de
+545 segmentos (3,184 ticks). Vita3K 0.2.1.4183 agotó 90 segundos antes del log
+nativo; los logs del emulador y del juego quedaron vacíos, así que no se
+acreditan transiciones dentro del emulador. Se usó el VPK 00.93 sin cambios
+(SHA-256 `8BF2E7A27E3DCBD940E67846A175B7D33C3267758846955C670E6988B256C4FA`).
+Python 3.12 ya estaba instalado en Windows bajo `AppData/Local/Programs`,
+aunque el alias `python.exe` de Microsoft Store impedía invocarlo por nombre.
+Véase [ITERATION94.md](ITERATION94.md).
+
 La iteración 085 hace determinista la reproducción de entradas en Vita3K al
 limitar el catch-up a un tick por cuadro durante pruebas, y permite consumir
 correctamente varios segmentos del replay. Pasan 159 pruebas Python y 12 tests
