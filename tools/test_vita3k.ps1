@@ -21,7 +21,7 @@ param(
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $repoRoot=Split-Path $PSScriptRoot -Parent
-$testRoot=if($TestRoot){[IO.Path]::GetFullPath($TestRoot)}else{Join-Path $repoRoot '_local/vita3k-vagante-clone'}
+$testRoot=if($TestRoot){[IO.Path]::GetFullPath($TestRoot)}else{Join-Path $repoRoot '_local/vita3k-vagante-dedicated'}
 $runtime=Join-Path $testRoot 'runtime'
 $filesystem=Join-Path $testRoot 'filesystem'
 if($Action -eq 'Collect'){
@@ -120,7 +120,9 @@ if(Test-Path -LiteralPath $themeRoot){
 }
 if(!(Test-Path -LiteralPath (Join-Path $runtime 'vita3k.log'))){[IO.File]::WriteAllText((Join-Path $runtime 'vita3k.log'),'')}
 foreach($debugName in @('debug-stdout.log','debug-stderr.log')){[IO.File]::WriteAllText((Join-Path $runtime $debugName),'')}
-foreach($partition in @('vs0','os0','sa0')){
+# Copy only firmware partitions from the source profile. sa0 can contain
+# per-user application data, so keep it empty in this isolated profile.
+foreach($partition in @('vs0','os0')){
  $source=Join-Path $originalFs $partition;$target=Join-Path $filesystem $partition
  if(!(Test-Path -LiteralPath $target) -and (Test-Path -LiteralPath $source)){Copy-Item -LiteralPath $source -Destination $target -Recurse}
 }
