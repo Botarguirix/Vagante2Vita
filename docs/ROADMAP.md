@@ -12,6 +12,16 @@ Python 3.12 ya estaba instalado en Windows bajo `AppData/Local/Programs`,
 aunque el alias `python.exe` de Microsoft Store impedía invocarlo por nombre.
 Véase [ITERATION94.md](ITERATION94.md).
 
+La revalidación 095 conserva el mismo VPK 00.93. Vita3K 0.2.1.4170, con Qt
+visible y SDL visible, termina con `0xC0000005` antes de crear una sesión; en
+0.2.1.4183, Qt visible agota 180 s y el modo consola termina con el mismo
+access violation. En todos esos intentos el log nativo permanece vacío, así
+que aún no hay evidencia de fallo dentro de Vagante. Ghidra se ejecutó en un
+proyecto aislado bajo `_local/ghidra-spider` y produjo un decompilado enfocado
+de `Spider::runAI`; confirma los estados idle/walk/jump/web y la lógica de
+retarget, pero el pseudocódigo pierde tipos de varios campos y no basta para
+recrear todavía el combate con fidelidad. Véase [ITERATION95.md](ITERATION95.md).
+
 La iteración 085 hace determinista la reproducción de entradas en Vita3K al
 limitar el catch-up a un tick por cuadro durante pruebas, y permite consumir
 correctamente varios segmentos del replay. Pasan 159 pruebas Python y 12 tests
