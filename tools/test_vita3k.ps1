@@ -273,6 +273,10 @@ if(Test-Path -LiteralPath (Join-Path $actOneDest 'act-one-world.vwi')){
   if(Test-Path -LiteralPath $packedFirefly){Copy-Item -LiteralPath $packedFirefly -Destination $firefly -Force}
  }
 }
+if(Test-Path -LiteralPath (Join-Path $actOneDest 'act-one-world.vwi')){
+ & $Python (Join-Path $PSScriptRoot 'audit_act_one_runtime_assets.py') $actOneDest
+ if($LASTEXITCODE -ne 0){throw 'ACT_ONE runtime asset preflight failed; see missing or invalid path above'}
+}
 $logDir=Join-Path $data ('logs/iteration'+$Iteration)
 $before=@();if(Test-Path -LiteralPath $logDir){$before=@(Get-ChildItem -LiteralPath $logDir -Filter 'session-*.log'|ForEach-Object {$_.Name})}
 $replay=Join-Path $data 'autotest.vts'

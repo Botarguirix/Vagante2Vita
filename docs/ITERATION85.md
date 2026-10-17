@@ -68,3 +68,11 @@ runtime y el arnés las adapta en entregas antiguas. Las aserciones del
 preparador pasan; la entrega privada local valida 108 archivos y ya está
 estagiada. Falta comprobar en una sesión nativa que esta carga visual llega a
 `WORLD_VISUALS ready=1`.
+
+El nuevo preflight `tools/audit_act_one_runtime_assets.py` ya forma parte del
+arnés y valida rutas reales, paquetes VWI2/VWE2/VWE3, CRC e inflación PNG,
+dimensiones de terreno y sprites, familias enemigas, entidades y atlas de loot.
+En el perfil dedicado comprobó los tres pisos, las familias Bat/Goblin/Lurker y
+56 imágenes, sin huecos ni PNG dañados. Esta comprobación estática reduce
+errores de staging; no sustituye la sesión Vita3K necesaria para afirmar que el
+renderer dibuja correctamente o que el jugador completa las transiciones.
