@@ -4,6 +4,7 @@ from tools.floor_layout import (assemble_tiles, close_act_one_border, solid,
                                 tile_paths_to_room_edge, above_ground_candidates,
                                 repair_provisional_route_support,
                                 act_one_room_monster_budget, act_one_enemy_type_for_roll,
+                                act_one_solid_above_type_for_roll,
                                 act_one_lurker_geometry_supported,
                                 act_one_shuffled_room_tiles,
                                 provisional_enemies,
@@ -44,6 +45,14 @@ class FloorLayoutTests(unittest.TestCase):
         for invalid in (-1, 100, True, 1.0):
             with self.assertRaises(ValueError):
                 act_one_enemy_type_for_roll(invalid)
+
+    def test_solid_above_roll_matches_act_one_bat_and_spider_branch(self):
+        self.assertEqual([act_one_solid_above_type_for_roll(i, 0)
+                          for i in (0, 49, 50, 69, 70, 124)],
+                         [10, 10, None, None, None, None])
+        self.assertEqual([act_one_solid_above_type_for_roll(i, 1)
+                          for i in (0, 49, 50, 69, 70, 124)],
+                         [10, 10, 14, 14, None, None])
 
     def test_act_one_lurker_roll_respects_native_neighbor_solidity_filter(self):
         tiles = [[[0] for _ in range(5)] for _ in range(5)]

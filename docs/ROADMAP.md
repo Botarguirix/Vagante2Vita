@@ -340,27 +340,25 @@ Los apartados siguientes conservan el historial de decisiones y pendientes.
 
 # Roadmap hacia Vagante en Vita
 
-## Estado actual: iteración 090
+## Estado actual: iteración 092
 
-La desensamblación de `LevelGenerator::addRandomEnemies` recuperó el orden
-x-major y el uso de `std::shuffle` para salas y celdas candidatas, además del
-roll uniforme de 31 bits. El generador Python ahora aplica esas etapas antes
-de los filtros aproximados y mantiene el filtro geométrico de Lurker. El
-bundle 090 conserva 8, 8 y 20 spawns provisionales; los VWI2/VWE2 aún coinciden
-con proofs de ruta seed 12345. Pasan 167 pruebas Python; las pruebas C y rutas
-físicas previas siguen documentadas en iteración 086.
+Ghidra ahora confirma la bifurcación de `addRandomEnemies` según solidez del
+tile sobre la celda: roll `% 125` para Bat/Spider bajo techo sólido y roll
+`% 100` para Goblin/Slime/Lurker sin ese techo, con el filtro geométrico del
+Lurker. El bundle 092 mantiene 8, 8 y 20 spawns provisionales; el piso 0 queda
+en 2 Bat, 3 Goblin y 3 Slime. Su VWI2/VWE2 conserva los hashes de ruta. Pasan
+168 pruebas Python.
 
-El paquete privado 090 valida 108 archivos, tres pisos y 56 imágenes, pero
-mantiene `campaign_complete=false`: los filtros nativos de tiles/entidades y
-el RNG intercalado no están completos. El VPK 00.90 se compiló con VitaSDK
+El paquete privado 092 valida 108 archivos, tres pisos y 61 imágenes, pero
+mantiene `campaign_complete=false`: filtros de entidad, draws intercalados y
+selección completa siguen aproximados. El VPK 00.92 se compiló con VitaSDK
 Windows (830,423 bytes; SHA-256
-`9A42FCC106F769523AD7B6F5C0AF7ECC9D921CD2518A92C8DDAF21E53F0204A9`). El
-preflight preparó una replay de campaña de 545 segmentos/3,184 ticks. Vita3K
-0.2.1.4183 agotó 90 segundos antes de crear sesión nativa o logs. La
-automatización de escritorio no está conectada en esta sesión. Siguen
-pendientes paridad completa, jefe, transiciones y validación de campaña en
-Vita3K/hardware. Véase [ITERATION90.md](ITERATION90.md),
-[ITERATION89.md](ITERATION89.md) y
+`6388FC5701100CEF1062E4F550317B199443128A1E907FEFBB3837CA7E699FF4`). La
+replay de campaña tiene 545 segmentos/3,184 ticks. Tres ejecuciones aisladas de
+Vita3K agotaron 90 segundos antes de crear sesión nativa o logs, incluso con
+OpenGL; no se valida gameplay en el emulador. Siguen pendientes paridad
+completa, jefe y transiciones comprobadas. Véase [ITERATION92.md](ITERATION92.md),
+[ITERATION90.md](ITERATION90.md) y
 [GENERATION_RECOVERY.md](GENERATION_RECOVERY.md).
 
 ## Estado después de la iteración 3

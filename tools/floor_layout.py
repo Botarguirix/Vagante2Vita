@@ -59,6 +59,19 @@ def act_one_enemy_type_for_roll(roll, *, lurker_geometry_supported=True):
     return 11 if lurker_geometry_supported else None  # TYPE_LURKER (15%)
 
 
+def act_one_solid_above_type_for_roll(roll, floor_index):
+    """Mirror ACT_ONE's native roll when the tile above the candidate is solid."""
+    if type(roll) is not int or not 0 <= roll < 125:
+        raise ValueError('ACT_ONE supported-surface roll must be 0 through 124')
+    if type(floor_index) is not int or floor_index not in (0, 1, 2):
+        raise ValueError('ACT_ONE floor index must be 0, 1, or 2')
+    if roll < 50:
+        return 10  # TYPE_BAT
+    if roll < 70 and floor_index > 0:
+        return 14  # TYPE_SPIDER
+    return None
+
+
 def act_one_lurker_geometry_supported(tiles, x, y):
     """Mirror addRandomEnemies' three Level::isSolid checks for a Lurker roll."""
     return not solid(tiles, x, y - 1) and not (
@@ -446,16 +459,20 @@ def provisional_enemies(tiles, room_types, placements, spec, rng, entrance, goal
         for x, y in candidates:
             if room_weight >= room_budget:
                 break
-            if solid(tiles, x, y) or solid(tiles, x, y + 1):
+            if solid(tiles, x, y):
                 continue
             if not tile_paths_to_room_edge(tiles, room_types, spec, x, y):
                 continue
             if any(abs(x - px) + abs(y - py) < 5 for px, py in (entrance, goal)):
                 continue
-            roll = rng.game_int() % 100
-            lurker_supported = act_one_lurker_geometry_supported(tiles, x, y)
-            subtype = act_one_enemy_type_for_roll(
-                roll, lurker_geometry_supported=lurker_supported)
+            if solid(tiles, x, y - 1):
+                roll = rng.game_int() % 125
+                subtype = act_one_solid_above_type_for_roll(roll, floor_index)
+            else:
+                roll = rng.game_int() % 100
+                lurker_supported = act_one_lurker_geometry_supported(tiles, x, y)
+                subtype = act_one_enemy_type_for_roll(
+                    roll, lurker_geometry_supported=lurker_supported)
             candidate_attempt += 1
             if subtype is None:
                 continue

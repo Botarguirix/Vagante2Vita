@@ -1075,3 +1075,25 @@ suite pasa 167 pruebas Python. El VPK 00.90 compila, pero Vita3K 0.2.1.4183
 agotó 90 segundos antes del logger nativo. El resultado y los límites están en
 [ITERATION90.md](ITERATION90.md); no se reclama paridad seed-exact ni mundo
 completo.
+
+## Recuperación 075: ramas de superficie en `addRandomEnemies`
+
+La inspección del flujo de instrucciones de Ghidra (listing local
+`_local/analysis091/add-random-enemies.listing.txt`) aclaró la bifurcación en
+`0x0068df03`–`0x0068e2bc`. La consulta al árbol de posiciones de BoulderTrap
+(G) y Boulder (H) selecciona una ruta del flujo; sus posiciones no son una
+lista de tiles prohibidos. Cuando el tile sobre un candidato es sólido,
+ACT_ONE hace `uniform_int<int> % 125`, emite Bat (ID 10) para 0–49 y
+Spider (ID 14) para 50–69 cuando `floorIndex > 0`; otros valores no emiten un
+enemigo. Sin soporte, ACT_ONE usa el roll `% 100` de Goblin/Slime/Lurker y
+aplica las comprobaciones geométricas del Lurker cuando corresponde.
+
+`floor_layout.py` incorpora estas dos ramas y las pruebas cubren sus límites
+de roll y el cambio por piso. La generación seed 12345 conserva 8, 8 y 20
+spawns provisionales; el piso 0 contiene 2 Bat, 3 Goblin y 3 Slime. El bundle
+092 valida 108 archivos, tres pisos y 61 imágenes; pasan 168 pruebas Python.
+VWI2/VWE2 del piso 0 siguen ligados a los hashes del proof físico. El VPK
+00.92 compila con VitaSDK Windows (830,423 bytes). Dos intentos aislados de
+Vita3K, Vulkan y OpenGL, agotaron 90 segundos antes de una sesión nativa y no
+dejaron logs. Véase [ITERATION92.md](ITERATION92.md). El modelo de enemigos
+sigue provisional por los filtros y hooks RNG aún no recuperados.
