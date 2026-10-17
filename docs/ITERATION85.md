@@ -42,6 +42,13 @@ el replay de campaña se generó con 545 pasos para las rutas de los tres pisos.
 Los recursos corregidos quedaron copiados en
 `_local/vita3k-vagante-dedicated/filesystem/ux0/data/Vagante2Vita/`.
 
+Como WSL responde `E_ACCESSDENIED`, recompilé 00.85 con el VitaSDK de Windows
+(`tools/build_vpk_windows.ps1`, `C:\vitasdk`). El VPK nuevo y el previo tienen
+los mismos siete miembros y los mismos SHA-256 para cada miembro, incluido
+`eboot.bin`; el hash exterior difiere por el contenedor ZIP. Así se confirma
+que el payload nativo 00.85 es reproducible, aunque Vita3K siga sin arrancar en
+el entorno automatizado.
+
 El arnés probó lanzamientos Qt y SDL con OpenGL, y el modo de consola con VPK
 directo. Los tres procesos quedaron sin ventana principal, sin salida y con
 `vita3k.log` vacío. SDL y consola expiraron a los 45 segundos antes de crear
