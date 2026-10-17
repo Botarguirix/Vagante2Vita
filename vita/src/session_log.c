@@ -4,7 +4,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 FILE *open_session_log(const char *directory,char *path,size_t capacity){
+#ifdef _WIN32
+ if(mkdir(directory)<0&&errno!=EEXIST)return NULL;
+#else
  if(mkdir(directory,0777)<0&&errno!=EEXIST)return NULL;
+#endif
  for(unsigned session=1;session<=999999;session++){
   int n=snprintf(path,capacity,"%s/session-%06u.log",directory,session);
   if(n<0||(size_t)n>=capacity)return NULL;

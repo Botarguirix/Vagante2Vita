@@ -340,14 +340,25 @@ Los apartados siguientes conservan el historial de decisiones y pendientes.
 
 # Roadmap hacia Vagante en Vita
 
-## Estado actual: iteración 070
+## Estado actual: iteración 086
 
-El runtime carga tres paquetes ACT_ONE y tiene una transición provisional al
-tocar la salida. DartTrap simula el proyectil y los enemigos provisionales
-ahora dañan por contacto con una regla explícitamente no exacta. Loot, IA fiel,
-valores nativos de daño y paridad de generación siguen pendientes. Vita3K no
-creó sesión nativa para 039. Los pisos 1–2 usan geometría provisional y el
-jefe/transición final está pendiente. Véase [ITERATION39.md](ITERATION39.md).
+GCC host de MSYS2 compila y ejecuta el probe C con la física `player_step`:
+los tres pisos del paquete privado de campaña 085 llegan a su salida con seed
+12345. Los datos de ruta y hashes de las trazas coinciden con los proofs ya
+incluidos en `campaign.json`. Los 12 tests C pasan y la suite Python también
+(162 pruebas, 66 subpruebas). Esta
+repetición valida recorribilidad física de los mapas entregados; no valida
+paridad del generador, campaña completa ni ejecución en el emulador.
+
+El VPK 00.86 se compiló con VitaSDK Windows y conserva el ID `VAGV00006`; se
+preparó en el perfil dedicado, pero no se verificó en una sesión de Vita3K. El
+paquete ACT_ONE conserva `campaign_complete=false`. La última evidencia
+automatizada de Vita3K es el intento 00.86/000001, que terminó antes de ventana
+o sesión nativa sin producir logs ni código de salida. La ventana iniciada
+manualmente no está expuesta a esta sesión de automatización.
+Siguen pendientes la generación exacta, la paridad integral de enemigos e
+inventario, jefe y transiciones verificadas en Vita3K/hardware. Véase
+[ITERATION86.md](ITERATION86.md) y [ITERATION85.md](ITERATION85.md).
 
 ## Estado después de la iteración 3
 
