@@ -23,6 +23,13 @@ class ExportActOneWorldTests(unittest.TestCase):
         self.assertEqual(struct.unpack_from('<4sHH', packet), (b'VWE3', 1, 16))
         self.assertEqual(struct.unpack_from('<BBHiiI', packet, 8), (24, 9, 0, 4096, 8192, 0))
         self.assertEqual(counts, {9: 1})
+
+    def test_encodes_native_act_one_spider_as_provisional_enemy(self):
+        packet, counts = encode_enemies([{'subtype': 14, 'world_pixel': [16, 32],
+                                          'native_parity': False}], 8, 8)
+        self.assertEqual(packet[:4], b'VWE3')
+        self.assertEqual(packet[9], 14)
+        self.assertEqual(counts, {14: 1})
         with self.assertRaisesRegex(ValueError, 'Invalid provisional'):
             encode_enemies([{'subtype': 49, 'world_pixel': [0, 0], 'native_parity': False}], 8, 8)
 

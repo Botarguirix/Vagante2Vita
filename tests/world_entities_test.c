@@ -111,6 +111,12 @@ int main(void){
  unsigned char enemies[]={'V','W','E','3',1,0,16,0,24,9,0,0,0,16,0,0,0,32,0,0,0,0,0,0};
  write(f,enemies,sizeof(enemies));assert(world_load_enemies(&w,path,NULL));assert(w.entity_count==2&&w.entities[0].kind==24&&w.entities[0].subtype==9&&w.entities[0].hp==2.0f&&w.entities[1].kind==16);
  assert(world_load_enemies(&w,path,NULL));assert(w.entity_count==2);
+ unsigned char spider[]={'V','W','E','3',1,0,16,0,24,14,0,0,0,16,0,0,0,32,0,0,0,1,0,0,0};
+ assert(world_load_enemies(&w,path,NULL));
+ write(f,spider,sizeof(spider));assert(world_load_enemies(&w,path,NULL));
+ assert(w.entities[0].kind==24&&w.entities[0].subtype==14);
+ before=w;spider[9]=13;write(f,spider,sizeof(spider));
+ assert(!world_load_enemies(&w,path,NULL));assert(!memcmp(&w,&before,sizeof(w)));
  unsigned char object[]={'V','W','E','2',1,0,16,0,17,0,0,0,0x34,0x12,0,0,0x56,0x34,0,0,0xde,0xbc,0x9a,0x78};
  write(f,object,sizeof(object));assert(world_load_entities(&w,path,NULL));assert(w.entity_count==2&&w.entities[0].kind==17&&w.entities[1].kind==24);
  unsigned char facing_trap[]={'V','W','E','2',1,0,16,0,18,6,0,0,0,0,0,0,0,0,0,0,1,0,0,0};

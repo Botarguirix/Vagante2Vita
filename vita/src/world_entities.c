@@ -78,7 +78,8 @@ int world_load_enemies(World *w,const char *path,FILE *log){
  if(fread(h,1,8,f)!=8||memcmp(h,"VWE3",4)||u16(h+6)!=16||u16(h+4)>64)goto bad;
  unsigned count=u16(h+4);
  for(unsigned i=0;i<count;i++){
-  if(fread(r,1,16,f)!=16||r[0]!=24||r[1]<9||r[1]>12||u16(r+2))goto bad;
+  if(fread(r,1,16,f)!=16||r[0]!=24||
+     !((r[1]>=9&&r[1]<=12)||r[1]==14)||u16(r+2))goto bad;
   int32_t x=i32(r+4),y=i32(r+8);if(x<0||y<0||x>=(int32_t)w->width*16*256||y>=(int32_t)w->height*16*256)goto bad;
   next[i]=(WorldEntity){.kind=24,.subtype=r[1],.x=(int16_t)(x>>8),.y=(int16_t)(y>>8),.x_q8=x,.y_q8=y,.source_index=u32(r+12),.hp=2.0f};
  }

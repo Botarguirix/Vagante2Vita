@@ -121,7 +121,7 @@ def encode_enemies(enemies, width, height):
     for index, enemy in enumerate(enemies):
         subtype = enemy.get('subtype')
         point = enemy.get('world_pixel')
-        if (subtype not in (9, 10, 11, 12) or enemy.get('native_parity') is not False
+        if (subtype not in (9, 10, 11, 12, 14) or enemy.get('native_parity') is not False
                 or not isinstance(point, (list, tuple)) or len(point) != 2):
             raise ValueError('Invalid provisional ACT_ONE enemy')
         x, y = point

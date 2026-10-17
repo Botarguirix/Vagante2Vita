@@ -340,25 +340,25 @@ Los apartados siguientes conservan el historial de decisiones y pendientes.
 
 # Roadmap hacia Vagante en Vita
 
-## Estado actual: iteración 092
+## Estado actual: iteración 093
 
-Ghidra ahora confirma la bifurcación de `addRandomEnemies` según solidez del
-tile sobre la celda: roll `% 125` para Bat/Spider bajo techo sólido y roll
-`% 100` para Goblin/Slime/Lurker sin ese techo, con el filtro geométrico del
-Lurker. El bundle 092 mantiene 8, 8 y 20 spawns provisionales; el piso 0 queda
-en 2 Bat, 3 Goblin y 3 Slime. Su VWI2/VWE2 conserva los hashes de ruta. Pasan
-168 pruebas Python.
+El runtime y el exportador ahora aceptan Spider (ID 14), que la generación
+ACT_ONE produce en pisos 1 y 2; la seed 1 del piso 1 ejercita la ruta. El
+delivery incluye idle, walk, jump, hurt y webshot y el preflight los comprueba
+siempre. La IA, el salto, la telaraña y el daño siguen usando un modelo
+provisional. Pasan 170 pruebas Python y cuatro archivos C compilan con VitaSDK
+ARM estricto.
 
-El paquete privado 092 valida 108 archivos, tres pisos y 61 imágenes, pero
-mantiene `campaign_complete=false`: filtros de entidad, draws intercalados y
-selección completa siguen aproximados. El VPK 00.92 se compiló con VitaSDK
-Windows (830,423 bytes; SHA-256
-`6388FC5701100CEF1062E4F550317B199443128A1E907FEFBB3837CA7E699FF4`). La
-replay de campaña tiene 545 segmentos/3,184 ticks. Tres ejecuciones aisladas de
-Vita3K agotaron 90 segundos antes de crear sesión nativa o logs, incluso con
-OpenGL; no se valida gameplay en el emulador. Siguen pendientes paridad
-completa, jefe y transiciones comprobadas. Véase [ITERATION92.md](ITERATION92.md),
-[ITERATION90.md](ITERATION90.md) y
+El paquete privado 093 valida 113 archivos, tres pisos y 66 imágenes. El VPK
+00.93 mide 830,445 bytes (SHA-256
+`8BF2E7A27E3DCBD940E67846A175B7D33C3267758846955C670E6988B256C4FA`). El
+smoke estándar de Vita3K agotó 90 segundos antes de crear sesión nativa o logs.
+El replay de campaña se detuvo en la preparación porque los proofs conservan
+un fingerprint previo; WSL no permitió enumerar sus distribuciones (`E_ACCESSDENIED`)
+para regenerarlos. No se valida gameplay. Siguen pendientes el combate nativo
+de Spider, paridad de generación, jefe, proofs actuales y transiciones
+observadas. Véase [ITERATION93.md](ITERATION93.md),
+[ITERATION92.md](ITERATION92.md) y
 [GENERATION_RECOVERY.md](GENERATION_RECOVERY.md).
 
 ## Estado después de la iteración 3

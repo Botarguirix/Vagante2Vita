@@ -16,7 +16,7 @@ DOODADS = {
     19: "waterfall_1_2.png", 20: "waterfall_1_3.png",
     21: "waterfall_1_4.png",
 }
-ENEMIES = {9: "goblin", 10: "bat", 11: "lurker", 12: "slime"}
+ENEMIES = {9: "goblin", 10: "bat", 11: "lurker", 12: "slime", 14: "spider"}
 ENEMY_STATES = ("stand", "move", "air", "hurt", "attack")
 ITEM_ATLASES = {
     "items.png": 16, "items-weapons.png": 20, "items-armor.png": 20,
@@ -110,7 +110,9 @@ def audit(root: Path) -> dict:
         (2, "floors/floor-02.vwi", "floors/floor-02-entities.vwe", "floors/floor-02-enemies.vwe", "floors/floor-02-terrain.png"),
     ]
     checked: list[str] = []
-    enemy_families: set[str] = set()
+    # ACT_ONE can generate Spider even when the currently selected seed does
+    # not; keep its source sprites ready for later floor transitions.
+    enemy_families: set[str] = {"spider"}
     entity_kinds: collections.Counter[int] = collections.Counter()
     doodad_variants: set[int] = set()
     for index, world_name, entities_name, enemies_name, terrain_name in floors:

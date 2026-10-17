@@ -8,16 +8,22 @@ static Texture terrain,sprites[8],decor[3],attack_pose,weapon_atlas,bow_pose,bow
 static Texture actone_chest,actone_spikes,actone_darttrap,actone_boulder_trap,actone_breakable_wall;
 static Texture actone_boulder_blocker,actone_boulders,actone_shake_boulder;
 static Texture loot_atlases[7];
-enum { ENEMY_GOBLIN,ENEMY_BAT,ENEMY_LURKER,ENEMY_SLIME,ENEMY_FAMILY_COUNT };
+enum { ENEMY_GOBLIN,ENEMY_BAT,ENEMY_LURKER,ENEMY_SLIME,ENEMY_SPIDER,ENEMY_FAMILY_COUNT };
 enum { ENEMY_STAND,ENEMY_MOVE,ENEMY_AIR,ENEMY_HURT,ENEMY_ATTACK,ENEMY_STATE_COUNT };
 static Texture enemy_sprites[ENEMY_FAMILY_COUNT][ENEMY_STATE_COUNT];
-static const char *enemy_folders[ENEMY_FAMILY_COUNT]={"goblin","bat","lurker","slime"};
+static const char *enemy_folders[ENEMY_FAMILY_COUNT]={"goblin","bat","lurker","slime","spider"};
 static const char *enemy_names[ENEMY_FAMILY_COUNT][ENEMY_STATE_COUNT]={
+ {"stand.png","move.png","air.png","hurt.png","attack.png"},
  {"stand.png","move.png","air.png","hurt.png","attack.png"},
  {"stand.png","move.png","air.png","hurt.png","attack.png"},
  {"stand.png","move.png","air.png","hurt.png","attack.png"},
  {"stand.png","move.png","air.png","hurt.png","attack.png"}
 };
+static int enemy_family(uint8_t subtype){
+ switch(subtype){case 9:return ENEMY_GOBLIN;case 10:return ENEMY_BAT;
+  case 11:return ENEMY_LURKER;case 12:return ENEMY_SLIME;
+  case 14:return ENEMY_SPIDER;default:return -1;}
+}
 static const char *loot_atlas_names[7]={"items.png","items-weapons.png","items-armor.png","potions.png","scrolls.png","spell_books.png","items-explosives.png"};
 static Texture actone_doodads[22];
 static const char *actone_doodad_names[22]={
@@ -78,8 +84,9 @@ int load_world_visuals_for_terrain(const char *directory,const char *terrain_fil
  snprintf(path,sizeof(path),"%s/entities/shake_boulder.png",directory);
  if(!load_png_file(&actone_shake_boulder,path,log)||actone_shake_boulder.w!=16||actone_shake_boulder.h!=16)free_texture(&actone_shake_boulder);
  unsigned enemy_families=0;
- for(unsigned i=0;i<world->entity_count;i++)if(world->entities[i].kind==24&&world->entities[i].subtype>=9&&world->entities[i].subtype<=12)
-  enemy_families|=1u<<(world->entities[i].subtype-9);
+ for(unsigned i=0;i<world->entity_count;i++)if(world->entities[i].kind==24){
+  int family=enemy_family(world->entities[i].subtype);if(family>=0)enemy_families|=1u<<family;
+ }
  for(int family=0;family<ENEMY_FAMILY_COUNT;family++)if(enemy_families&(1u<<family)){
   for(int state=0;state<ENEMY_STATE_COUNT;state++){
    snprintf(path,sizeof(path),"%s/enemies/%s/%s",directory,enemy_folders[family],enemy_names[family][state]);
@@ -262,8 +269,9 @@ void draw_world(uint32_t *p,const World *w,const NativePlayer *player,int reduct
    else {int x=left/d,y=top/d;if(x>=0&&x<width&&y>=0&&y<height)p[y*width+x]=0xffffd040;}
   }
   if(e->kind==24&&e->hp>0){
-   if(e->subtype>=9&&e->subtype<=12){
-    unsigned family=(unsigned)(e->subtype-9);float ex=e->x_q8/256.0f,ey=e->y_q8/256.0f;
+   int family=enemy_family(e->subtype);
+   if(family>=0){
+    float ex=e->x_q8/256.0f,ey=e->y_q8/256.0f;
     float body_w,body_h;world_enemy_body(e->subtype,&body_w,&body_h);
     int support=(int)floorf((ey+body_h+1.0f)/16.0f);
     int tile_x=(int)floorf((ex+body_w*.5f)/16.0f);

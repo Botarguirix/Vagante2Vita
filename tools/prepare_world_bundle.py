@@ -104,6 +104,7 @@ def main():
             "bat":("bat_hang.png","bat.png","bat.png","bat_hurt.png","bat.png"),
             "lurker":("lurker_retract.png","lurker_attack.png","lurker_retract.png","lurker_retract.png","lurker_attack.png"),
             "slime":("stand.png","walk.png","jump.png","jump.png","walk.png"),
+            "spider":("spider_idle.png","spider_walk.png","spider_jump.png","spider_hurt.png","spider_webshot.png"),
         }
         for family,filenames in enemy_sprites.items():
             for state,filename in zip(("stand","move","air","hurt","attack"),filenames):

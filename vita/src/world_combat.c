@@ -9,6 +9,7 @@ void world_enemy_body(uint8_t subtype,float *width,float *height){
   case 10:*width=9.0f;*height=10.0f;break; /* Bat::Bat */
   case 11:*width=10.0f;*height=10.0f;break;/* Lurker::Lurker */
   case 12:*width=10.0f;*height=7.0f;break; /* Slime::Slime */
+  case 14:*width=10.0f;*height=8.0f;break; /* Spider::Spider */
   default:*width=12.0f;*height=12.0f;break;
  }
 }

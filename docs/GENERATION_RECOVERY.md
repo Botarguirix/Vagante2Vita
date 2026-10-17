@@ -1076,6 +1076,30 @@ agotó 90 segundos antes del logger nativo. El resultado y los límites están e
 [ITERATION90.md](ITERATION90.md); no se reclama paridad seed-exact ni mundo
 completo.
 
+## Recuperación 076: incorporación de Spider a VWE3
+
+`addRandomEnemies` (`0x0068d1e0`) puede emitir TYPE_SPIDER (ID 14) en ACT_ONE
+para `floorIndex > 0` cuando el tile sobre el candidato es sólido y el roll
+`uniform_int<int> % 125` cae entre 50 y 69. La seed 1 del piso 1 produce un
+caso real de esta rama. Antes, el exportador y `world_load_enemies` aceptaban
+solo IDs 9–12, y `world_visuals.c` no podía cargar Spider.
+
+La iteración 093 añade ID 14 al paquete VWE3, mapea su caja de 10×8 obtenida
+de `Spider::Spider` (`0x007aff60`) y empaqueta cinco sprites de la carpeta
+local `gfx/monster/spider`. El preflight ahora valida siempre esos sprites,
+porque las seeds y los pisos futuros pueden elegir Spider. La prueba de seed
+1 llega desde `floor_layout` hasta `encode_enemies`; los archivos C modificados
+y la prueba C de entidades pasan compilación ARM estricta.
+
+Solo se recuperaron constructor, tamaño y recursos visuales. El movimiento
+compartido es provisional: `Spider::runAI` (`0x007b18a0`), salto, web y daño no
+están integrados en el runtime. La suite tiene 170 pruebas y el bundle privado
+093 valida 113 archivos y 66 imágenes. Vita3K volvió a agotar 90 segundos antes
+de una sesión nativa. El replay de campaña tiene proofs con fingerprint viejo;
+WSL rechazó enumerar distros con `E_ACCESSDENIED`, por lo que no se regeneraron
+pruebas físicas. Véase [ITERATION93.md](ITERATION93.md). El mundo sigue
+incompleto y no se reclama paridad de enemigos.
+
 ## Recuperación 075: ramas de superficie en `addRandomEnemies`
 
 La inspección del flujo de instrucciones de Ghidra (listing local

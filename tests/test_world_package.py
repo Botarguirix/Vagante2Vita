@@ -79,6 +79,7 @@ class WorldPackageTests(unittest.TestCase):
                 "bat":("bat_hang.png","bat.png","bat.png","bat_hurt.png","bat.png"),
                 "lurker":("lurker_retract.png","lurker_attack.png","lurker_retract.png","lurker_retract.png","lurker_attack.png"),
                 "slime":("stand.png","walk.png","jump.png","jump.png","walk.png"),
+                "spider":("spider_idle.png","spider_walk.png","spider_jump.png","spider_hurt.png","spider_webshot.png"),
             }
             for family,filenames in enemy_files.items():
                 for filename in filenames:
@@ -130,7 +131,8 @@ class WorldPackageTests(unittest.TestCase):
             self.assertIn("entities/doodads/waterfall_1_4.png",manifest["files"])
             for path in ("enemies/goblin/stand.png","enemies/goblin/move.png",
                          "enemies/bat/air.png","enemies/lurker/hurt.png",
-                         "enemies/slime/air.png"):
+                         "enemies/slime/air.png","enemies/spider/stand.png",
+                         "enemies/spider/attack.png"):
                 self.assertIn(path,manifest["files"])
             self.assertIn("act-one-export.json",manifest["files"])
 

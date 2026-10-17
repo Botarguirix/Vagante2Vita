@@ -3,9 +3,23 @@ import unittest
 from pathlib import Path
 
 from tools.floor_layout import floor_layout
+from tools.export_act_one_world import encode_enemies
 
 
 class ActOneSeedSweepTests(unittest.TestCase):
+    def test_act_one_seed_with_native_spider_branch_exports_vwe3(self):
+        database_path = Path(__file__).parents[1] / '_local/assets/rooms.json'
+        if not database_path.is_file():
+            self.skipTest('Private local Vagante room database is not available')
+        database = json.loads(database_path.read_text('utf-8'))
+        report = floor_layout(1, 1, database)['tile_layout']
+        spiders = [enemy for enemy in report['provisional_enemies']
+                   if enemy['subtype'] == 14]
+        self.assertEqual(len(spiders), 1)
+        packet, counts = encode_enemies(report['provisional_enemies'], 80, 40)
+        self.assertEqual(packet[:4], b'VWE3')
+        self.assertEqual(counts[14], 1)
+
     def test_twenty_seeds_across_act_one_floors_fit_runtime_and_have_tile_routes(self):
         database_path = Path(__file__).parents[1] / '_local/assets/rooms.json'
         if not database_path.is_file():
