@@ -340,23 +340,24 @@ Los apartados siguientes conservan el historial de decisiones y pendientes.
 
 # Roadmap hacia Vagante en Vita
 
-## Estado actual: iteración 087
+## Estado actual: iteración 088
 
-La copia x86/PDB permitió recuperar `Room::monstersAllowed` para ACT_ONE:
-presupuesto 0.5, 0.5 y 1.5 por sala en pisos 0–2. El generador provisional
-usa ese presupuesto como tope por peso de enemigo; el paquete 087 conserva 8,
-8 y 20 spawns provisionales. Los VWI2 y VWE2 de los tres pisos coinciden con
-los hashes de los proofs físicos existentes; los recorridos seed 12345 siguen
-reproducibles. Pasan 12 tests C y la suite Python (164 pruebas, 66 subpruebas).
+La desensamblación de `LevelGenerator::addRandomEnemies` recuperó además la
+tabla ACT_ONE: 40 % Goblin, 45 % Slime y 15 % Lurker cuando pasa su filtro
+geométrico. Se corrigió el ID de entidad del tramo central (Slime `12`, no Bat
+`10`). El bundle privado 088 lleva 8, 8 y 20 spawns provisionales en pisos
+0–2; los VWI2/VWE2 conservan exactamente los hashes de proofs de ruta seed
+12345. Pasan 165 tests Python; los 12 tests C y recorridos físicos previos
+siguen documentados como evidencia de la iteración 086.
 
-El paquete privado 087 valida 108 archivos y el preflight 56 imágenes, pero
-mantiene `campaign_complete=false`: orden de candidatos, filtros/selección de
-enemigos y consumo completo de RNG siguen provisionales. El VPK disponible es
-00.86, compilado con VitaSDK Windows. El intento Vita3K 00.86/000002 preparó la
-replay de 545 pasos y terminó por timeout antes de una sesión nativa, sin
-ventana ni log del emulador. Siguen pendientes paridad completa, jefe,
-transiciones y validación de campaña en Vita3K/hardware. Véase
-[ITERATION87.md](ITERATION87.md), [ITERATION86.md](ITERATION86.md) y
+El paquete privado 088 valida 108 archivos y el preflight 56 imágenes, pero
+mantiene `campaign_complete=false`: candidatos, filtros geométricos, orden de
+barajado y consumo completo de RNG siguen provisionales. El VPK disponible es
+00.86, compilado con VitaSDK Windows. Vita3K 00.86/000003 intentó iniciar el
+replay con Vulkan durante 90 segundos y terminó antes de crear una sesión
+nativa; no generó ventana ni log del emulador. Siguen pendientes paridad
+completa, jefe, transiciones y validación de campaña en Vita3K/hardware. Véase
+[ITERATION88.md](ITERATION88.md), [ITERATION87.md](ITERATION87.md) y
 [GENERATION_RECOVERY.md](GENERATION_RECOVERY.md).
 
 ## Estado después de la iteración 3

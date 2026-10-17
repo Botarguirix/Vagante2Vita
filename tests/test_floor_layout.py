@@ -3,7 +3,8 @@ import unittest
 from tools.floor_layout import (assemble_tiles, close_act_one_border, solid,
                                 tile_paths_to_room_edge, above_ground_candidates,
                                 repair_provisional_route_support,
-                                act_one_room_monster_budget, provisional_enemies,
+                                act_one_room_monster_budget, act_one_enemy_type_for_roll,
+                                provisional_enemies,
                                 consume_spellbook_rng,
                                 consume_placed_entity_rng,
                                 blocked_endpoint_tiles)
@@ -33,6 +34,14 @@ class FloorLayoutTests(unittest.TestCase):
         for invalid in (-1, 3, True, 1.0):
             with self.assertRaises(ValueError):
                 act_one_room_monster_budget(invalid)
+
+    def test_act_one_enemy_roll_uses_native_entity_ids_and_boundaries(self):
+        self.assertEqual([act_one_enemy_type_for_roll(i) for i in (0, 39, 40, 84, 85, 99)],
+                         [9, 9, 12, 12, 11, 11])
+        self.assertIsNone(act_one_enemy_type_for_roll(85, lurker_geometry_supported=False))
+        for invalid in (-1, 100, True, 1.0):
+            with self.assertRaises(ValueError):
+                act_one_enemy_type_for_roll(invalid)
 
     def test_provisional_enemy_spawns_obey_recovered_room_weight_cap(self):
         from tools.floor_main_path import MT19937

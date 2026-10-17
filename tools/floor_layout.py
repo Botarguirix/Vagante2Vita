@@ -46,6 +46,19 @@ def act_one_room_monster_budget(floor_index, new_game_plus=False):
     return float(floor_index >> 1) + 0.5 + (0.5 if new_game_plus else 0.0)
 
 
+def act_one_enemy_type_for_roll(roll, *, lurker_geometry_supported=True):
+    """Map ACT_ONE's recovered 0..99 roll to an entity type for a valid floor candidate."""
+    if type(roll) is not int or not 0 <= roll < 100:
+        raise ValueError('ACT_ONE enemy roll must be an integer from 0 through 99')
+    if type(lurker_geometry_supported) is not bool:
+        raise ValueError('lurker_geometry_supported must be a bool')
+    if roll < 40:
+        return 9   # TYPE_GOBLIN (40%)
+    if roll < 85:
+        return 12  # TYPE_SLIME (45%)
+    return 11 if lurker_geometry_supported else None  # TYPE_LURKER (15%)
+
+
 def consume_spellbook_rng(rng, floor_index):
     """Consume the recovered Item/Skill draws for one empty book pedestal."""
     draws_before = rng.draws
@@ -422,7 +435,9 @@ def provisional_enemies(tiles, room_types, placements, spec, rng, entrance, goal
             candidate_index = rng.raw() % len(candidates)
             x, y = candidates.pop(candidate_index)
             roll = rng.raw() % 100
-            subtype = 9 if roll < 40 else 10 if roll < 85 else 11
+            subtype = act_one_enemy_type_for_roll(roll)
+            if subtype is None:
+                continue
             enemies.append(dict(kind='enemy', subtype=subtype,
                                 world_pixel=[x * 16 + 4, y * 16 + 4],
                                 room=[rx, ry], spawn_model='provisional_act_one',

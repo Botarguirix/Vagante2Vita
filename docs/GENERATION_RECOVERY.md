@@ -1012,3 +1012,22 @@ manifiesto valida 108 archivos y el preflight revisa 56 imágenes. La suite
 Python pasa 164 pruebas y 66 subpruebas; los 12 tests C y los recorridos
 físicos registrados en la iteración 086 siguen pasando. `floor_complete` y
 `campaign_complete` permanecen falsos.
+
+## Recuperación 072: selección de enemigos ACT_ONE
+
+La función `LevelGenerator::addRandomEnemies` (`0x0068d1e0`) sí conserva la
+rama ACT_ONE en `_local/decompiled/0068d1e0.c`. Para los candidatos de suelo
+que pasan los filtros previos, la llamada a `uniform_int<int>` seguida por
+`% 100` escoge `TYPE_GOBLIN` (ID 9) para valores 0–39, `TYPE_SLIME` (ID 12)
+para 40–84 y `TYPE_LURKER` (ID 11) para 85–99. La rama de Lurker todavía
+comprueba sólidos vecinos antes de instanciarlo; no todos esos rollos producen
+un enemigo. El PDB confirma los nombres e IDs en `Entity::EntityType`.
+
+`floor_layout.py` emitía por error Bat (ID 10) en vez de Slime para el tramo
+40–84. Se corrigió la tabla y se añadieron pruebas de sus límites e IDs. La
+entrega privada 088 regeneró los tres VWE3; VWI2 y VWE2 no cambiaron y los tres
+proofs seed 12345 siguen ligados byte por byte a sus mapas y entidades. El
+bundle valida 108 archivos y 56 imágenes, y pasan 165 pruebas Python. Los
+rollos siguen usando el RNG provisional del generador; la geometría que filtra
+Lurkers, el barajado nativo y el orden real de candidatos aún no se modelan
+completamente. `floor_complete` y `campaign_complete` continúan falsos.
