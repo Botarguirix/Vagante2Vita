@@ -1,4 +1,468 @@
-# Estado de reconstrucción (17 de octubre de 2026)
+# Estado de reconstrucción (18 de octubre de 2026)
+
+## Iteración 01.99: render 640×360 y rutas de campaña con clase fija
+
+El modo lógico de 640×360 se mantiene como predeterminado y se escala a
+960×540 dentro del framebuffer Vita de 960×544. En menú, L permite bajar a
+320×180. El build 01.99 se recompiló y su VPK contiene las siete entradas
+permitidas, con identidad VAGV00006 / 01.99. La batería completa pasa: 13
+suites C host, 226 pruebas Python y 70 subpruebas.
+
+Las pruebas de ruta ahora registran la clase del personaje y el empaquetado
+rechaza conjuntos de pisos con clases mezcladas. El controlador host ensaya
+saltos evasivos cerca de enemigos durante el Dragon del piso 0 y completa los
+tres recorridos Rogue aislados. La cadena con salud persistente mejora de
+10/80 a 20/80 HP al terminar el primer piso, pero muere en el piso 1 en tick
+1015 por contacto del Worm/Bat. La ruta Rogue previa moría en tick 918. El
+probador registra clase, HP máximo/actual y flechas iniciales, admite estados
+cargados y rechaza una traza cuyo estado no coincide con el transferido por la
+campaña. Se detectó que la traza aislada del piso 1 comenzaba con 80/80 HP y 30
+flechas, frente a 20/80 y 24 reales; al planear desde esos valores, el
+controlador actual aún muere en tick 1015. El ajuste evasivo solo cambia la
+generación de replay de prueba para el Dragon del piso 0; el controlador humano
+del juego no cambia. Las rutas separadas no prueban ACT_ONE completo: la
+siguiente prioridad es mejorar la navegación/evasión del piso 1 y demostrar
+dos transiciones en una sola cadena viva.
+
+El VPK se compiló, pero Vita3K 0.2.1.4194 en la copia completa aislada agotó
+45 segundos antes de crear la sesión nativa. El diagnóstico posterior, incluso
+sin lanzar un título, reprodujo `0xC0000005` en SDL y Qt. La excepción parte de
+`ucrtbase.dll+0x25F31`, con retorno a `Vita3K.exe+0x683965`; la copia no incluye
+PDB para resolver una función. Por eso el VPK y la transición aún no se han
+validado dentro del emulador. Las trazas están en
+`_local/vita3k-c197-fullcopy-test/diagnostics/no-title-startup-20261019/`.
+
+Una táctica de salto cada 12 ticks cerca de enemigos no mejoró la cadena: el
+Rogue murió en tick 1022 y apenas dañó al Worm (4.5 HP). El salto continuo
+generó un recorrido sin terminación útil y se descartó. La línea base sigue
+muriendo en tick 1013 tras varios contactos de Worm/Bat. La siguiente mejora
+debe cambiar la aproximación al saliente del Worm y permitir disparar al
+mantenerse fuera del alcance, no aumentar saltos sin objetivo. La traza de
+posiciones del estado 20 HP/24 flechas está en
+`_local/worm-carry20-baseline-positions.csv`. Véase
+[Demo ACT_ONE 01.99](DEMO_ACT_ONE_199.md).
+
+## Actualización 166x
+
+La ruta host nativa completa los tres pisos del bundle privado: derrota al
+Dragon, Worm y Goblin King de prueba, mantiene al jugador vivo y toca cada meta
+real. El paquete `_local/campaign-act-one-complete-166x` valida y contiene
+proofs v3 con trazas del controlador. Esto verifica la física/ruta de la
+reconstrucción, pero los jefes y su selección siguen provisionales y no hay
+paridad exacta de generación ni prueba de transición en Vita3K.
+
+Las 13 suites C host y las pruebas del generador de replay y del checker
+Vita3K pasan. El VPK 01.65 y los 144 recursos pasaron preflight. Vita3K
+0.2.1.4194 de `C:\Vita3k`, incluso con perfil completo aislado, vence el
+timeout antes de crear una sesión nativa; por ello no afirmamos que haya
+validado la puerta de entrada o la campaña. El detalle está en
+[WORM_BUILD_DIAGNOSTIC.md](WORM_BUILD_DIAGNOSTIC.md) y el estado de jefes en
+[BOSS_DECOMP_LEDGER.md](BOSS_DECOMP_LEDGER.md).
+
+El reintento directo con `C:\Vita3k\Vita3K.exe` y `--config-location` al perfil
+aislado también expiró a los 20 segundos sin stdout/stderr ni log fresco. No se
+pudo demostrar que esa opción mantuviera `VitaFS` aislado; esta ejecución no
+cuenta como smoke válido. El detalle está en la última sección de
+[WORM_BUILD_DIAGNOSTIC.md](WORM_BUILD_DIAGNOSTIC.md).
+
+La revisión de `generateLevel` corrigió además el diagnóstico RNG: endpoints se
+seleccionan antes de `addRandomEnemies`, así que filtros de enemigos/jefe solo
+afectan draws posteriores. Los reportes ahora separan ambas fronteras y los
+tests comprueban que el trace enemigo comienza después del intervalo RNG de
+endpoints. Otro test fija el orden x-major y la partición seco/agua recuperados
+de Ghidra. La suite completa pasa: 211 pruebas y 70 subtests.
+
+La iteración 01.63 consolida la transición que corrige el reinicio observado
+con el VPK antiguo 01.55. Desde el spawn, la traza alcanza la cueva manteniendo
+derecha 38 ticks; el VPK y los 142 datos de campaña pasan sus verificadores.
+Vita3K no creó sesión nativa en copias aisladas de 0.2.1.4170, 0.2.1.4183 y
+0.2.1.4194. El binario 0.2.1.4194 de `C:\Vita3k` también cae al iniciar con
+`--skip-title`, antes de cargar el VPK. El harness ahora limpia la instalación
+y los datos propios del título dentro del sandbox y registra hashes de VPK,
+replay y recursos; la corrida confirmó ese reporte, pero el frontend volvió a
+fallar antes de una sesión. La replay histórica de 00.25 se regeneró idéntica,
+pero tampoco pudo ejecutarse en el clon local. Falta recuperar la
+configuración exacta del PASS antiguo y congelar perfil, firmware y hashes de
+entrada. Véase [ITERATION163.md](ITERATION163.md).
+
+La iteración 01.61 hace explícito en VTS1 el modo de empezar en el intro y
+añade un smoke que reproduce la entrada por la cueva y completa el primer piso
+ACT_ONE. La ruta intro alcanza la meta en 38 ticks; la replay completa tiene
+77 segmentos / 674 ticks y enlaza trazas `player_step` del intro y del piso 0.
+Pasan 13 grupos C y 206 pruebas Python; el paquete de 142 archivos valida y el
+VPK 01.61 compila. Vita3K 0.2.1.4190 y 0.2.1.4170 (Qt/OpenGL con DLLs
+presentes) en clones aislados terminan con `0xC0000005` antes de la sesión
+nativa; repetir 4170 bajo una ruta corta tuvo el mismo resultado. El smoke no
+llegó al juego. Véase [ITERATION161.md](ITERATION161.md).
+
+La iteración 01.60 prioriza el mapa introductorio con la cueva en partidas
+normales cuando sus datos existen; ACT_ONE queda como respaldo y sigue siendo
+la entrada directa de las replays automatizadas. Se confirmó con el probe
+nativo de física que el spawn del intro alcanza la meta de la cueva en 38
+ticks, sin salto ni colisión atascada. Pasan 13 grupos C y 204 pruebas Python;
+VPK 01.60 compilado y su identidad/Self verificados. La transición todavía no
+se validó en Vita3K, que volvió a quedarse antes de crear sesión para 01.59.
+Véase [ITERATION160.md](ITERATION160.md).
+
+La iteración 01.59 elimina la asignación de Círculo a reiniciar y hace que la
+salida del mundo inicial de respaldo cargue el piso 0 de ACT_ONE cuando los
+datos están instalados; si faltan, deja un error visible. La ayuda de juego
+indica la secuencia inicial derecha y abajo+X. Pasan 13 grupos C, 204 pruebas
+Python y tres rutas host. Vita3K 0.2.1.4170 y 0.2.1.4190 no iniciaron una
+sesión nativa en sus clones privados; puerta y transición siguen sin
+confirmación visual. Véase [ITERATION159.md](ITERATION159.md).
+
+La iteración 01.56 mueve el spawn desde el centro del marcador de entrada tipo
+10 hacia el lado lateral despejado y apoyado, orientado al recorrido. Pasan 13
+grupos C host y 204 pruebas Python; los tres recorridos host llegan a su
+objetivo, incluido Goblin King. VPK compilado. Se intentó correr la campaña en
+Vita3K 0.2.1.4190 sobre clon completo aislado: agotó 120 s sin crear sesión
+nativa, por lo que no alcanzó a ejecutar el juego. La puerta sigue sin prueba
+visual en emulador. Véase [ITERATION156.md](ITERATION156.md).
+
+La iteración 01.55 corrige la colisión horizontal contra paredes: el cálculo
+anterior podía elegir el tile vacío adyacente y desplazar al jugador varios
+píxeles hacia atrás al contacto. La regresión con pared en x=320 y jugador en
+x=311.75 confirma que ahora se alinea con la cara sólida. Pasan 13 grupos C
+y se compiló el VPK 01.55. La suite Python más reciente pasó 204/204. Vita3K
+0.2.1.4190 agotó 120 s sin ventana ni sesión nativa con un clon completo de
+2,162 archivos; 0.2.1.4183 terminó con `0xC0000005`. Ninguno ejecutó el juego.
+ACT_ONE sigue incompleto. Véase [ITERATION155.md](ITERATION155.md).
+
+La iteración 01.54 añadió una línea de visión por tiles al gate provisional de
+ataque del Dragon. Pasan 13 grupos C host, 204 pruebas Python y sintaxis ARM;
+las rutas host de tres pisos pasan y el replay prepara 607 pasos. El VPK 01.54
+se instaló en una copia completa de Vita3K 0.2.1.4183, pero el emulador cayó con
+`0xC0000005` antes de la sesión nativa. Véase [ITERATION154.md](ITERATION154.md).
+
+La iteración 01.53 usó los exports y enums de Ghidra para recuperar la cola de
+acciones del Dragon (15 acciones, ramas de disparo, vuelo y buceo). El runtime
+aún conserva su persecución y disparo provisionales; no se trasladó la IA hasta
+confirmar los campos superpuestos y el estado del MT19937. No cambió el VPK.
+Véase [ITERATION153.md](ITERATION153.md) y la fila Dragon de
+[BOSS_DECOMP_LEDGER.md](BOSS_DECOMP_LEDGER.md).
+
+La iteración 01.52 repitió el VPK 01.50 con un perfil completo aislado (2,162
+archivos verificados): Vita3K 0.2.1.4183 termina con `0xC0000005` antes de
+crear sesión nativa, aun con Qt/OpenGL visibles. El replay de tres pisos se
+prepara, pero no se ejecuta en el emulador. Logs viejos heredados del perfil se
+descartaron como evidencia. Pasan 204 pruebas Python y 13 grupos C host; la
+causa del crash y la campaña jugable siguen pendientes. Véase
+[ITERATION152.md](ITERATION152.md).
+
+La iteración 01.50 incorpora un Dragon provisional tipo 50 como encuentro de
+prueba en el primer piso de ACT_ONE y bloquea la salida hasta derrotarlo. Su
+ancla evita la entrada estrecha al objetivo. El probe host reconoce ambos jefes
+soportados y carga el arco, pero no ha conseguido demostrar esta pelea física:
+las flechas chocan con la plataforma y el jugador puede morir. La copia completa
+de Vita3K contiene 2,126 archivos verificados y el VPK 01.50 está instalado, pero
+Vita3K no creó una sesión nativa. Pasan 204 pruebas Python y 13 pruebas C host;
+la decompilación, la victoria del Dragon y el smoke en Vita3K siguen pendientes.
+Véase [ITERATION150.md](ITERATION150.md).
+
+La iteración 01.49 integra el ciclo provisional de fuego del Dragon: el atlas
+`launching_fireballs` de cinco cuadros se reproduce y genera un proyectil con
+velocidad normal 1.2, colisión con terreno y daño único al jugador. Véase
+[ITERATION149.md](ITERATION149.md).
+
+La iteración 01.48 corrige el enfriamiento del contacto provisional del Dragon:
+ahora se reduce cada tick de combate y el atlas se voltea según el lado al que
+mira. El host test cubre contacto, cooldown y segundo impacto. Esto mejora la
+pelea provisional, pero no recupera ataques de proyectil ni IA nativa.
+[ITERATION148.md](ITERATION148.md).
+
+La iteración 01.47 mueve al Dragon con persecución aérea y colisión contra
+tiles; su contacto provisional inflige el daño base recuperado (5) con
+enfriamiento. Host tests cubren desplazamiento, hitbox y daño. Se quitó Worm
+del combate genérico: el Ghidra export confirma que necesita 20 crawlers
+enlazados, aún ausentes. El Dragon no tiene proyectiles ni paridad de IA y el
+gate de campaña sigue requiriendo su roster. Véase
+[ITERATION147.md](ITERATION147.md).
+
+La iteración 01.46 conserva un registro de derrotas de los tres tipos de jefe
+de ACT_ONE a través de cambios de piso y la salida final exige la máscara
+completa. Los logs y el checker de Vita3K ahora rechazan una finalización
+basada solo en el Goblin King. Esto hace visible una limitación real: el Dragon
+no tiene IA de jefe, Worm no está implementado y los paquetes actuales aún no
+permiten derrotar los tres tipos; por eso la campaña completa todavía no es
+alcanzable. Los tres IDs proceden del selector nativo de ACT_ONE en Ghidra;
+la distribución exacta de encuentros por piso sigue pendiente de validar en
+una sesión nativa. Véase [ITERATION146.md](ITERATION146.md).
+
+La iteración 01.45 corrige el hitbox cuerpo a cuerpo del Dragon: usa el cuerpo
+13×13 confirmado en el constructor, con una prueba que cubre su franja inferior.
+Pasan 13 pruebas C, 202 Python y 70 subtests; los proofs físicos de los tres
+pisos se regeneraron y pasan. El VPK 01.45 compila. El smoke completo valida
+2,126 archivos, el paquete de 142 archivos y prepara el replay, pero Vita3K
+vuelve a expirar antes de sesión nativa. El Dragon aún carece de IA y Worm de
+sus 20 segmentos; ACT_ONE permanece provisional. Véase
+[ITERATION145.md](ITERATION145.md).
+
+La iteración de runtime 01.44 extrae y prueba la decisión de salida de ACT_ONE:
+avance en los pisos 0/1, gate de jefe vivo en el piso final, cierre del acto y
+salida intro. Los proofs host se regeneraron con su nueva huella y las 13
+pruebas C + 202 Python pasan. VPK 01.44 compila con VitaSDK; el runner verifica
+SHA-256 de los 2,126 archivos de la instancia aislada. SDL, Qt y consola/VPK
+directo agotaron el plazo antes de crear sesión nativa, con logs vacíos. No
+equivale a validación del juego. Véase [ITERATION144.md](ITERATION144.md).
+
+La iteración 136 añadió una traza física de los tres pisos que derrota al
+Goblin King provisional del piso 2 y alcanza la salida: 2,161 ticks en la
+pelea final, con 41 HP restantes. El runtime bloquea la salida si el jefe
+sigue vivo. Las rutas de los pisos 0/1/2 quedaron ligadas a las fuentes
+actuales y el replay consume las tres (`player_step:0/1/2`). El ancla usa la
+geometría candidata conectada `(28,21)`; generación exacta y paridad nativa
+siguen sin verificarse. El VPK 01.36 compila; Vita3K 0.2.1.4183 y 0.2.1.4190
+caen con `0xC0000005` antes del log nativo aun usando perfiles completos con
+`pref-path` aislado. Véase [ITERATION136.md](ITERATION136.md).
+
+La corrección del exportador alinea el cuerpo del Goblin King con el centro del
+tile (`[456,344]`); usar el origen del tile hacía que la ruta física se
+atascara tras el combate. Los proofs y las trazas se regeneraron: los tres
+pisos pasan y el jefe cae antes de la salida en el probe host. No cambió el
+VPK, porque este ajuste pertenece al generador de paquetes. Vita3K sigue sin
+validar el runtime debido al cierre previo a la sesión.
+
+La iteración 143 añadió un runner host Windows reproducible con Clang/UCRT,
+proofs verificados contra la misma huella del empacador y paquete actualizado
+de 142 archivos. El replay de tres pisos se reconstruye desde esas trazas (494
+pasos, 3,821 ticks). La suite Python (201) y la suite C host (12) pasan. Esto
+mejora la prueba automatizada local; no reemplaza el replay pendiente dentro de
+Vita3K ni la paridad con el generador nativo. Véase
+[ITERATION143.md](ITERATION143.md).
+
+El build privado 01.36 se recompiló desde el código C actual con VitaSDK y se
+instaló en un clon íntegro aislado. SDL/OpenGL, consola con instalación VPK por
+CLI y un lanzamiento visible agotaron sus plazos antes del primer log nativo;
+controles sin título tampoco mostraron ventana ni logs. El ejecutable anterior
+local reprodujo el estado. La evidencia señala la inicialización de Vita3K en
+este entorno, pero no identifica su causa ni valida el juego. El nuevo paquete
+mantiene `campaign_complete=false`; siguen faltando la ejecución real en
+emulador, Dragon/Worm integrados, RNG exacto, recompensa nativa y paridad de
+generación. Detalle y hashes en [ITERATION143.md](ITERATION143.md).
+
+La iteración 133 recuperó por listing y PDB las fórmulas normales del Goblin
+King: 70 HP y 8 de daño con los factores iniciales de Monster en 1. El actor
+VWE3 ahora recibe melee y flechas, y daña una vez por carga; pasan 12 pruebas
+host y pasan las 194 pruebas Python. El VPK 01.31 compila y las tres rutas
+físicas pasan. Vita3K 0.2.1.4183 y 0.2.1.4190 siguen expirando antes de crear
+sesión nativa; las pruebas de CLI tampoco responden a `--version` en 10 s. No
+se ha validado la ejecución del juego en emulador; véase el detalle
+en [ITERATION133.md](ITERATION133.md).
+El exporter de campaña sigue sin instanciar jefes, por lo que no se declara un
+encuentro ACT_ONE integrado. Véase [ITERATION133.md](ITERATION133.md).
+
+La revisión de Decompedia confirma que sirve como índice y guía metodológica,
+no como código que podamos incorporar directamente. Ghidra rechazó la base
+original por diferencia de propietario; la iteración 133 resolvió el análisis
+desde una copia local aislada y guardó los listings de stats/daño. Véanse
+[ITERATION132.md](ITERATION132.md) y [ITERATION133.md](ITERATION133.md).
+
+La auditoría de la iteración 131 evitó tratar el antiguo `hp=1` de los paquetes
+VWE3 como salud real. La iteración 133 recuperó la fórmula nativa normal e
+inicializa el actor con 70 HP; el exporter y el flujo de derrota aún impiden
+considerarlo una pelea integrada. Véase [ITERATION131.md](ITERATION131.md) y
+el [ledger](BOSS_DECOMP_LEDGER.md).
+
+La iteración 130 implementa el movimiento y atlas de carga del Goblin King
+como comportamiento provisional. El registro VWE3 lo ejecuta si se provee,
+pero ACT_ONE todavía no genera jefes ni implementa daño/derrota/transición. Las
+rutas físicas seed 1/49/4 pasan en 438/890/546 ticks, 12 pruebas C y 194 Python
+pasan, y el VPK 01.30 compila. Vita3K 0.2.1.4190 sigue expirando antes de abrir
+sesión nativa. Véase [ITERATION130.md](ITERATION130.md) y el
+[ledger de jefes](BOSS_DECOMP_LEDGER.md).
+
+La iteración 129 conecta el golpe del Thief con su spritesheet de ataque y la
+128 integra su ataque provisional de corto alcance (daño 1–2, cooldown 60
+ticks, caja aproximada). Véanse [ITERATION129.md](ITERATION129.md) y
+[ITERATION128.md](ITERATION128.md).
+
+Al cierre de la iteración 129, ACT_ONE todavía no estaba completo ni validado en emulador: la campaña host
+recorre tres paquetes de piso, pero el exportador no genera jefes y no existe
+combate/derrota/continuación de jefes. `BossGoblinKing::chargeAttack` aporta
+ahora valores confirmados de telegraph/impulso (35 o 75 ticks y ±9.3 px/tick),
+con colisión y daño aún por recuperar; el ledger conserva esta evidencia sin
+presentarla como una IA implementada. Véase
+[BOSS_DECOMP_LEDGER.md](BOSS_DECOMP_LEDGER.md).
+
+La revisión de `decomp.wiki` y la wiki técnica de decompilación quedó aplicada
+al flujo de análisis: evidencia por función/CFG/tipos y validación por etapas,
+sin confundir reconstrucción funcional con matching. Detalle en
+[referencias públicas](REFERENCE_REPOSITORIES.md#hallazgos-de-las-wikis-y-aplicación-al-análisis-de-vagante).
+
+La iteración 125 corrige la rama Thief: el gate inicial exacto es `roll % 5 ==
+0` y `floorIndex > 0`, con presupuesto local máximo de un ladrón. En 100 seeds
+por piso produjo 0/100, 23/100 y 21/100 gates habilitados (pisos 0/1/2). Esto
+solo valida el gate; todavía no se simula la posición del spawn. Véase
+[iteración 125](ITERATION125.md).
+
+La iteración 122 organiza el análisis por función en un ledger de evidencia
+para los jefes ACT_ONE y prepara los 23 atlas originales de Goblin King,
+Dragon y Worm en el bundle privado, con validación de manifiesto y PNG. Aclara que el proyecto
+reconstruye comportamiento para un port y no realiza matching decompilation;
+el reporte de sala/anclas aún no constituye un spawn, faltan el RNG exacto, los
+bloqueos dinámicos y el runtime de los tres jefes. Véase
+[BOSS_DECOMP_LEDGER.md](BOSS_DECOMP_LEDGER.md) y
+[ITERATION122.md](ITERATION122.md).
+
+El seguimiento de runtime acepta un registro de prueba Goblin King y dibuja su
+atlas estático, con pruebas host para el contrato VWE3. El exportador todavía
+no crea encuentros de jefe y no hay IA, daño, derrota ni transición. El smoke
+01.12 de tres pisos validó el paquete, pero Vita3K agotó 90 s antes del log
+nativo; por tanto no cuenta como prueba de juego. Véase [iteración 123](ITERATION123.md).
+
+La iteración 124 corrige la lectura del filtro `E/G/K/T`: `T` es Thief
+(`EntityType` 84), con cuerpo 7×12, no Shrine. `addRandomEnemies` puede crear
+ladrones con un gate inicial exacto: entero `%5 == 0` y piso posterior al
+primero, con presupuesto local máximo de uno. El enum `4` pertenece a
+`ActType`, no a una sala. La traza registra el gate sin simular el spawn porque
+faltan la asociación de la entrada, el orden de candidatos y el punto de
+aparición. Véase
+[iteración 125](ITERATION125.md).
+
+La iteración 121 ejecutó un control Vita3K 0.2.1.4190 sin título desde el
+filesystem aislado: `--version` termina con código 0, pero el frontend normal y
+`--load-app-list` quedan sin ventana, sin log y sin cargar Qt. Esto ubica el
+bloqueo antes del título, aunque aún no explica la falla de inicialización.
+Véase [ITERATION121.md](ITERATION121.md).
+
+La iteración 120 separa los errores WER históricos de `G:\Vita3k` (0.2.1.4182
+y 4183, `0xc0000005`, 14 de octubre) de los tres timeouts en las instancias
+privadas de 1.12: no hay un evento WER nuevo asociado a esos intentos, y la
+ventana de error detectada no se pudo atribuir. Por eso la causa de no alcanzar
+sesión nativa sigue sin resolver; no se alteró la instancia compartida.
+Véase [ITERATION120.md](ITERATION120.md). El build y los resultados del smoke
+están en [ITERATION119.md](ITERATION119.md).
+
+La iteración 119 produjo y verificó estructuralmente el VPK 01.12 con VitaSDK
+Windows 15.2.0. El preflight de campaña confirma tres pisos, pero tres
+ejecuciones aisladas (Vita3K reciente OpenGL/SDL, 0.2.1.4170 OpenGL/SDL y
+0.2.1.4170 consola) terminaron antes de crear sesión nativa, todas con logs
+vacíos. No hay todavía validación de gameplay. WSL permanece bloqueado por
+`E_ACCESSDENIED`; se usó el toolchain Windows disponible. Véase
+[ITERATION119.md](ITERATION119.md).
+
+La iteración 118 incorpora al trace provisional la rama de enemigos acuáticos
+de `addRandomEnemies`: masa de fluido, selección Piranha/Minnow y pesos nativos
+de sala. Sus filtros de candidato no son aún exactos y los peces no llegan al
+paquete del runtime, por lo que esto no completa los spawns ni el piso. Se
+analizó Decompedia y se confirmó que sus recursos de matching sirven como
+referencia metodológica, no como herramientas directas de port ARM. Suite
+completa: 187 pruebas; bundle privado VWI2 conserva su hash. Véase
+[ITERATION118.md](ITERATION118.md).
+
+La iteración 117 reconstruye la rama `std::_Sort_unchecked` que usa insertion
+sort para listas menores de 32 candidatos. En el barrido de 60 layouts, metas
+alcanzan como máximo 27 candidatos y fallbacks 12; por ello el reporte marca
+exacto el orden de empates para los layouts observados. La composición de las
+listas y el estado RNG siguen provisionales. Suite enfocada: 21/21 + 3/3; el
+bundle privado 12345/piso 1 conserva hashes y sigue incompleto. Véase
+[ITERATION117.md](ITERATION117.md).
+
+La iteración 116 verifica el comparador estricto de coordenadas objetivo
+`addStartAndGoal` (`0x00689c60`) contra sus ramas Ghidra con una prueba de todas
+las parejas de candidatos. Las 182 pruebas pasan. El orden de MSVC para empates,
+el conjunto exacto de candidatos y el estado RNG al entrar en enemigos/jefe
+siguen sin validar; seed 12345/piso 1 conserva hashes VWI2/VWE2/VWE3 y el piso
+sigue incompleto. No hubo cambio del runtime C ni del VPK. Véase
+[ITERATION116.md](ITERATION116.md).
+
+La iteración 115 cierra el ledger RNG de entidades de sala para el catálogo
+ACT_ONE: `Boulder` estático (BOULDER_SQUARE), `BoulderBlocker` y waterfall
+doodad 20 se clasifican correctamente como RNG-free. Una auditoría de las 287
+habitaciones confirma que todos los tipos/subtipos tienen ruta clasificada;
+60 layouts también registran `full_room_entity_rng_reconstructed=true`. Esto
+no certifica el estado global de `addBoss`: extremos y filtros de enemigos
+siguen incompletos. Pruebas enfocadas: 19/19 del layout y 3/3 del barrido.
+Véase [ITERATION115.md](ITERATION115.md).
+
+La iteración 114 añade `provisional_enemy_rng_trace`: registra el orden de
+salas del modelo de enemigos, sus draws por shuffle/roll y el índice del
+recorrido en que Ghidra sitúa la llamada a `addBoss`. Esta auditoría no ejecuta
+el jefe y no afirma paridad RNG; el modelo de enemigos aún no ejecuta esa
+llamada. También se recuperó el filtro ACT_ONE `y != 0` que excluye la fila
+superior del shuffle, y la única llamada conocida a
+`addBoss` queda fuera si la sala seleccionada está en esa fila. Las pruebas
+enfocadas y el barrido de 60 layouts pasan, y la suite completa queda en
+180/180. Seed 12345/piso 1 se regeneró y exportó como VWI2/VWE2/VWE3 privado;
+el reporte sigue marcando el piso incompleto y la generación no exacta. WSL
+responde `E_ACCESSDENIED`; no hubo build ni ejecución Vita3K porque el runtime
+C no cambió.
+Véase [ITERATION114.md](ITERATION114.md).
+
+La iteración 113 modela candidatos de spawn con geometría y filtro de entidades
+estáticas derivado de `EntityType`, y reconstruye el fallback de cuatro tiles
+abiertos más el shuffle en un helper parametrizado por MT19937. Para seed 12345
+da 4/3/11 anclas geométricas y 4/0/11 tras entidades estáticas en pisos 0/1/2.
+Véase [ITERATION113.md](ITERATION113.md).
+
+La lectura enfocada de `addBoss` posterior a la iteración 112 estableció que
+ACT_ONE contempla Goblin King, Dragon y Worm en sus tres slots y que
+`spawnedBosses` persiste en el `LevelGenerator` reutilizado entre pisos. La
+integración pendiente de jefes debe ocurrir dentro de los pisos y respetar esa
+selección/ciclo; el marcador antiguo `boss_transition_pending` describe una
+implementación de runtime sin jefes, no evidencia de que el juego original
+coloque una arena única al final del tercer piso. Aún falta spawn real,
+combate/derrota y validación Vita3K. Véase [ITERATION112.md](ITERATION112.md).
+
+La iteración 112 recupera y registra en cada layout el candidato de sala que
+`generateLevel` pasa a `addBoss`: exclusiones, distancia, conteo de tiles
+abiertos y desempate x-major. No agrega el jefe al runtime y mantiene
+`campaign_complete=false`. Python pasa 173/173; el nuevo bundle local 112
+valida tres pisos/66 imágenes y prepara replay de 545 segmentos. El VPK no
+cambió (sigue 01.11) y no hay sesión nativa Vita3K validada. Véase
+[ITERATION112.md](ITERATION112.md).
+
+La iteración 111 corrige el criterio de cierre: después de dos transiciones,
+el runtime informa que completó los tres paquetes de piso, pero mantiene
+`campaign_complete=0` porque todavía no integra los jefes nativos que aparecen
+dentro de ACT_ONE. La prueba automatizada requiere el nuevo marcador y no valida
+ningún jefe. Python pasa 171/171 y VitaSDK construye el VPK 01.11 (835,757 bytes,
+SHA-256 `9b1d1bd6be0e7091a9d613791c43c1f37a31fdadce3bbdd8a7ec8d9433991c79`).
+Vita3K sigue sin crear una sesión nativa. Véase [ITERATION111.md](ITERATION111.md).
+
+La iteración 105 conserva la embestida normal del Slime de la 104 e incorpora
+su salto periódico, gravedad y rebotes aproximados a partir de `Slime::step`
+en Ghidra. Prueba rangos del impulso y aterrizaje; las variantes siguen fuera
+de alcance porque VWE3 no transporta `SlimeType`. Se añadió una revisión de
+decomp.wiki a las [referencias](REFERENCE_REPOSITORIES.md): aporta contexto y
+taxonomía, no código de Vagante ni una herramienta para integrar. Validación
+y artefactos están en [ITERATION105.md](ITERATION105.md). CTest pasa 12/12,
+el VPK 01.05 compila con VitaSDK y la campaña privada valida 113 archivos;
+las rutas host de los tres pisos alcanzan salida en 1,741/736/375 ticks. No se
+completó Vita3K: el proceso de una corrida visible quedó activo sin ventana ni
+log de sesión y se cerró, quedando el resultado `before_native_session`.
+
+La iteración 104 implementa el ciclo de embestida normal del Slime recuperado
+con Ghidra: probabilidad 1/20 bajo condiciones de proximidad, aviso de 60
+ticks, impulso horizontal 7 por 25 ticks y 150 de enfriamiento. El paquete no
+identifica `SlimeType`, por lo que las variantes y el salto periódico aún no
+son paridad completa. CTest pasa 12/12 y el VPK 01.04 compila con VitaSDK. Se
+regeneraron las rutas v3 de los tres pisos y la campaña privada valida 113
+archivos con replay de 545 segmentos. Vita3K cae con `0xC0000005` antes de
+crear sesión, incluso usando rutas Windows sin espacios. Véase
+[ITERATION104.md](ITERATION104.md).
+
+La iteración 103 añade al Bat su ciclo de carga recuperado con Ghidra:
+persecución aérea con aceleración 0.05, aviso de 30 ticks, embestida de 20
+ticks a rapidez 4 y enfriamiento de 60 ticks. La persecución directa y el
+límite de rapidez son aproximaciones porque el juego delega el movimiento al
+PathManager. CTest pasa 12/12. El VPK 01.03 compila con VitaSDK y las rutas de
+los tres pisos se regeneraron con el fingerprint actual. Vita3K 0.2.1 termina
+con `0xC0000005` antes de crear una sesión, tanto en OpenGL como en Vulkan; la
+build histórica 4170 también falla en el mismo punto. El VPK de control 00.25
+falla al iniciar en el mismo Vita3K actual. No hay validación nativa de
+gameplay. Véase [ITERATION103.md](ITERATION103.md).
+
+La iteración 100 conserva el contador `items_collected` al pasar de piso y
+ajusta el diagnóstico para separar daño de formas de arma ya aplicado de
+escalado estadístico pendiente. Python pasa 170/170, CTest 12/12 y el VPK
+00.98 compila con VitaSDK en WSL; CMake ahora empaqueta correctamente con rutas
+de proyecto que contienen espacios (831,570 bytes, hash
+`A59A03F04A8C38368CC8A23440CAAE4E6646EB84370A2E343BE0E14924617FF3`). Los
+proofs físicos se regeneraron con el fingerprint actual y el replay de tres
+pisos se preparó; Vita3K volvió a caer con `0xC0000005` antes de la sesión
+nativa. `campaign_complete=false`. Véase [iteración 100](ITERATION100.md).
 
 La auditoría de repositorios públicos no encontró un motor Vagante reutilizable.
 `mtolly/vagante-extract` documenta el contenedor VRA, que este proyecto ya
@@ -627,6 +1091,20 @@ ACT_ONE configuró 34 pasos y 56 tiles de ruta, pero Vita3K agotó 45 s antes de
 crear sesión o logs; no demuestra arranque ni transición. No se declara
 completo el primer mundo. Véase [ITERATION73.md](ITERATION73.md).
 
+## Iteración 151 — rutas ACT_ONE regeneradas con el simulador actual
+
+El runner tolera el paquete actual del piso 0 sin jefe, resuelve los recursos
+compartidos desde la raíz de campaña y firma proofs con las mismas fuentes que
+el verificador. Después de derrotar al Goblin King en el piso 2, vuelve a
+calcular la ruta hacia la salida desde la posición real del jugador. Los tres
+pisos pasan el probe host y generan proofs v3 actuales; el replay de campaña se
+prepara con 607 pasos/4,140 ticks y el bundle valida 142 archivos. La suite
+Python pasa 204/204 y las pruebas C host 13/13. Vita3K expira a los 120 s antes
+de una ventana o sesión nativa incluso con el perfil completo aislado; no se
+declara verificada la campaña allí. Generación exacta, paridad de IA/RNG y
+transiciones en Vita3K siguen pendientes. Véase
+[ITERATION151.md](ITERATION151.md).
+
 ## Iteración 085 — replay determinista y campaña ACT_ONE
 
 El replay limita la recuperación a un tick de física por cuadro y consume
@@ -640,3 +1118,238 @@ expiran antes de crear ventana, log o sesión nativa; por ello no se han
 verificado el renderer ni las transiciones. ACT_ONE sigue incompleto:
 generación exacta, paridad de enemigos e inventario, jefe, transiciones nativas
 y pruebas en Vita real siguen pendientes. Véase [ITERATION85.md](ITERATION85.md).
+
+## Iteración 101 — ataque de telaraña del Spider
+
+El Spider selecciona un lanzamiento de telaraña al azar cuando está a menos de
+64 px del jugador, usa el proyectil WEB_BALL reconstruido con velocidad 4 y 7
+de daño, se detiene al tocar terreno y aplica inmovilización temporal al
+impactar. La selección y el viento de preparación son una aproximación de la
+IA/animación original; el test C cubre impacto, daño y bloqueo por pared. CTest
+12/12 pasó. El VPK 01.01 compila con VitaSDK. La suite Python ejecutó 156 tests,
+pero dos módulos no importaron porque WSL no tiene Pillow, pip ni venv; el
+workflow ahora instala Pillow explícitamente. Los route proofs se regeneraron
+con el fingerprint actual y el paquete de 113 archivos genera el replay de 545
+segmentos/3,184 ticks. Vita3K 0.2.1 SDL/OpenGL termina con `0xC0000005` antes de
+crear una sesión nativa; el resultado está en `_local/vita3k-vagante-test101-final/`.
+ACT_ONE sigue incompleto.
+Véase [ITERATION101.md](ITERATION101.md).
+
+## Iteración 102 — emboscada del Lurker
+
+Lurker dejó de compartir la persecución genérica. La rama nueva usa el aviso
+de 16 ticks y el daño base 4–16 observados en Ghidra, golpea una sola vez por
+ataque y espera antes de volver a morder. Su radio de activación y los tiempos
+de animación/recuperación siguen aproximados porque el paquete de salas no
+contiene el sensor ni la metadata del sprite de retractarse. CTest pasa 12/12 y
+la suite Python 170/170; VPK 01.02 compila con VitaSDK. Los proofs de los tres
+pisos y el replay de 545 segmentos validan. Vita3K agotó 30 s antes de crear una
+sesión nativa; el resultado está en `_local/vita3k-vagante-test102/`. ACT_ONE
+continúa incompleto.
+Véase [ITERATION102.md](ITERATION102.md).
+
+## Iteración 110 — integrar daño base del jugador
+
+El análisis Ghidra de `Player::updateStats` calcula `meleeDamage` y
+`rangeDamage`; `Player::attack` pasa el daño del jugador a `Weapon::startSwing`,
+y `Weapon::doCollision` suma `wielderDamage` al rango propio de la forma antes
+de aplicar multiplicadores. El runtime ahora conecta `DerivedStats.melee_base`
+al estado de ataque cuerpo a cuerpo y `ranged_base` al daño al lanzar flechas.
+Las formas melee todavía usan el punto medio de su rango y el daño del jugador
+se aplica como valor esperado; falta recuperar tiradas aleatorias, bonos de
+equipo/perks, críticos y multiplicadores de colisión. El test C de melee cubre
+la suma del bono; VitaSDK pasó comprobación estricta de sintaxis para las fuentes
+afectadas, Python 171/171 y los 12 tests C host pasan 12/12 con el runner Windows.
+Las rutas de los tres pisos pasan con proofs v3 actuales (1,741/736/375 ticks);
+la replay de campaña tiene 545 segmentos/3,184 ticks y el bundle valida sus 113
+archivos. El VPK 01.10 se construyó y verificó como ZIP/SFO. Las dos pruebas
+Vita3K (intro y campaña) expiraron antes de sesión nativa. También fallaron
+pruebas intro en las builds locales 0.2.1.4170, 4183 y 4190 (OpenGL/SDL o
+consola); el perfil de 4190 fue descargado de Windows Nightlies y quedó aislado
+en `_local`. CTest no se ejecutó.
+ACT_ONE sigue incompleto. Véase [ITERATION110.md](ITERATION110.md).
+
+## Iteración 109 — localizar bloqueo de Slime en Vita3K
+
+La sesión nativa 107 identifica `slime_step` de la entidad 18, tick 435 del
+tercer piso, como el punto donde deja de avanzar. La llamada no retorna y falta
+aislar el subpaso. El movimiento ahora protege la conversión de velocidad a
+contador de iteraciones frente a valores inválidos; se añadió cobertura C aún
+pendiente de ejecutar. VitaSDK Windows compiló VPK 01.09 (835,860 bytes) con
+SFO `APP_VER=01.09`, alineado a `vita/iteration.cmake`. El smoke compara el
+formato 1.09 de Vita3K y una prueba de regresión cubre iteraciones 100+. La
+suite Python pasó 171/171. El intento Vita3K 01.08 no creó sesión nativa y dejó
+un diálogo de error de memoria. La campaña 01.09 también falló antes de la
+sesión nativa, con log vacío y sin código de salida; su resultado queda en
+`_local/vita3k-vagante-test105-long/runs/iteration109/run-000001/`. La versión
+01.09 todavía no se ha validado en el emulador.
+WSL responde `E_ACCESSDENIED`, por lo que CTest no corrió. ACT_ONE sigue
+incompleto. Véase [ITERATION109.md](ITERATION109.md).
+## Diagnóstico actual — Dragon del primer piso
+
+El fixture host separado ya completa una ruta repetible en el piso 0 con el
+Dragon de prueba en el ancla `[20,29]`: lo derrota tras siete impactos y llega
+a la salida con 30 HP en 2,283 ticks. El runner de campaña pasó también el piso
+1 y el piso 2 con Goblin King. Esto acredita el simulador de rutas para ese
+fixture; el Dragon sigue fuera del bundle de entrega mientras falten selección
+de spawn/RNG y comportamiento nativos completos.
+
+Vita3K 0.2.1.4194 desde `C:\Vita3k` vuelve a agotar el timeout antes de crear
+una sesión nativa, así que aún no hay resultado de juego en el emulador. Worm,
+la máscara final de jefes y paridad completa de Dragon también siguen
+pendientes. Véase [DRAGON_ROUTE_DIAGNOSTIC163.md](DRAGON_ROUTE_DIAGNOSTIC163.md).
+
+## Actualización 01.66 — estadísticas del Worm
+
+El runtime del Worm ahora usa 100 HP, contacto aleatorio de 2–4 y cooldown de 30
+frames según la evidencia Ghidra. Las 13 suites C host y las tres rutas actuales
+de ACT_ONE pasan; en el primer piso el Worm cae y el jugador conserva 36 HP. El
+VPK 01.66 compila. El smoke de campaña se preparó desde el emulador en
+`C:\Vita3k` con filesystem aislado y preflight correcto, pero Vita3K venció el
+timeout de 45 segundos sin crear sesión nativa. No cuenta como validación del
+juego en el emulador. Véase [ITERATION166.md](ITERATION166.md).
+
+El reintento Qt/OpenGL visible de 01.66 mostró un fallo de arranque de Vita3K
+antes del título: violación de acceso por lectura nula (`ucrtbase.dll+0x25F31`,
+llamada desde `Vita3K.exe+0x683965`). El mismo fallo sucede al iniciar sin el
+juego y sin opciones de configuración del harness; el VPK no alcanza a
+cargarse. Para el detalle véase [WORM_BUILD_DIAGNOSTIC.md](WORM_BUILD_DIAGNOSTIC.md).
+
+## Estado de validación — 01.96
+
+Las 13 suites C host, 220 pruebas Python y 70 subpruebas pasan. El simulador
+produce proofs de ruta para los tres pisos con Rogue. En Vita3K 0.2.1.4194,
+aislado desde `C:\Vita3k`, Knight completó el piso 0, derrotó al jefe y cargó el
+piso 1. La prueba Rogue no creó sesión nativa; el intento visible dejó un
+diálogo de error de Vita3K cuyo detalle aún no se pudo leer. La campaña completa
+de tres pisos, la entrada a la cueva con Rogue y hardware Vita siguen sin
+verificación. La compilación 01.96 es diagnóstica y no es de entrega; ACT_ONE
+sigue incompleto. Véase [ITERATION196.md](ITERATION196.md).
+
+## Build limpia — 01.97
+
+Se quitó la traza temporal y se generó el VPK 01.97 con VitaSDK Windows, ya que
+WSL sigue devolviendo `E_ACCESSDENIED`. La build, las 13 suites C host, las 222
+pruebas Python y la estructura del VPK pasan. Los proofs V4 verifican los
+paquetes VWI2, VWE2 y VWE3 por piso; el generador de replay ya consume esas
+trazas y rechaza cambios en VWE3. La campaña con Worm provisional en posición
+tardía pasa el auditor y las tres rutas Rogue en host, aunque cada piso se
+simuló por separado y esa posición no representa spawn nativo recuperado.
+También se lanzó un smoke de campaña completa desde el perfil aislado creado
+con `C:\Vita3k`: Vita3K 0.2.1.4194 quedó inactivo 300 segundos sin crear sesión
+nativa y los logs quedaron vacíos. Por tanto, la campaña de Vita3K sigue sin
+validar. También quedó preparado el replay de entrada desde la cueva hasta la
+salida del primer piso (224 pasos), aunque aún no se ejecutó en una sesión
+nativa. Una ejecución depurada de Vita3K con `--skip-title` reprodujo una
+violación de acceso antes de cargar cualquier juego (`ucrtbase.dll+0x25F31`,
+`Vita3K.exe+0x683965`), por lo que el bloqueo actual pertenece al arranque del
+emulador y no aporta evidencia sobre el VPK. Véanse [ITERATION197.md](ITERATION197.md)
+y [WORM_BUILD_DIAGNOSTIC.md](WORM_BUILD_DIAGNOSTIC.md).
+
+## Auditoría de transición — tres pisos
+
+La cadena host ahora reproduce las trazas VTR1 con los paquetes reales y
+conserva HP, atributos e inventario mediante la misma función de transición
+del runtime. La corrida uniforme Rogue vence los tres pisos por separado, pero
+al encadenarlos llega al Worm con 10/80 HP y muere en el tick 870; el piso 1
+aislado terminaba con 2 HP tras comenzar lleno. Las pruebas anteriores mezclan
+además Rogue en los pisos 0–1 y Knight en el 2, mientras que el replay normal
+elige Knight por defecto. Por ello, los tres proofs separados no acreditan una
+campaña jugable. Falta una ruta/combate que sobreviva con estado persistente;
+no se añadirá curación entre pisos hasta verificarla en el original. El
+diagnóstico está en [ITERATION197.md](ITERATION197.md) y se repite con
+`tools/test_act_one_campaign_chain_windows.ps1`.
+
+## Demo local — 01.98
+
+Se generó `_local/demo-act-one-198/` con VPK `VAGV00006` 01.98 y el paquete local de intro/ACT_ONE para `ux0:data/Vagante2Vita`. El VPK pasa el verificador de la skill Vita-port (7 entradas, sin recursos comerciales); pasan las 13 suites C host, 222 pruebas Python y 70 subpruebas. El replay determinista intro→piso 0 se prepara con 224 segmentos, 37 ticks hasta la cueva y 1,268 ticks de ruta del piso 0. Las tres rutas de piso pasan por separado con Rogue en el simulador host.
+
+La cadena Rogue con salud persistente falla: completa el piso 0 con 10/80 HP y muere en el piso 1 a tick 918 antes de dañar al Worm. La prueba de entrada por la cueva para VPK 01.98, Vita3K 0.2.1.4194, runtime/perfil aislados desde `C:\Vita3k` y OpenGL agotó 45 segundos sin sesión nativa ni logs. Es una limitación del arranque de Vita3K observada en este entorno; no se declara validado el gameplay del VPK. La demo y su instalación están descritas en [DEMO_ACT_ONE_198.md](DEMO_ACT_ONE_198.md).
+
+## Demo local — 01.99, resolución alta
+
+La iteración 01.99 deja 640×360 como resolución lógica inicial y la escala a 960×540, dentro del framebuffer de 960×544. En los menús, L conserva el modo ligero de 320×180. No se agregan buffers. El VPK contiene siete entradas y pasa `check_vpk.py`; pasan las 13 suites C host, 222 pruebas Python y 70 subpruebas. Se preparó `_local/demo-act-one-199/` con 189 archivos inventariados y recursos externos ACT_ONE validados (144 archivos).
+
+La prueba de intro→cueva del VPK 01.99 en Vita3K 0.2.1.4194 volvió a agotar 45 segundos antes de crear una sesión nativa, aun con OpenGL y una copia aislada completa del emulador y perfil. No confirma la calidad visual en Vita3K ni en hardware. Instrucciones y evidencia: [DEMO_ACT_ONE_199.md](DEMO_ACT_ONE_199.md) y `_local/vita3k-c197-fullcopy-test/runs/iteration199/run-000001/`.
+
+## Iteración 200 — verificación del Worm
+
+El probe host ahora prioriza melee del Rogue cuando el Worm o una amenaza
+cercana está al alcance; el arco gastaba flechas contra terreno desde el
+saliente. La corrida `_local/route-act-one-199-close-melee-fullchain/` pasa los
+proofs físicos individuales de los tres pisos. Eso todavía no representa una
+cadena con salud persistente: el piso 0 termina con 10 HP en la corrida actual
+(20 HP en una ruta anterior), y el piso 1 con el mejor estado conocido de
+20 HP/26 flechas termina en muerte al tick 934. La ejecución encadenada actual
+entra con 10 HP al piso 1 y muere al tick 850. Las 14 suites C host y 226
+pruebas Python pasan. No se simula curación entre pisos; hacen falta datos del
+juego original y una ruta encadenada que sobreviva. Vita3K sigue fallando antes
+de cargar el VPK. Véase [ITERATION200.md](ITERATION200.md).
+
+## Iteración 201 — golpe al jugador
+
+Las exportaciones Ghidra locales recuperan `Player::hurt` (`0x006f9020`): tras
+un daño aceptado pone `hurtTimer=10`, libera el agarre y calcula knockback según
+atributos y estado. `Player::doCollision` consulta `invulFrames` por entidad;
+esto no confirma inmunidad global y no evita por sí solo contactos de fuentes
+distintas. No se integró una reacción parcial sin recuperar `Unit::hurt` y los
+argumentos exactos de knockback. Los proofs físicos individuales siguen pasando,
+pero el estado persistente de 10 HP falla al tick 850 del piso 1; Vita3K sigue
+sin cargar el VPK. Véase [ITERATION201.md](ITERATION201.md) y la evidencia local
+en `_local/decompiled/006f9020.c`, `006f74c0.c` y `006fc9f0.c`.
+
+## Iteración 202 — salida de pantalla completa
+
+La revisión del escalador encontró filas que se pisaban al mapear 640×360 a
+960×540. El mapeo corregido cubre cada píxel visible de Vita y conserva el
+perfil ligero; las 14 suites C host y 226 pruebas Python pasan. El VPK 02.02
+se compiló con VitaSDK Windows, verifica sus siete entradas y mantiene los
+recursos de ACT_ONE en el paquete local de 189 archivos. Vita3K falla antes de
+cargar un título con `0xC0000005`; WSL no inició por `E_ACCESSDENIED`. La cadena
+de salud persistente y la ejecución en hardware siguen pendientes. Véase
+[ITERATION202.md](ITERATION202.md) y [demo local](DEMO_ACT_ONE_202.md).
+
+## Iteración 203 — feedback visual de daño
+
+Ghidra confirma que `Player::hurt` inicia `hurtTimer=10` al aceptar daño. El
+runtime incorpora un destello rojo de 10 ticks en las cuatro rutas de impacto
+que ya aplican HP, sin alterar daño, desplazamiento ni inmunidad. Pasan las 14
+suites C y 226 pruebas Python; VitaSDK compila el VPK 02.03 y el verificador
+reporta siete entradas sin errores. El bundle local vuelve a validar sus 189
+archivos por SHA-256. Vita3K continúa fallando antes de cargar títulos y la
+cadena de campaña persistente no completa el piso 1. Véase
+[ITERATION203.md](ITERATION203.md) y [demo local](DEMO_ACT_ONE_203.md).
+
+La auditoría de cadena de 02.03 regeneró rutas Rogue separadas, pero sus proofs
+inician en 80/80 HP y 30 flechas cada uno: floor 0 termina en 10 HP, floor 1
+termina en 4 HP y floor 2 en 45 HP. La ejecución integrada lleva correctamente
+10 HP/23 flechas al Worm; una corrida histórica sin guard murió al tick 850 tras
+tres contactos en 37 ticks. El gate integrado ahora detecta y rechaza el proof
+de floor 1 antes de simularlo porque su estado inicial no corresponde al
+jugador transportado. La ruta de evasión experimental no mejoró el resultado y
+se retiró. El primer ACT_ONE aún no está validado como campaña persistente ni
+en Vita3K.
+
+## Estado actualizado — 20 de octubre de 2026
+
+La iteración publicada localmente sigue siendo el VPK 02.03 (`VAGV00006`). En
+esta revisión se repitieron las 14 pruebas C host y las 226 pruebas Python:
+ambas suites pasan. El VPK contiene siete entradas y pasa `check_vpk.py` sin
+errores ni advertencias; el bundle privado local contiene 189 archivos y todos
+coinciden con el manifiesto SHA-256. SHA-256 del VPK:
+`B598F7C865E127636255FCFBCF50C563A33BB33C939D9AA08D9A509D9161D221`.
+
+La cadena no está completa: proofs independientes parten cada uno con 80 HP y
+30 flechas, mientras que la cadena transporta 10 HP y 23 flechas al primer
+Worm. El validador integrado detecta ese estado incompatible antes de aceptar
+el proof aislado. El selector de staging experimental del probe tampoco ha
+demostrado una ruta válida hasta el jefe. No se atribuye progreso de campaña a
+esas rutas individuales. La ejecución actual de Vita3K sigue sin validar el
+gameplay; el diagnóstico anterior termina con `0xC0000005` antes de cargar un
+título. El build tampoco se ha probado en una Vita física.
+
+El repositorio público conserva código, herramientas, pruebas y análisis
+reproducible. Los sprites, mapas y paquetes exportados desde la copia local de
+Vagante permanecen fuera de Git; cada persona debe generar sus recursos locales
+con su propia copia. Véanse [ITERATION203.md](ITERATION203.md),
+[DEMO_ACT_ONE_203.md](DEMO_ACT_ONE_203.md) y el [inventario local](LOCAL_ARTIFACTS.md).

@@ -2,7 +2,7 @@
 
 Investigación técnica e ingeniería inversa reproducible para un posible port nativo de **Vagante a PS Vita**.
 
-**Estado:** reconstrucción parcial; el VPK 00.81 se compiló con VitaSDK en WSL y Windows, y los siete archivos internos coinciden. El bundle privado ACT_ONE 082 valida; `player_step` alcanzó las salidas de los tres mapas actuales y produjo proofs v3 con trazas físicas. Pasan 12 pruebas C host y 159 Python. El smoke de campaña agota 45 s en Vita3K antes de crear una sesión nativa, por lo que el emulador no ha validado el VPK ni las transiciones. Generación exacta y comportamiento de enemigos siguen incompletos. Véanse el [estado de reconstrucción](docs/ROADMAP.md), la [iteración 081](docs/ITERATION81.md) y el [análisis de referencias](docs/PORTING_REFERENCE_REVIEW.md).
+**Demo local actual: VPK 02.03.** Incluye la intro con entrada por la cueva, ACT_ONE con tres pisos, enemigos, jefes y transiciones entre pisos. El render lógico 640×360 llena 960×540; L conserva el modo ligero 320×180 en menús. Recibir daño muestra un destello rojo breve. Pasan 14 suites C host y 226 pruebas Python; el VPK compila y pasa el verificador. La cadena Rogue aún no completa el piso 1 con salud persistente, y Vita3K 0.2.1.4194 falla antes de cargar títulos. La generación y los jefes siguen siendo reconstrucciones provisionales. El paquete local, controles y límites están en [Demo ACT_ONE 02.03](docs/DEMO_ACT_ONE_203.md); consulta también el [roadmap actualizado](docs/ROADMAP.md) y [cómo reproducir el build y las pruebas](docs/REPRODUCING.md).
 
 Se generó localmente pseudocódigo de **30 568 funciones**, incluidos código del juego y bibliotecas/runtime, con dos fallos por timeout después de reintentar. El título 00.02 fue probado en Vita por el usuario. La iteración 00.03 añade fondo animado, sprites por atlas, vista parcial de selección de clases y log de recursos, transiciones y rendimiento; falta probar esta versión en consola. Estos resultados no representan un porcentaje de reconstrucción ni prueban rendimiento del juego en Vita.
 
@@ -60,7 +60,7 @@ Para registrar qué `data.vra` local produjo un paquete externo, añade
 manifiesto guarda su tamaño y SHA-256; el archivo comercial no se copia al
 bundle ni al VPK.
 
-**Última iteración de reconstrucción: 071.** `BreakableWall` recibe daño melee, destruye su grupo ortogonal y actualiza las tiles y colisiones; el VPK 00.71 compila. El smoke Vita3K de este paquete terminó por timeout sin sesión nativa, por lo que el gameplay no quedó validado en emulador. Los Boulders independientes y varias reglas nativas de pared siguen pendientes. [ITERATION71.md](docs/ITERATION71.md).
+El siguiente resumen conserva el estado histórico de la iteración 071; para el estado vigente, consulta [Demo ACT_ONE 01.99](docs/DEMO_ACT_ONE_199.md) y el [roadmap](docs/ROADMAP.md). `BreakableWall` recibe daño melee, destruye su grupo ortogonal y actualiza las tiles y colisiones; el VPK 00.71 compila. [ITERATION71.md](docs/ITERATION71.md).
 
 ## Alcance del repositorio
 

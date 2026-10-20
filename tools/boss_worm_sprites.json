@@ -1,0 +1,39 @@
+{
+  "format": "vagante-vita-boss-sprites",
+  "version": 1,
+  "boss": "worm",
+  "entity_type": 51,
+  "evidence": {
+    "constructor_address": "0x005301e0",
+    "set_level_address": "0x005307a0",
+    "step_address": "0x00531270",
+    "animation_address": "0x00537280",
+    "frame_step_address": "0x007b9720",
+    "segment_count": 20,
+    "body_cell": [32, 32],
+    "head_cell": [32, 32],
+    "sprite_speed_argument": 5,
+    "frame_advance_ticks": 6,
+    "segment_reference_interval_pixels": 24,
+    "spit_projectile_type": 10,
+    "spit_projectile_name": "PROJECTILE_WORM_SHOT",
+    "spit_projectile_damage_type": 4,
+    "spit_projectile_damage_name": "DAMAGE_POISON",
+    "spit_velocity_multiplier": 2.5,
+    "spit_cooldown_cases": [20, 28, 40],
+    "spit_count_threshold_cases": [3, 5, 8],
+    "spit_sound": "enemy/act1/worm_acid_spit.wav",
+    "spit_source_addresses": ["0x00532f60", "0x00720dd0", "0x00721fe0"],
+    "native_parity": false
+  },
+  "sprites": {
+    "body": {"path": "bosses/worm/body.png", "cell": [32, 32]},
+    "head": {"path": "bosses/worm/head.png", "cell": [32, 32]},
+    "projectile": {"path": "bosses/worm/spitball.png", "cell": [16, 16]}
+  },
+  "limitations": [
+    "Host body-follow model does not yet reproduce native vector constraints or terrain response.",
+    "Native runAI state-to-cooldown/count selection, aim spread mapping, projectile constructor damage amount, hit/collision behavior, and projectile effects are not fully reconstructed.",
+    "The ACT_ONE deterministic actor is a test fixture, not addBoss RNG parity."
+  ]
+}

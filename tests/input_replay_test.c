@@ -13,7 +13,7 @@ static void packet_two_steps(const char *path){
 }
 int main(void){
  InputReplay r={0},before;const char *path="input-replay-fixture.vts";
- packet(path,0x4000,6,0);assert(replay_load(&r,path,NULL));assert(replay_buttons(&r)==0x4000);
+ packet(path,0x4000,6,0);assert(replay_load(&r,path,NULL));assert(replay_buttons(&r)==0x4000);assert(!r.start_intro);
  replay_advance(&r,0);assert(!r.done);replay_advance(&r,5);assert(!r.done);replay_advance(&r,1);assert(r.done&&!r.active&&!replay_buttons(&r));
  before=r;packet(path,0x4000,0,0);assert(!replay_load(&r,path,NULL));assert(!memcmp(&r,&before,sizeof(r)));
  packet(path,0x4000,601,0);assert(!replay_load(&r,path,NULL));
@@ -30,6 +30,16 @@ int main(void){
  replay_advance(&r,2);assert(r.done&&!r.active);
  before=r;
  packet(path,0x4000,6,1);assert(!replay_load(&r,path,NULL));
+ packet(path,0x4000,6,0);FILE *flags=fopen(path,"r+b");assert(flags);assert(fseek(flags,6,SEEK_SET)==0);fputc(1,flags);fclose(flags);
+ assert(replay_load(&r,path,NULL));assert(r.start_intro&&!r.stop_after_first_floor);before=r;
+ flags=fopen(path,"r+b");assert(flags);assert(fseek(flags,6,SEEK_SET)==0);fputc(2,flags);fclose(flags);
+ assert(replay_load(&r,path,NULL));assert(!r.start_intro&&r.stop_after_first_floor);
+ flags=fopen(path,"r+b");assert(flags);assert(fseek(flags,6,SEEK_SET)==0);fputc(4,flags);fclose(flags);
+ assert(replay_load(&r,path,NULL));assert(!r.start_intro&&!r.stop_after_first_floor&&r.fast_forward);before=r;
+ flags=fopen(path,"r+b");assert(flags);assert(fseek(flags,6,SEEK_SET)==0);fputc(7,flags);fclose(flags);
+ assert(replay_load(&r,path,NULL));assert(r.start_intro&&r.stop_after_first_floor&&r.fast_forward);before=r;
+ flags=fopen(path,"r+b");assert(flags);assert(fseek(flags,6,SEEK_SET)==0);fputc(8,flags);fclose(flags);
+ assert(!replay_load(&r,path,NULL));assert(!memcmp(&r,&before,sizeof(r)));
  FILE *f=fopen(path,"wb");fwrite("VTS1",1,4,f);fclose(f);assert(!replay_load(&r,path,NULL));
  assert(!memcmp(&r,&before,sizeof(r)));
  f=fopen(path,"wb");assert(f);fwrite("VTS1",1,4,f);unsigned char header[4]={1,2,0,0};fwrite(header,1,4,f);

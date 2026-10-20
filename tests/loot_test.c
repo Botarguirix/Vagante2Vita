@@ -20,6 +20,19 @@ int main(void){
  assert(world_spawn_chest_loot(&w,&chest,0,123,&type));assert(type==49&&w.entity_count==1);
  assert(w.entities[0].item_sprite==12&&w.entities[0].item_atlas==1);
  assert(w.loot.spawned_unique_count==1&&w.loot.spawned_unique[0]==49);
+ WorldEntity boss={.kind=WORLD_KIND_BOSS,.subtype=WORLD_BOSS_GOBLIN_KING,
+                   .x_q8=220*256,.y_q8=100*256,.hp=0,.source_index=7};
+ assert(world_spawn_boss_reward_chest(&w,&boss));
+ assert(boss.boss_reward_spawned&&w.entity_count==2);
+ assert(w.entities[1].kind==16&&w.entities[1].boss_reward&&
+        w.entities[1].source_index==boss.source_index);
+ assert(!world_spawn_boss_reward_chest(&w,&boss)&&w.entity_count==2);
+ WorldEntity dragon={.kind=WORLD_KIND_BOSS,.subtype=WORLD_BOSS_DRAGON,
+                     .x_q8=240*256,.y_q8=100*256,.hp=0,.source_index=8};
+ assert(world_spawn_boss_reward_chest(&w,&dragon));
+ assert(w.entities[2].kind==16&&w.entities[2].boss_reward&&dragon.boss_reward_spawned);
+ assert(world_spawn_chest_loot(&w,&w.entities[1],0,123,&type)&&type==50);
+ assert(w.entity_count==4);
  assert(!world_spawn_chest_loot(&w,&chest,11,123,&type));
  /* Interaction opens a chest and creates a drop; a later UP collects it. */
  memset(&w,0,sizeof(w));w.width=40;w.height=24;w.ready=1;w.entrance_x=14;w.entrance_y=20;

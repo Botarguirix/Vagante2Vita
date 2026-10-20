@@ -20,21 +20,30 @@ except ModuleNotFoundError:
 
 
 def load_route_proof(proof_path: Path | None, world: bytes, entities: bytes,
-                     source_root: Path | None = None):
+                     source_root: Path | None = None, enemies: bytes | None = None):
     if proof_path is None:
         return None
     proof = json.loads(proof_path.read_text('utf-8'))
     if (proof.get('format') != 'act-one-native-route-proof'
-            or proof.get('version') not in (1, 2, 3) or proof.get('reached_exit') is not True
+            or proof.get('version') not in (1, 2, 3, 4, 5) or proof.get('reached_exit') is not True
             or proof.get('world_sha256') != hashlib.sha256(world).hexdigest()
             or proof.get('entities_sha256') != hashlib.sha256(entities).hexdigest()):
         raise ValueError(f'{proof_path}: route proof is invalid or belongs to different floor data')
-    if proof['version'] in (2, 3):
+    if proof.get('version') == 5 and proof.get('player_class') not in (0, 1, 2):
+        raise ValueError(f'{proof_path}: class-tagged route proof has no valid player class')
+    if 'boss' in proof:
+        if (proof.get('version') not in (4, 5) or enemies is None
+                or proof.get('enemies_sha256') != hashlib.sha256(enemies).hexdigest()):
+            raise ValueError(f'{proof_path}: boss proof is not bound to this floor enemy packet')
+    elif proof.get('enemies_sha256') is not None:
+        if enemies is None or proof['enemies_sha256'] != hashlib.sha256(enemies).hexdigest():
+            raise ValueError(f'{proof_path}: route proof belongs to different floor enemy data')
+    if proof['version'] in (2, 3, 4, 5):
         if source_root is None:
             source_root = Path(__file__).resolve().parents[1]
         if proof.get('simulator') != source_fingerprint(source_root):
             raise ValueError(f'{proof_path}: route proof was produced by different simulator sources')
-    if proof['version'] == 3:
+    if proof['version'] in (3, 4, 5) and 'controller_trace_file' in proof:
         trace_name = proof.get('controller_trace_file')
         trace_path = proof_path.with_suffix('.vtr')
         if trace_name != trace_path.name or not trace_path.is_file():
@@ -44,6 +53,20 @@ def load_route_proof(proof_path: Path | None, world: bytes, entities: bytes,
                 or hashlib.sha256(trace_path.read_bytes()).hexdigest() != proof.get('controller_trace_sha256')):
             raise ValueError(f'{proof_path}: controller trace does not match its proof')
     return proof
+
+
+def validate_campaign_route_classes(proofs):
+    """Reject class-tagged route sets that cannot describe one campaign run."""
+    proofs = list(proofs)
+    if not any(proof and proof.get('version') == 5 for proof in proofs):
+        return None
+    if (len(proofs) != 3 or any(proof is None or proof.get('version') != 5 for proof in proofs)
+            or any(proof.get('player_class') not in (0, 1, 2) for proof in proofs)):
+        raise ValueError('Class-tagged ACT_ONE campaign proofs must cover all floors with one player class')
+    classes = {proof['player_class'] for proof in proofs}
+    if len(classes) != 1:
+        raise ValueError('Class-tagged ACT_ONE campaign proofs must cover all floors with one player class')
+    return classes.pop()
 
 
 def validate_floor(export_dir: Path, route_proof_path: Path | None = None):
@@ -75,7 +98,7 @@ def validate_floor(export_dir: Path, route_proof_path: Path | None = None):
     path = summary.get("native_tile_path", {})
     if geometry.get("verified") is not True or path.get("reachable") is not True:
         raise ValueError(f"{export_dir}: spawn or tile-route audit is incomplete")
-    route_proof = load_route_proof(route_proof_path, world, entities)
+    route_proof = load_route_proof(route_proof_path, world, entities, enemies=enemies)
     return dict(width=width, height=height, entities=struct.unpack_from("<H", entities, 4)[0],
                 provisional_enemies=struct.unpack_from("<H", enemies, 4)[0],
                 exact_generation_parity=summary.get("exact_generation_parity") is True,
@@ -150,7 +173,9 @@ def prepare(base: Path, output: Path, floors, route_proofs=None):
     if 0 in route_proofs:
         base_world = (base / 'act-one-world.vwi').read_bytes()
         base_entities = (base / 'act-one-entities.vwe').read_bytes()
-        base_proof = load_route_proof(route_proofs[0], base_world, base_entities)
+        base_enemies = (base / 'act-one-enemies.vwe').read_bytes()
+        base_proof = load_route_proof(route_proofs[0], base_world, base_entities,
+                                      enemies=base_enemies)
     for index, source in floors:
         if index not in (1, 2) or index in checked:
             raise ValueError("Campaign extension requires unique floor indices 1 and 2")
@@ -159,6 +184,8 @@ def prepare(base: Path, output: Path, floors, route_proofs=None):
         raise ValueError("Campaign extension requires floor 1 and floor 2")
     if set(route_proofs) - {0, 1, 2}:
         raise ValueError('Route proof index must be 0, 1, or 2')
+    campaign_proofs = [base_proof] + [checked[index][1]['native_route_proof'] for index in (1, 2)]
+    validate_campaign_route_classes(campaign_proofs)
     loot_report = validate_loot_table(loot_path) if loot_path.is_file() else None
     if loot_report is None:
         raise ValueError('ACT_ONE campaign requires a verified item-loot.vlt VLT1 v2 table')
@@ -174,7 +201,7 @@ def prepare(base: Path, output: Path, floors, route_proofs=None):
         destination = root / f'route-proofs/floor-{index:02d}.json'
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(proof_path, destination)
-        if json.loads(destination.read_text('utf-8')).get('version') == 3:
+        if json.loads(destination.read_text('utf-8')).get('version') in (3, 4, 5):
             source_trace = proof_path.with_suffix('.vtr')
             destination_trace = destination.with_suffix('.vtr')
             shutil.copyfile(source_trace, destination_trace)

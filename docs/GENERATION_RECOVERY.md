@@ -3,6 +3,104 @@
 Análisis de las funciones locales identificadas por PDB/Ghidra. El pseudocódigo
 no se publica ni se presenta como código recompilable.
 
+## Aclaración del orden RNG de endpoints y enemigos
+
+La decompilación local de `generateLevel` (`_local/decompiled/0067c4c0.c`,
+llamadas alrededor de 1688–1704) confirma este orden: `createRoomEntities`,
+`addStartAndGoal`, validación del camino y después `addRandomEnemies`. Por eso,
+los filtros de enemigos y la selección de jefe no pueden alterar la selección
+de entrada/salida; sí alteran el estado RNG posterior. El reporte de
+`floor_layout.py` ahora separa la incertidumbre de candidatos/shuffle de
+endpoints de la paridad pendiente de `addRandomEnemies` y anota el intervalo de
+draws previo a enemigos. Esto corrige el diagnóstico de causa; no declara
+paridad exacta: generación de agua/entidades y candidatos de endpoints aún
+requieren contraste seed-exact con el ejecutable original.
+
+El barrido del test cubre 20 semillas en los tres pisos (60 mapas) y mantiene
+los conjuntos de meta bajo 32 candidatos, donde la ruta de insertion-sort
+MSVC está reconstruida. En seed 12345, los pisos producen 8–16 candidatos de
+meta y 16–23 draws de endpoint; estos conteos verifican el modelo interno, no
+una comparación directa con el juego original. Se añadió una prueba dirigida
+del orden x-major y la partición de candidatos secos/adyacentes a agua según
+`findRandomAboveGroundTiles` (`0x0065a9a0`). La suite Python completa queda en
+211 pruebas y 70 subtests.
+
+## Recuperación 118: spawn acuático y peso de Piranha/Minnow
+
+`LevelGenerator::addRandomEnemies` (`0x0068d1e0`) consulta la masa del fluido
+en tiles de tipo agua y consume un `generate_canonical<float>` para escoger
+Piranha (<0.8) o Minnow (>=0.8). `Level` duplica las dimensiones de fluido; el
+índice observado `2 * (x + fluidWidth * y)` apunta al sub-tile superior
+izquierdo de 8 px. El inicializador de `Monster::MONSTER_SPAWN_WEIGHT`
+(`0x004035f0`) asigna 0.5 a Piranha y float32 `0x3e2aaaab` a Minnow. El trace
+provisional consume esa rama y aplica los pesos al contador de sala; los
+filtros de candidatos siguen aproximados y los peces no se serializan al
+runtime. Por ello esto recupera la rama y su efecto local conocido, no el
+estado RNG global ni el spawn nativo completo. Véase [`ITERATION118.md`](ITERATION118.md).
+
+Decompedia define recursos para *matching decompilation*, que busca reproducir
+bytes con el compilador original. Ese objetivo difiere de la reconstrucción
+funcional ARM/Vita de este port; decomp.me y el servidor Ghidra compartido no
+son necesarios y no reciben nuestros EXE, PDB, dumps ni pseudocódigo privado.
+La revisión se registra en [`ITERATION118.md`](ITERATION118.md).
+
+## Recuperación 117: ruta de insertion sort de MSVC para metas
+
+`std::_Sort_unchecked` (`0x006974e0`) toma insertion sort cuando el vector tiene
+menos de 32 elementos. El helper `sort_goal_candidates_msvc_path` reproduce
+esta rama: conserva el orden cuando el comparador estricto considera iguales
+dos puntos. Con 20 seeds × 3 pisos, el máximo del vector meta observado fue 27;
+el fallback alcanzó 12, de modo que los 60 layouts usaron esa ruta y la salida
+reporta `exact_tie_order=true`. Listas de 32 o más elementos permanecen
+marcadas como fallback no exacto. La composición de candidatos y el estado RNG
+previo aún no son paridad nativa. Véase [`ITERATION117.md`](ITERATION117.md).
+
+## Recuperación 116: comparador de candidatos de meta
+
+Se aisló `goal_candidate_rank` y se contrastó con el comparador de
+`LevelGenerator::addStartAndGoal` (`0x00689c60`). Su orden estricto es: mayor
+número de lados abiertos, apoyo sólido, tipo distinto de plataforma y mayor Y.
+Una prueba transcribe las ramas del predicado nativo y compara cada pareja en
+una matriz sintética que incluye sólidos, plataformas y agua. El helper conserva
+la semántica del comparador, pero Python realiza un sort estable: no acredita
+el orden de MSVC `std::sort` entre candidatos equivalentes. Tampoco resuelve
+todavía la fidelidad del conjunto candidato ni el estado RNG de entrada. Véase
+[`ITERATION116.md`](ITERATION116.md).
+
+## Recuperación 115: ledger completo de entidades estáticas ACT_ONE
+
+La revisión de los 287 cuartos ACT_ONE encontró tres categorías que el ledger
+marcaba como sin clasificar. `Room::createEntity` (`0x00758e50`) construye el
+Boulder de sala con `BOULDER_SQUARE` (enum 1); el constructor `Boulder`
+(`0x0053e5c0`) solo consume tres `generate_canonical` para `BOULDER_SHAKE`
+(enum 0), así que el tipo estático no consume draws. `BoulderBlocker` tampoco
+consume RNG en construcción/setup y `Doodad::setTypeVars` (`0x0059a6e0`) no
+toma RNG para `DOODAD_WATERFALL_3` (20). Se clasifican estas rutas como
+RNG-free. Los únicos doodads ACT_ONE con RNG colocados son los que el ledger ya
+identifica; los libros sin objeto se generan en la segunda pasada de
+`Level::createRoomEntities`.
+
+La auditoría verifica todas las definiciones originales ACT_ONE: ocho tipos de
+entidad y ocho subtipos doodad, sin rutas sin clasificar. Para cada layout, el
+campo `full_room_entity_rng_reconstructed` es ahora verdadero solo si no queda
+ninguna entidad sin clasificar y cada pedestal vacío tiene sus draws de
+spellbook consumidos. Esto valida el ledger de contenido de sala, no el estado
+RNG global ni la paridad del spawn; selección de extremos y los filtros de
+`addRandomEnemies` todavía pueden cambiar sus draws.
+
+## Recuperación 114: filtro de fila en `addRandomEnemies`
+
+El armado del vector de salas de `LevelGenerator::addRandomEnemies`
+(`0x0068d1e0`, `0x0068d799–0x0068d7ab`) asigna `puVar5 = roomY` para
+`Room::ActType::ACT_ONE` y solo agrega la coordenada cuando ese valor es distinto
+de cero. El PDB exportado confirma `ACT_ONE=0`. Así, las salas de `y=0` se
+excluyen antes del shuffle x-major; dado que el único call site encontrado de
+`addBoss` está dentro del recorrido posterior de ese vector, tampoco se invoca
+para una sala de jefe situada en la fila superior. El modelo provisional ya
+excluye esa fila y la traza informa cuándo el jefe no está en la lista. Sigue
+sin ser paridad RNG: entidades, filtros de tiles y draws condicionales
+anteriores todavía faltan.
+
 ## Rutas verificadas
 
 LevelGenerator::generateFloor, 0x0067c370: índices de piso 0–2 llaman generateLevel
@@ -15,7 +113,104 @@ No se ha resuelto todavía el mapeo de distribución/semilla consumida.
 LevelGenerator::generateBranch, 0x0067c450: pisos <3 Ruins, <6 Forest,
 <9 Tower y restantes Factory; marca isBranch. No sustituye generateFloor.
 
+## Recuperación 077: jefe de ACT_ONE y límite del cierre actual
+
+La implementación local todavía no contiene un jefe. `main.c` termina los
+tres paquetes de piso y vuelve a `MENU_CLASS`; la iteración 111 marca ese
+estado como `ACT_ONE_FLOORS complete=1 count=3 boss_transition_pending=1
+campaign_complete=0`. Los registros anteriores a la iteración 111 pueden
+contener `ACT_ONE_DUNGEON cleared=1`, pero tampoco prueban una campaña
+completa. El cargador solo acepta pisos 0–2 y no prepara estado de jefe.
+
+La exportación Ghidra de `LevelGenerator::addBoss` (`0x0068a770`) conserva tres
+slots para `levelAct == 0`: slot 0 construye `BossGoblinKing`, slot 1
+`BossDragon` y slot 2 `BossWorm`; sus tipos son 49, 50 y 51. El constructor
+`BossGoblinKing` (`0x005157c0`) registra el tipo `TYPE_BOSS_GOBLIN`, crea
+sprites separados para espera, movimiento, preparación de salto/embestida,
+hacha, muerte, rugido, salto, lanzamiento y daño, y consume RNG al inicializar
+la dirección de patrulla. `BossGoblinKing::step` (`0x00516af0`),
+`initializeStats` (`0x00516610`) y `doCollision` (`0x005166a0`) existen en la
+exportación local, pero los pseudocódigos por sí solos no equivalen a una
+implementación fiel ni establecen todos los valores mientras las estructuras
+y llamadas indirectas sigan sin resolver.
+
+La taxonomía del PDB evita una confusión de los paquetes de sala: el flag
+`0x4000` de `Room::getRoomTypeBasedOnFlags` (`0x00756f00`) es
+`bookPedestalRoom`, no una arena de jefe. Los grupos ACT_ONE indexados en
+`rooms.json` con ese flag contienen salas normales de 10×8 tiles, no una arena
+especial. `addBoss` (`0x0068a770`) recorre tiles que pasan
+`tilePathsToEdgeOfRoom`, descarta candidatos bloqueados por determinadas
+entidades y baraja los puntos elegibles antes de elegir. La selección consulta
+además `spawnedBosses`; si el slot elegido ya fue añadido, incrementa el índice
+circularmente módulo tres y vuelve a intentarlo. El `LevelGenerator` se crea al
+construir `GameEngine` (`0x005c0820`) y se reutiliza en
+`GameEngine::loadNextLevel` (`0x005c23b0`), que vuelve a llamar `generateFloor`.
+Así, el conjunto sobrevive las transiciones y ACT_ONE puede seleccionar jefes
+distintos a lo largo de sus pisos. Aún no se verifican los sorteos concretos
+para pisos 0–2 ni la muerte/transición que sigue al combate.
+
+La primera selección no debe aproximarse como `rng % 3`: el pseudocódigo toma
+un valor de `uniform_int<int>`, aplica `& 0x80000001` y normaliza el bit de
+signo. Cuando ya hay un jefe registrado, usa otro valor y `% 3`; los índices
+ocupados se saltan con el avance circular. El conjunto de los tres tipos hace
+que `addBoss` salga sin añadir otra unidad cuando todos ya están registrados.
+La función también consume RNG al barajar puntos spawn antes de seleccionar.
+Por tanto, una prueba determinista requiere reproducir el estado y el orden de
+MT19937 desde el inicio de `generateFloor`, incluidos sorteos de salas y
+entidades; fijar solo la semilla no valida un spawn si el orden anterior de
+consumo difiere.
+
+`generateLevel` (`0x0067c4c0`) calcula `bossRoomX/Y` tras `randomizeRooms` y
+antes de `initRoom`: recorre x-major las salas que no sean tienda, tesoro,
+secretas ni `brightSkyRoom`, y que estén a distancia Manhattan mayor que dos
+de start y goal. `Room::getNumOpenTiles` (`0x0075aef0`) cuenta cada tile cuyo
+tipo no sea 1; un máximo estrictamente mayor reemplaza al candidato anterior,
+así que los empates conservan la primera sala. `addRandomEnemies`
+(`0x0068d1e0`) invoca `addBoss` solo al procesar esa coordenada. El cálculo
+reconstruido en `floor_room_selection.choose_boss_room` deja esta selección en
+el reporte privado; no añade aún un jefe al paquete runtime. Si no hay sala con
+tiles abiertos elegibles, el selector conserva las coordenadas goal como
+respaldo, tal como indican los valores iniciales locales observados.
+
+La copia privada contiene los doce PNG de
+`_local/assets/gfx/monster/goblin_king/` y seis WAV de sus efectos ACT_ONE.
+`BossGoblinKing::setLevel` (`0x00515c70`) asigna esos atlas a sprites separados
+para espera, preparación, caminar, salto, carga, hacha, muerte, rugido,
+embestida, lanzamiento y daño. Los PNG son atlas comprimidos y sus dimensiones
+van de 28×19 a 128×16; los argumentos de construcción de `Sprite` y los métodos
+de selección de cuadro deben resolverse en conjunto para recuperar tiempos y
+transiciones. La integración también requiere las reglas de selección/spawn y
+el flujo de nivel. No se infiere una arena ni una pelea a partir del mero
+inventario de recursos.
+
+La siguiente integración debe recuperar el contrato de spawn del jefe dentro
+de cada piso (puntos, bloqueos y orden RNG de `addBoss`), completar metadatos de
+sprites/acciones para los tres tipos y modelar combate/derrota con pruebas C.
+Después deberá extenderse el paquete y el cargador para transportar jefes y
+mantener `spawnedBosses` entre pisos. Hasta entonces, el final de los tres
+paquetes solo prueba transiciones entre esos paquetes, no los jefes ni el
+primer mundo completo.
+
 ## Dependencias para el primer piso real
+
+La función local `boss_room_spawn_geometry` en `tools/floor_layout.py` traslada
+otra parte de `addBoss` (`0x0068a770`) a un reporte auditable: recorre anclas en
+orden x-major/y-major, exige que los cuatro tiles del cuerpo 2×2 tengan camino
+por tiles no sólidos hasta un borde enlazado (`Level::tilePathsToEdgeOfRoom`,
+`0x0065b8a0`) y requiere dos tiles sólidos de apoyo debajo. En seed 12345 el
+modelo encontró 4, 3 y 11 anclas geométricas para pisos 0, 1 y 2. El enum PDB
+confirma los bloqueadores `TYPE_SPIKES=69`, `TYPE_BOULDER_TRAP=71`,
+`TYPE_SPIKE_TRAP=75` y `TYPE_SHRINE=84`, los mismos valores que los caracteres
+E/G/K/T de la comparación nativa. El reporte ya filtra las entidades estáticas
+de sala conocidas por su centro 16×16, pero no cubre entidades dinámicas. El
+helper `boss_spawn_random_fallback` implementa el fallback nativo: sortea x e y
+por módulo hasta acumular cuatro tiles abiertos, conserva posiciones repetidas
+y aplica el shuffle de Windows. El helper necesita el MT19937 exacto en la
+entrada de `addBoss`; como el generador aún no conoce todos los sorteos
+anteriores, no se conecta al reporte ni produce VWE3, y se mantiene
+`native_spawn_ready=false`. La prueba de semilla cubre 60 layouts; unit tests
+cubren soporte, rutas, tipo de entidad, duplicados del fallback y entradas
+inválidas.
 
 - generateLevel 0x0067c4c0: ensamblado y selección de habitaciones/nodos.
 - RoomDatabase::randomizeRooms 0x0075ed40 y getRandomRoom 0x0075f250:
@@ -565,10 +760,11 @@ Vita3K sigue pendiente.
 
 Se añadió `world_goal_touched`, que valida valores finitos y prueba la
 intersección entre la caja actual de 8×12 píxeles del jugador y el tile de meta
-de VWI2. El loop registra `WORLD_EXIT` al contacto. Para conservar una ruta
-jugable antes de tener el siguiente generador, el prototipo vuelve a aparecer
-en la entrada del mismo mundo y etiqueta el evento como `exit-restart`; no es
-un cambio de piso y no cuenta como mundo completo.
+de VWI2. El loop registra `WORLD_EXIT` al contacto. Antes de 01.59, el
+prototipo volvía a aparecer en la entrada del mismo mundo (`exit-restart`).
+Desde 01.59, esa salida del mundo de respaldo carga el piso 0 de ACT_ONE cuando
+sus datos están instalados; si faltan, muestra el bloqueo en vez de reiniciar
+silenciosamente.
 
 `act-one-export.json` conserva ahora la ruta A* completa y
 `tools/prepare_smoke_replay.py --act-one-exit --layout <layout-o-export>` la
@@ -823,10 +1019,14 @@ supere una condición de velocidad vertical de 0.4 y otras comprobaciones de
 contacto; entonces construye `DamageEventMeta(999, DAMAGE_PURE, true, ...)`.
 El enum PDB define `DAMAGE_PURE=1`. Esto permite implementar el peligro como
 daño letal basado en la colisión descendente, en vez de inventar daño periódico
-por simple proximidad. Aún falta portar las demás guardas del actor (inmunidad,
-agua, estado de muerte/resurrección y registro de víctimas por pincho) y
-conectar `Player::hurt`/resultado de muerte con el loop del runtime; el
-pseudocódigo Ghidra no prueba por sí solo el resultado visual del golpe.
+por simple proximidad. La exportación Ghidra `Player::hurt` (`0x006f9020`)
+confirma que, tras `Unit::hurt` con resultado `DID_HURT`, pone `hurtTimer=10`,
+libera el agarre y calcula knockback sujeto a `immuneToKnockback`, `isSkeleton`
+y `rangeFocus`. `Player::doCollision` (`0x006f74c0`) consulta `invulFrames`
+por entidad al procesar colisiones. Esto no prueba una inmunidad global del
+jugador: la implementación base `Unit::hurt`, las guardas del actor (inmunidad,
+agua, muerte/resurrección y víctimas por pincho) y el efecto visual todavía
+requieren análisis e integración en runtime.
 La primera integración está en [ITERATION30.md](ITERATION30.md); el test C y el
 smoke Vita3K están compilado y lanzado respectivamente, pero no ejecutados con
 resultado de gameplay comprobado.

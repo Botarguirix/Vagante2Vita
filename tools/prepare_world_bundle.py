@@ -105,10 +105,30 @@ def main():
             "lurker":("lurker_retract.png","lurker_attack.png","lurker_retract.png","lurker_retract.png","lurker_attack.png"),
             "slime":("stand.png","walk.png","jump.png","jump.png","walk.png"),
             "spider":("spider_idle.png","spider_walk.png","spider_jump.png","spider_hurt.png","spider_webshot.png"),
+            # Native Thief sheets use 18x18 frames; use walk art for the
+            # unsupported attack pose until its combat animation is ported.
+            "thief":("idle.png","walk.png","jump.png","hurt.png","walk.png"),
         }
         for family,filenames in enemy_sprites.items():
             for state,filename in zip(("stand","move","air","hurt","attack"),filenames):
                 sources[f"enemies/{family}/{state}.png"]=args.assets/"gfx"/"monster"/family/filename
+        # Stage native ACT_ONE boss sheets in a private namespace so each boss
+        # record resolves its original art without becoming a normal enemy.
+        boss_assets={
+            "goblin_king":("stand.png","prep_hop.png","prep_leap.png","walk.png",
+                           "jump.png","charge_attack.png","charge_axe.png","dead.png",
+                           "roar.png","leap.png","throw.png","hurt.png"),
+            "dragon":("baby_dragon_flying.png","dead.png","dive.png","fall.png",
+                      "flip.png","hurt.png","launch.png","launching_fireballs.png",
+                      "unconscious.png"),
+            "worm":("body.png","head.png","spitball.png"),
+        }
+        source_folders={"goblin_king":"goblin_king","dragon":"baby_dragon","worm":"worm"}
+        for boss,filenames in boss_assets.items():
+            for filename in filenames:
+                sources[f"bosses/{boss}/{filename}"]=args.assets/"gfx"/"monster"/source_folders[boss]/filename
+        sources["bosses/goblin_king/sprites.json"]=Path(__file__).with_name("boss_goblin_king_sprites.json")
+        sources["bosses/worm/sprites.json"]=Path(__file__).with_name("boss_worm_sprites.json")
         doodads={1:"counter.png",2:"shop_sign.png",3:"torch.png",4:"decorative_helmet.png",
                  5:"decorative_shield.png",13:"flower_1.png",14:"spellbook_altar.png",
                  19:"waterfall_1_2.png",20:"waterfall_1_3.png",21:"waterfall_1_4.png"}

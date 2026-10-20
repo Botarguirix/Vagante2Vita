@@ -6,7 +6,9 @@ from pathlib import Path
 from PIL import Image
 
 from tools.export_act_one_world import (audit_act_one_entity_definitions,
-                                        encode_entities, encode_enemies, export, validate_spawn_geometry)
+                                        encode_entities, encode_enemies, export,
+                                        plan_provisional_final_boss,
+                                        validate_spawn_geometry)
 
 
 def valid_spawn_report():
@@ -32,6 +34,92 @@ class ExportActOneWorldTests(unittest.TestCase):
         self.assertEqual(counts, {14: 1})
         with self.assertRaisesRegex(ValueError, 'Invalid provisional'):
             encode_enemies([{'subtype': 49, 'world_pixel': [0, 0], 'native_parity': False}], 8, 8)
+
+    def test_encodes_goblin_king_test_actor_as_vwe3_boss(self):
+        boss = {'kind': 'boss', 'subtype': 49, 'world_pixel': [336, 320],
+                'native_parity': False,
+                'spawn_model': 'deterministic_final_floor_test_anchor'}
+        packet, counts = encode_enemies([boss], 32, 32)
+        self.assertEqual(struct.unpack_from('<4sHH', packet), (b'VWE3', 1, 16))
+        self.assertEqual(struct.unpack_from('<BBHiiI', packet, 8),
+                         (26, 49, 0, 336 * 256, 320 * 256, 0))
+        self.assertEqual(counts, {'boss_goblin_king': 1})
+        with self.assertRaisesRegex(ValueError, 'Invalid provisional ACT_ONE boss'):
+            encode_enemies([{**boss, 'spawn_model': 'native'}], 32, 32)
+
+    def test_encodes_provisional_dragon_actor_using_act_one_type_50(self):
+        dragon = {'kind': 'boss', 'subtype': 50, 'world_pixel': [320, 300],
+                  'native_parity': False,
+                  'spawn_model': 'deterministic_intro_dragon_test_anchor'}
+        packet, counts = encode_enemies([dragon], 32, 32)
+        self.assertEqual(struct.unpack_from('<BBHiiI', packet, 8),
+                         (26, 50, 0, 320 * 256, 300 * 256, 0))
+        self.assertEqual(counts, {'boss_dragon': 1})
+        with self.assertRaisesRegex(ValueError, 'Invalid provisional ACT_ONE boss'):
+            encode_enemies([{**dragon, 'spawn_model': 'native'}], 32, 32)
+
+    def test_encodes_provisional_worm_actor_with_runtime_linked_segments(self):
+        worm = {'kind': 'boss', 'subtype': 51, 'world_pixel': [320, 300],
+                'native_parity': False,
+                'spawn_model': 'deterministic_final_floor_worm_test_anchor'}
+        packet, counts = encode_enemies([worm], 32, 32)
+        self.assertEqual(struct.unpack_from('<BBHiiI', packet, 8),
+                         (26, 51, 0, 320 * 256, 300 * 256, 0))
+        self.assertEqual(counts, {'boss_worm': 1})
+
+    def test_plans_only_a_deterministic_non_native_final_floor_boss(self):
+        geometry = {'after_static_entity_filter': [
+            {'tile': [21, 20]}, {'tile': [24, 18]}, {'tile': [26, 20]}, {'tile': [28, 21]}]}
+        boss = plan_provisional_final_boss(2, 4, geometry)
+        self.assertEqual(boss['tile'], [21, 20])
+        self.assertEqual(boss['world_pixel'], [340, 324])
+        self.assertFalse(boss['native_parity'])
+        self.assertEqual(boss['selection_index'], 0)
+        self.assertIsNone(plan_provisional_final_boss(1, 49, geometry))
+        with self.assertRaisesRegex(ValueError, 'verified spawn anchor'):
+            plan_provisional_final_boss(2, 4, {'after_static_entity_filter': []})
+
+    def test_plans_intro_dragon_centered_on_verified_anchor(self):
+        geometry = {'after_static_entity_filter': [{'tile': [20, 29]}, {'tile': [21, 25]}, {'tile': [25, 29]}]}
+        route = [[20, y] for y in range(10, 30)]
+        boss = plan_provisional_final_boss(0, 4, geometry, route)
+        self.assertEqual(boss['subtype'], 50)
+        self.assertEqual(boss['tile'], [20, 29])
+        self.assertEqual(boss['world_pixel'], [321.5, 465.5])
+        self.assertEqual(boss['spawn_model'], 'deterministic_intro_dragon_test_anchor')
+        self.assertFalse(boss['native_parity'])
+
+    def test_final_boss_prefers_candidate_nearest_to_floor_tile_route(self):
+        geometry = {'after_static_entity_filter': [
+            {'tile': [21, 20]}, {'tile': [24, 18]}, {'tile': [26, 20]}, {'tile': [28, 21]}]}
+        route = [[44, y] for y in range(38, 20, -1)] + [[28, 21]]
+        boss = plan_provisional_final_boss(2, 4, geometry, route)
+        self.assertEqual(boss['tile'], [28, 21])
+        self.assertEqual(boss['world_pixel'], [452, 340])
+        self.assertEqual(boss['selection_index'], 3)
+
+    def test_can_select_worm_only_as_an_explicit_test_boss(self):
+        geometry = {'after_static_entity_filter': [{'tile': [21, 20]}, {'tile': [24, 18]}]}
+        worm = plan_provisional_final_boss(2, 4, geometry, boss_subtype=51)
+        self.assertEqual(worm['subtype'], 51)
+        self.assertEqual(worm['spawn_model'], 'deterministic_final_floor_worm_test_anchor')
+        self.assertFalse(worm['native_parity'])
+
+    def test_plans_floor_one_worm_at_deterministic_late_route_candidate(self):
+        route = [[4, y] for y in range(2, 11)]
+        worm = plan_provisional_final_boss(1, 49, {'after_static_entity_filter': []},
+                                           route, boss_subtype=51)
+        route_index = min(len(route) - 1, len(route) * 3 // 4 + 1)
+        self.assertEqual(worm['tile'], route[route_index])
+        self.assertEqual(worm['world_pixel'], [route[route_index][0] * 16 + 4,
+                                                route[route_index][1] * 16 + 4])
+        self.assertEqual(worm['spawn_model'], 'deterministic_floor_route_worm_route_test_anchor')
+        self.assertFalse(worm['native_parity'])
+
+    def test_does_not_place_floor_one_worm_without_a_route_waypoint(self):
+        with self.assertRaisesRegex(ValueError, 'verified spawn anchor or Worm route tile'):
+            plan_provisional_final_boss(1, 49, {'after_static_entity_filter': []},
+                                         boss_subtype=51)
 
     def test_act_one_room_entity_catalog_is_supported_and_complete(self):
         import json

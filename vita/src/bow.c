@@ -60,11 +60,24 @@ static void sweep(NativeArrow *a,ArrowPool *pool,World *w,float dx,float dy){
   float x=a->x+sx,y=a->y+sy;
   if(arrow_solid(w,x,y)){a->stuck=1;a->vx=a->vy=0;a->life=120;return;}
   for(unsigned j=0;j<w->entity_count;j++){
-   WorldEntity *e=&w->entities[j];if(e->kind!=24||e->hp<=0)continue;
+   WorldEntity *e=&w->entities[j];
+   int boss=e->kind==WORLD_KIND_BOSS&&
+       (e->subtype==WORLD_BOSS_GOBLIN_KING||e->subtype==WORLD_BOSS_DRAGON||
+        e->subtype==WORLD_BOSS_WORM);
+   if((!boss&&e->kind!=24)||e->hp<=0)continue;
    float ex=e->x_q8/256.0f,ey=e->y_q8/256.0f;
    float enemy_w,enemy_h;world_enemy_body(e->subtype,&enemy_w,&enemy_h);
-   if(x+1<=ex||x-1>=ex+enemy_w||y+1<=ey||y-1>=ey+enemy_h)continue;
-   e->hp-=a->damage;if(e->hp<=0){e->hp=0;pool->enemy_kills++;}
+   int hit=x+1>ex&&x-1<ex+enemy_w&&y+1>ey&&y-1<ey+enemy_h;
+   if(!hit&&e->kind==WORLD_KIND_BOSS&&e->subtype==WORLD_BOSS_WORM){
+    for(unsigned segment=0;segment<WORLD_WORM_SEGMENTS&&!hit;segment++){
+     float sx,sy;world_worm_path_sample(w,e,segment,&sx,&sy);
+     hit=x+1>sx&&x-1<sx+8.0f&&y+1>sy&&y-1<sy+8.0f;
+    }
+   }
+   if(!hit)continue;
+   e->hp-=a->damage;if(e->hp<=0){e->hp=0;pool->enemy_kills++;
+    if(boss){world_record_boss_defeat(w,e);if(!world_spawn_boss_reward_chest(w,e))e->boss_reward_spawned=1;}
+   }
    pool->enemy_hits++;a->active=0;a->vx=a->vy=0;return;
   }
   a->x=x;a->y=y;

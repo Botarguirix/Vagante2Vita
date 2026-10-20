@@ -1,6 +1,8 @@
-/* Initial-room movement subset. Combat/skills and PC parity remain pending. */
+/* ACT_ONE movement and basic weapon collision subset. Skill execution and PC parity remain pending. */
 #include "player.h"
+#include <limits.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 static int cell(float v){return (int)floorf(v/16.0f);}
 unsigned player_interact_chests(NativePlayer *p,World *w){
@@ -90,10 +92,21 @@ static void axis_move(NativePlayer *p,const World *w,float distance,int vertical
     }else p->contacts|=WORLD_UP;
    }
    else {
-    p->x=before;
-    int tile_x=step>0?cell(p->x+p->w):cell(p->x-0.001f);
-    float safe_x=step>0?tile_x*16.0f-p->w-0.001f:(tile_x+1)*16.0f+0.001f;
-    p->x=safe_x;
+    /* Resolve against the solid tile overlapped by the attempted position.
+       Using `before` to find the tile can select the adjacent empty tile when
+       the player is still a fraction of a pixel short of the wall, snapping
+       the player back by an entire tile. */
+    int wall_x=step>0?INT_MAX:INT_MIN;
+    int y0=cell(p->y),y1=cell(p->y+p->h-0.001f);
+    int x0=cell(p->x),x1=cell(p->x+p->w-0.001f);
+    for(int ty=y0;ty<=y1;ty++)for(int tx=x0;tx<=x1;tx++){
+     if(!world_solid(w,tx,ty))continue;
+     if(step>0&&tx<wall_x)wall_x=tx;
+     if(step<0&&tx>wall_x)wall_x=tx;
+    }
+    if((step>0&&wall_x!=INT_MAX)||(step<0&&wall_x!=INT_MIN))
+     p->x=step>0?wall_x*16.0f-p->w-0.001f:(wall_x+1)*16.0f+0.001f;
+    else p->x=before;
     if(player_overlaps_solid(p,w))p->x=before;
     p->vx=0;p->contacts|=step>0?WORLD_RIGHT:WORLD_LEFT;
    }
@@ -105,7 +118,23 @@ int player_spawn(NativePlayer *p,const World *w,int player_class){
  NativePlayer next;memset(&next,0,sizeof(next));
  if(!w->ready||!starting_stats(player_class,&next.stats))return 0;
  next.player_class=player_class;next.facing=1;next.w=8;next.h=12;
- next.x=(float)(w->entrance_x*16)+4;next.y=(float)(w->entrance_y*16)+16-next.h;
+ int spawn_x=w->entrance_x,spawn_y=w->entrance_y;
+ const WorldTile *entrance=world_tile(w,spawn_x,spawn_y);
+ if(entrance&&entrance->type==10){
+  /* The entrance marker is a doorway, not a standing tile. Spawn just inside
+     the walkable corridor so the player never has to push through its frame. */
+  int best_x=-1,best_score=INT_MAX;
+  for(int dir=-1;dir<=1;dir+=2){
+   int tx=w->entrance_x+dir,ty=w->entrance_y;
+   const WorldTile *cell_tile=world_tile(w,tx,ty),*head_tile=world_tile(w,tx,ty-1),*support=world_tile(w,tx,ty+1);
+   if(!cell_tile||!head_tile||!support||cell_tile->solid||head_tile->solid||(!support->solid&&!support->platform))continue;
+   int score=abs(tx-w->goal_x)+abs(ty-w->goal_y);
+   if(score<best_score){best_x=tx;best_score=score;}
+  }
+  if(best_x>=0)spawn_x=best_x;
+ }
+ next.x=(float)(spawn_x*16)+4;next.y=(float)(spawn_y*16)+16-next.h;
+ next.facing=spawn_x>=w->entrance_x?1:-1;
  player_derive_stats(&next.stats,&next.derived);
  if(!player_starting_loadout(player_class,&next.loadout))return 0;
  next.melee.definition=melee_find(&w->melee,(unsigned)next.loadout.items[0].type);
@@ -120,6 +149,7 @@ int player_carry_campaign_state(NativePlayer *next,const NativePlayer *previous,
  next->stats=previous->stats;next->derived=previous->derived;next->loadout=previous->loadout;
  next->max_hp=previous->max_hp;next->hp=previous->hp<0?0:previous->hp>next->max_hp?next->max_hp:previous->hp;
  next->chests_opened=previous->chests_opened;
+ next->items_collected=previous->items_collected;
  int melee_type=-1;
  for(unsigned i=0;i<next->loadout.item_count;i++)if(next->loadout.items[i].role==START_MELEE){melee_type=next->loadout.items[i].type;break;}
  next->melee.definition=melee_type>=0?melee_find(&w->melee,(unsigned)melee_type):NULL;
@@ -154,6 +184,7 @@ static int mantle(NativePlayer *p,const World *w){
 }
 void player_step(NativePlayer *p,World *w,unsigned input){
  if(!p||!w||p->dead)return;
+ if(p->hurt_flash)p->hurt_flash--;
  arrows_step(&p->arrows,w);
  unsigned pressed=input&~p->previous,released=p->previous&~input;p->previous=input;p->ticks++;p->contacts=0;
  if(p->drop_ticks)p->drop_ticks--;
@@ -164,11 +195,23 @@ void player_step(NativePlayer *p,World *w,unsigned input){
   else if(input&PLAYER_DOWN){p->hanging=0;p->hang_cooldown=12;}
   else {if(input&PLAYER_UP)mantle(p,w);return;}
  }
- int dir=!!(input&PLAYER_RIGHT)-!!(input&PLAYER_LEFT);if(dir)p->facing=dir;
- if((pressed&PLAYER_ATTACK)&&!p->bow.active&&!p->hanging&&!p->on_ladder&&!p->ducking)melee_start(&p->melee,p->melee.definition,p->derived.attack_speed_bonus,p->facing);
+ int dir=p->webbed?0:!!(input&PLAYER_RIGHT)-!!(input&PLAYER_LEFT);if(dir)p->facing=dir;
+ if((pressed&PLAYER_ATTACK)&&!p->bow.active&&!p->hanging&&!p->on_ladder&&!p->ducking&&melee_start(&p->melee,p->melee.definition,p->derived.attack_speed_bonus,p->facing))p->melee.damage_bonus=p->derived.melee_base;
  if(pressed&PLAYER_UP)player_interact_chests(p,w);
  melee_step(&p->melee,!!(input&PLAYER_ATTACK));
  world_enemies_step(w,p->x,p->y,p->w,p->h,&p->melee);
+ int web_damage=world_spider_web_step(w,p->x,p->y,p->w,p->h);
+ if(web_damage){
+#ifdef ACT_ONE_CHAIN_DIAGNOSTICS
+  int hp_before=p->hp;
+#endif
+  p->webbed=90;int damage=(int)ceilf((float)web_damage*p->derived.damage_taken_multiplier);if(damage<1)damage=1;p->hp-=damage;if(p->hp<0)p->hp=0;p->hurt_flash=10;
+#ifdef ACT_ONE_CHAIN_DIAGNOSTICS
+  fprintf(stdout,"CHAIN_DAMAGE tick=%u cause=spider_web amount=%d hp=%d x=%.2f y=%.2f\n",p->ticks,hp_before-p->hp,p->hp,p->x,p->y);
+#endif
+  if(!p->hp){p->dead=1;p->death_cause=PLAYER_DEATH_ENEMY;p->motion=PLAYER_FALL;return;}}
+ else if(p->webbed)p->webbed--;
+ if(p->webbed){dir=0;p->vx=0;}
  world_breakable_walls_step(w,p->x,p->y,p->w,p->h,&p->melee);
  StartingItem *ammo=NULL;
  for(unsigned i=0;i<p->loadout.item_count;i++)if(p->loadout.items[i].type==3)ammo=&p->loadout.items[i];
@@ -190,7 +233,7 @@ void player_step(NativePlayer *p,World *w,unsigned input){
   p->y-=6;p->h=12;
   if(player_overlaps_solid(p,w)){p->y+=6;p->h=6;}else p->ducking=0;
  }
- float limit=p->derived.move_speed;
+ float limit=p->webbed?0.0f:p->derived.move_speed;
  if(p->ducking||(input&PLAYER_SLOW))limit*=0.5f;
  if(dir){p->facing=dir;p->vx+=(float)dir*(p->on_ground?0.3f:0.2f);}
  else p->vx*=0.8f;
@@ -202,26 +245,42 @@ void player_step(NativePlayer *p,World *w,unsigned input){
  float fall_speed=p->vy;p->on_ground=0;axis_move(p,w,p->vx,0);axis_move(p,w,p->vy,1);
  if(hit_active_spikes(p,w,fall_speed)){
   /* The observed pure-damage payload is far above every base-class HP value. */
+#ifdef ACT_ONE_CHAIN_DIAGNOSTICS
+  fprintf(stdout,"CHAIN_DAMAGE tick=%u cause=spikes amount=%d hp=0 x=%.2f y=%.2f\n",p->ticks,p->hp,p->x,p->y);
+#endif
   p->hp=0;p->dead=1;p->death_cause=PLAYER_DEATH_SPIKES;p->motion=PLAYER_FALL;return;
  }
- if(world_dart_traps_step(w,p->x,p->y,p->w,p->h)){
+ int dart_hit=world_dart_traps_step(w,p->x,p->y,p->w,p->h);
+ if(dart_hit){
+#ifdef ACT_ONE_CHAIN_DIAGNOSTICS
+  int hp_before=p->hp;
+#endif
   int damage=(int)ceilf(5.0f*p->derived.damage_taken_multiplier);
   if(damage<1)damage=1;
-  p->hp-=damage;if(p->hp<0)p->hp=0;
+  p->hp-=damage;if(p->hp<0)p->hp=0;p->hurt_flash=10;
+#ifdef ACT_ONE_CHAIN_DIAGNOSTICS
+  fprintf(stdout,"CHAIN_DAMAGE tick=%u cause=dart_trap amount=%d hp=%d x=%.2f y=%.2f\n",p->ticks,hp_before-p->hp,p->hp,p->x,p->y);
+#endif
   if(!p->hp){p->dead=1;p->death_cause=PLAYER_DEATH_DART_TRAP;p->motion=PLAYER_FALL;return;}
  }
  unsigned enemy_damage=world_enemies_contact_damage(w,p->x,p->y,p->w,p->h);
  if(enemy_damage){
+#ifdef ACT_ONE_CHAIN_DIAGNOSTICS
+  int hp_before=p->hp;
+#endif
   int damage=(int)ceilf((float)enemy_damage*p->derived.damage_taken_multiplier);
   if(damage<1)damage=1;
-  p->hp-=damage;if(p->hp<0)p->hp=0;
+  p->hp-=damage;if(p->hp<0)p->hp=0;p->hurt_flash=10;
+#ifdef ACT_ONE_CHAIN_DIAGNOSTICS
+  fprintf(stdout,"CHAIN_DAMAGE tick=%u cause=enemy_contact raw=%u amount=%d hp=%d x=%.2f y=%.2f\n",p->ticks,enemy_damage,hp_before-p->hp,p->hp,p->x,p->y);
+#endif
   if(!p->hp){p->dead=1;p->death_cause=PLAYER_DEATH_ENEMY;p->motion=PLAYER_FALL;return;}
  }
  if(fire&&ammo&&ammo->quantity>0){
   float x,y;bow_projectile_origin(&shot,p->x+p->w*0.5f,p->y+p->h,&x,&y);
   float speed=bow_projectile_speed(&shot),flip=shot.facing<0?-1.0f:1.0f;
   float charge=shot.keyframe?fminf(1,(float)(shot.keyframe+1)/shot.definition->draw_frames):0;
-  float damage=shot.definition->damage_min+(shot.definition->damage_max-shot.definition->damage_min)*charge;
+  float damage=shot.definition->damage_min+(shot.definition->damage_max-shot.definition->damage_min)*charge+p->derived.ranged_base;
   if(arrow_launch(&p->arrows,w,p->x+p->w*0.5f,p->y+p->h-6,x,y,flip*cosf(shot.angle)*speed,sinf(shot.angle)*speed,damage))ammo->quantity--;
  }
  if(!p->melee.active&&!p->bow.active)try_ledge(p,w,dir);
@@ -249,7 +308,13 @@ int player_boulder_contact(NativePlayer *p,World *w){
   int damage=(int)ceilf(20.0f*p->derived.damage_taken_multiplier);
   if(damage<1)damage=1;
   if(damage>30)damage=30;
-  p->hp-=damage;if(p->hp<0)p->hp=0;
+#ifdef ACT_ONE_CHAIN_DIAGNOSTICS
+  int hp_before=p->hp;
+#endif
+  p->hp-=damage;if(p->hp<0)p->hp=0;p->hurt_flash=10;
+#ifdef ACT_ONE_CHAIN_DIAGNOSTICS
+  fprintf(stdout,"CHAIN_DAMAGE tick=%u cause=boulder amount=%d hp=%d x=%.2f y=%.2f\n",p->ticks,hp_before-p->hp,p->hp,p->x,p->y);
+#endif
   if(!p->hp){p->dead=1;p->death_cause=PLAYER_DEATH_BOULDER;p->motion=PLAYER_FALL;}
   return 1;
  }

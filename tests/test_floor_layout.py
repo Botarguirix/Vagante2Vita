@@ -4,9 +4,13 @@ from tools.floor_layout import (assemble_tiles, close_act_one_border, solid,
                                 tile_paths_to_room_edge, above_ground_candidates,
                                 repair_provisional_route_support,
                                 act_one_room_monster_budget, act_one_enemy_type_for_roll,
+                                act_one_water_enemy_type_for_roll,
+                                act_one_water_enemy_spawn_weight,
                                 act_one_solid_above_type_for_roll,
                                 act_one_lurker_geometry_supported,
                                 act_one_shuffled_room_tiles,
+                                goal_candidate_rank,
+                                sort_goal_candidates_msvc_path,
                                 provisional_enemies,
                                 consume_spellbook_rng,
                                 consume_placed_entity_rng,
@@ -29,6 +33,101 @@ def joined_rooms():
 
 
 class FloorLayoutTests(unittest.TestCase):
+    def test_act_one_water_enemy_float_threshold_matches_piranha_minnow_branch(self):
+        self.assertEqual(act_one_water_enemy_type_for_roll(0.799999), 16)
+        self.assertEqual(act_one_water_enemy_type_for_roll(0.8), 17)
+        for invalid in (-0.1, 1.1, float('nan'), True):
+            with self.assertRaises(ValueError):
+                act_one_water_enemy_type_for_roll(invalid)
+
+    def test_act_one_water_enemy_spawn_weights_match_native_map(self):
+        self.assertEqual(act_one_water_enemy_spawn_weight(16), 0.5)
+        self.assertAlmostEqual(act_one_water_enemy_spawn_weight(17), 1 / 3, places=7)
+        with self.assertRaises(ValueError):
+            act_one_water_enemy_spawn_weight(9)
+
+    def test_enemy_water_probe_reads_top_left_subtile_used_by_native_expression(self):
+        from tools.floor_water import WaterField
+
+        tiles = [[0] * 3 for _ in range(2)]
+        water = WaterField(tiles, fluid=[0] * (6 * 4))
+        index = (2 * 1) * water.width + 2 * 2
+        water.fluid[index] = 100
+        self.assertEqual(water.native_enemy_probe_mass(2, 1), 100)
+        self.assertEqual(water.native_enemy_probe_mass(-1, 1), 0)
+
+    def test_provisional_enemy_trace_consumes_canonical_for_native_water_branch(self):
+        from tools.floor_water import WaterField
+        from tools.floor_main_path import MT19937
+
+        tiles = [[[9, -1, -1, -1, -1, -1] for _ in range(16)] for _ in range(16)]
+        water = WaterField(tiles, fluid=[100] * (32 * 32))
+        room_types = [[0] * 4 for _ in range(4)]
+        room_types[2][2] = 0xff
+        placements = [dict(x=2, y=2, room_type=0, uid='water-room')]
+        trace = {}
+        enemies = provisional_enemies(
+            tiles, room_types, placements, {'width': 4, 'height': 4}, MT19937(123),
+            [0, 0], [15, 15], floor_index=0, rng_trace=trace, water_field=water)
+        self.assertEqual(enemies, [])  # Fish packet/runtime support is still pending.
+        self.assertEqual(len(trace['water_spawn_decisions']), 1)
+        decision = trace['water_spawn_decisions'][0]
+        self.assertIn(decision['subtype'], (16, 17))
+        self.assertEqual(decision['probe_mass'], 100)
+        self.assertTrue(decision['rng_branch_reconstructed'])
+        self.assertFalse(decision['candidate_filter_parity'])
+        room = trace['rooms'][0]
+        self.assertEqual(room['water_enemy_float_draws'], 1)
+        self.assertEqual(room['roll_draws'], 0)
+        self.assertEqual(room['spawn_count'], 1)
+
+    def test_goal_rank_matches_ghidra_native_comparator_predicates(self):
+        # This directly transcribes comparator @ 0x00689c60. It tests the
+        # ordering relation, not MSVC std::sort's permutation of exact ties.
+        kinds = (0, 1, 6, 7, 9)
+        tiles = [[[kinds[(x * 7 + y * 11) % len(kinds)], -1, -1, -1, -1, -1]
+                  for x in range(7)] for y in range(7)]
+
+        def native_precedes(a, b):
+            ax, ay = a
+            bx, by = b
+            a_open = int(not solid(tiles, ax - 1, ay)) + int(not solid(tiles, ax + 1, ay))
+            b_open = int(not solid(tiles, bx - 1, by)) + int(not solid(tiles, bx + 1, by))
+            if a_open != b_open:
+                return b_open < a_open
+            a_support = solid(tiles, ax, ay + 1)
+            b_support = solid(tiles, bx, by + 1)
+            if a_support == b_support:
+                a_non_platform = tiles[ay][ax][0] != 6
+                b_non_platform = tiles[by][bx][0] != 6
+                if a_non_platform == b_non_platform:
+                    return by < ay
+                return a_non_platform and not b_non_platform
+            return a_support and not b_support
+
+        points = [(x, y) for y in range(1, 5) for x in range(1, 6)]
+        for a in points:
+            for b in points:
+                native = native_precedes(a, b)
+                rank_a, rank_b = goal_candidate_rank(tiles, a), goal_candidate_rank(tiles, b)
+                self.assertEqual(rank_a < rank_b, native, (a, b, rank_a, rank_b))
+
+    def test_goal_sort_reconstructs_native_insertion_path_and_keeps_equal_order(self):
+        tiles = [[[0, -1, -1, -1, -1, -1] for _ in range(8)] for _ in range(8)]
+        tiles[6][2][0] = tiles[6][3][0] = 1
+        points = [[x, 4] for x in range(1, 7)] + [[3, 4], [4, 4]]
+        expected = sorted(points, key=lambda point: goal_candidate_rank(tiles, point))
+        actual = points[:]
+        report = sort_goal_candidates_msvc_path(actual, tiles)
+        self.assertEqual(actual, expected)
+        self.assertEqual(report['algorithm'], 'msvc_insertion_sort')
+        self.assertTrue(report['exact_tie_order'])
+
+        large = [[1 + (x % 6), 4] for x in range(34)]
+        report = sort_goal_candidates_msvc_path(large, tiles)
+        self.assertEqual(report['algorithm'], 'python_stable_sort_fallback')
+        self.assertFalse(report['exact_tie_order'])
+
     def test_act_one_room_monster_budget_matches_native_act_branch(self):
         self.assertEqual([act_one_room_monster_budget(i) for i in range(3)],
                          [0.5, 0.5, 1.5])
@@ -103,6 +202,47 @@ class FloorLayoutTests(unittest.TestCase):
                              list(range(len(enemies))))
         self.assertEqual(counts, [1, 1, 2])
 
+    def test_provisional_enemy_rng_trace_marks_native_boss_call_position(self):
+        from tools.floor_main_path import MT19937
+
+        spec = {'width': 1, 'height': 1}
+        tiles = [[[0, -1, -1, -1, -1, -1] for _ in range(3)] for _ in range(3)]
+        placements = [dict(x=0, y=0, room_type=4),
+                      dict(x=1, y=1, room_type=4),
+                      dict(x=2, y=2, room_type=1)]
+        trace = {}
+        rng = MT19937(12345)
+        provisional_enemies(tiles, [[0] * 3 for _ in range(3)], placements,
+                            spec, rng, (0, 0), (2, 2), boss_room=(2, 2),
+                            rng_trace=trace)
+
+        boss_call = trace['boss_call']
+        boss_room_trace = trace['rooms'][boss_call['order_index']]
+        self.assertEqual(boss_room_trace['room'], [2, 2])
+        self.assertEqual(boss_call['draw_index'], boss_room_trace['draw_start'])
+        self.assertEqual(boss_room_trace['skip_reason'], 'boss_call_not_simulated')
+        self.assertFalse(trace['native_parity'])
+        self.assertEqual(trace['exit_draw'], rng.draws)
+        self.assertEqual(trace['draws_consumed'], rng.draws - trace['entry_draw'])
+
+    def test_act_one_enemy_room_vector_excludes_top_row_and_omits_boss_call(self):
+        from tools.floor_main_path import MT19937
+
+        spec = {'width': 1, 'height': 1}
+        tiles = [[[0, -1, -1, -1, -1, -1] for _ in range(3)] for _ in range(2)]
+        placements = [dict(x=0, y=0, room_type=1),
+                      dict(x=1, y=1, room_type=4)]
+        trace = {}
+        provisional_enemies(tiles, [[0, 0], [0, 0]], placements, spec,
+                            MT19937(7), (0, 0), (1, 1), boss_room=(0, 0),
+                            rng_trace=trace)
+
+        self.assertEqual(trace['room_list_filter']['excluded_top_row_count'], 1)
+        self.assertEqual(trace['room_order'], [[1, 1]])
+        self.assertIsNone(trace['boss_call'])
+        self.assertEqual(trace['boss_not_called']['reason'],
+                         'native_ACT_ONE_room_vector_excludes_y_zero')
+
     def test_placed_entity_rng_counts_only_recovered_creation_paths_in_source_order(self):
         class CountingRng:
             draws = 0
@@ -116,7 +256,9 @@ class FloorLayoutTests(unittest.TestCase):
             for kind, doodad_type, extra in (
                 ('Chest', None, {}), ('Spikes', None, {}), ('BreakableWall', None, {}),
                 ('Doodad', 3, {}), ('Doodad', 16, {}), ('Doodad', 14, {}),
-                ('Doodad', 16, {'crateType': 2}), ('DartTrap', None, {}))]
+                ('Doodad', 16, {'crateType': 2}), ('DartTrap', None, {}),
+                ('Doodad', 20, {}), ('Boulder', None, {}),
+                ('BoulderBlocker', None, {}))]
         locations = [dict(room=[0, 0], source_uid='fixture', source_entity_index=index,
                           definition=definition)
                      for index, definition in enumerate(definitions)]
@@ -133,10 +275,13 @@ class FloorLayoutTests(unittest.TestCase):
         })
         self.assertEqual([entity['source_entity_index'] for entity in report['per_entity']],
                          [0, 1, 2, 3, 4])
-        self.assertEqual(report['rng_free_entity_count'], 2)
+        self.assertEqual(report['rng_free_entity_count'], 5)
         self.assertEqual([(entity['source_entity_index'], entity['kind'], entity['doodad_type'])
                           for entity in report['rng_free_entities']],
-                         [(6, 'Doodad', 16), (7, 'DartTrap', None)])
+                         [(6, 'Doodad', 16), (7, 'DartTrap', None),
+                          (8, 'Doodad', 20), (9, 'Boulder', None),
+                          (10, 'BoulderBlocker', None)])
+        self.assertEqual(report['rng_free_entities'][3]['boulder_type'], 1)
         self.assertEqual(report['deferred_entity_count'], 1)
         self.assertEqual(report['deferred_entities'][0]['source_entity_index'], 5)
         self.assertEqual(report['unclassified_entity_count'], 0)
@@ -282,6 +427,23 @@ class FloorLayoutTests(unittest.TestCase):
         tiles[2][1][0] = 6
         candidates = above_ground_candidates(tiles, [[4, 1]], SPEC, [0, 0])
         self.assertNotIn([1, 1], candidates['preferred'] + candidates['near_water'])
+
+    def test_entrance_candidates_keep_native_x_major_order_and_water_grouping(self):
+        # Ghidra 0x0065a9a0 iterates room x, then y, and stores candidates
+        # adjacent to water in a separate vector before either vector is shuffled.
+        tiles = [[[0, -1, -1, -1, -1, -1] for _ in range(12)] for _ in range(12)]
+        close_act_one_border(tiles)
+        for x in range(4, 8):
+            tiles[7][x][0] = 1
+        tiles[6][4][0] = 9
+        types = [[255] * 3 for _ in range(3)]
+        candidates = above_ground_candidates(
+            tiles, types, {'width': 4, 'height': 4}, [1, 1])
+        self.assertEqual(candidates['preferred'], [[6, 6], [7, 6]])
+        self.assertEqual(candidates['near_water'], [[4, 6], [5, 6]])
+        self.assertEqual(candidates['effective_group'], 'preferred')
+        self.assertFalse(candidates['shuffled'])
+        self.assertFalse(candidates['candidate_set_seed_exact'])
 
     def test_provisional_route_repair_adds_platforms_and_ladders_without_overwriting_walls(self):
         tiles = [[[0, -1, -1, -1, -1, -1] for _ in range(7)] for _ in range(7)]

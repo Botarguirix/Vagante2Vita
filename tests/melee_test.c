@@ -34,7 +34,7 @@ int main(void){
  d.shapes[0].vertices[0]=(MeleePoint){0,0};d.shapes[0].vertices[1]=(MeleePoint){4,0};d.shapes[0].vertices[2]=(MeleePoint){4,4};d.shapes[0].vertices[3]=(MeleePoint){0,4};
  MeleeState s;memset(&s,0,sizeof(s));assert(melee_start(&s,&d,0,1));assert(!melee_start(&s,&d,0,1));
  assert(!melee_hits_rect(&s,10,20,13,17,1,1));melee_step(&s,0);assert(s.keyframe==0);melee_step(&s,0);assert(s.keyframe==1);
- assert(melee_hits_rect(&s,10,20,13,17,1,1));assert(melee_damage_rect(&s,10,20,13,17,1,1)==1.5f);assert(!melee_damage_rect(&s,10,20,5,17,1,1));assert(!melee_hits_rect(&s,10,20,5,17,1,1));
+ assert(melee_hits_rect(&s,10,20,13,17,1,1));assert(melee_damage_rect(&s,10,20,13,17,1,1)==1.5f);s.damage_bonus=2.25f;assert(melee_damage_rect(&s,10,20,13,17,1,1)==3.75f);s.damage_bonus=0;assert(!melee_damage_rect(&s,10,20,5,17,1,1));assert(!melee_hits_rect(&s,10,20,5,17,1,1));
  s.facing=-1;assert(melee_hits_rect(&s,10,20,5,17,1,1));assert(!melee_hits_rect(&s,10,20,13,17,1,1));
  s.facing=1;d.frames[1].degrees=90;assert(melee_hits_rect(&s,10,20,9,17,1,1));assert(!melee_hits_rect(&s,10,20,13,17,1,1));
  melee_step(&s,0);melee_step(&s,0);assert(!s.active&&!melee_hits_rect(&s,10,20,9,17,1,1));

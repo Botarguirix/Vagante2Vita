@@ -1,16 +1,23 @@
 param(
- [ValidatePattern('^[0-9]{3}$')][string]$Iteration='032',
+ [ValidatePattern('^[0-9]{3}$')][string]$Iteration,
  [string]$VitaSdk='C:\vitasdk',
- [string]$OutputDirectory
+ [string]$OutputDirectory,
+ [ValidateSet('O0','O1','O2','O3','Os')][string]$Optimization='O3'
 )
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
+$iterationConfig=Get-Content -LiteralPath (Join-Path $repo 'vita/iteration.cmake') -Raw
+$configuredIteration=[regex]::Match($iterationConfig,'(?m)^set\(VAGANTE_ITERATION "([0-9]{3})"\)\r?$')
+$configuredVersion=[regex]::Match($iterationConfig,'(?m)^set\(VITA_VERSION "([0-9]+\.[0-9]+)"\)\r?$')
+if(!$configuredIteration.Success -or !$configuredVersion.Success){throw 'Cannot read VAGANTE_ITERATION and VITA_VERSION from vita/iteration.cmake'}
+if(!$Iteration){$Iteration=$configuredIteration.Groups[1].Value}
+if($Iteration -ne $configuredIteration.Groups[1].Value){throw "Requested iteration $Iteration does not match vita/iteration.cmake ($($configuredIteration.Groups[1].Value))"}
+$version=$configuredVersion.Groups[1].Value
 if(!$OutputDirectory){$OutputDirectory=Join-Path $repo ("_local/build-act-one-$Iteration")}
 $OutputDirectory=[IO.Path]::GetFullPath($OutputDirectory)
 $localRoot=[IO.Path]::GetFullPath((Join-Path $repo '_local'))+[IO.Path]::DirectorySeparatorChar
 if(!$OutputDirectory.StartsWith($localRoot,[StringComparison]::OrdinalIgnoreCase)){throw 'OutputDirectory must stay inside the repository _local folder'}
 New-Item -ItemType Directory -Force (Join-Path $OutputDirectory 'obj')|Out-Null
-$version='00.'+$Iteration.Substring(1,2)
 $bin=Join-Path $VitaSdk 'bin'
 $cc=Join-Path $bin 'arm-vita-eabi-gcc.exe'
 $ar=Join-Path $bin 'arm-vita-eabi-ar.exe'
@@ -24,8 +31,9 @@ function Invoke-Checked([string]$Executable,[string[]]$Arguments){
  if($LASTEXITCODE -ne 0){throw "Command failed ($LASTEXITCODE): $Executable $($Arguments -join ' ')"}
 }
 $includes=@('-I',(Join-Path $repo 'vita/src'),'-I',(Join-Path $repo 'third_party/stb'),'-I',(Join-Path $repo 'third_party/miniz'))
-$base=@('-O3','-DNDEBUG','-ffp-contract=off')+$includes
-$resourceNames=@('resources','scene','menu','world','player','loot','world_visuals','world_entities','world_combat','player_stats','native_ui','melee','bow','input_replay')
+$optimizationFlag=if($Optimization -eq 'Os'){'-Os'}else{"-$Optimization"}
+$base=@($optimizationFlag,'-DNDEBUG','-ffp-contract=off')+$includes
+$resourceNames=@('resources','scene','menu','world','player','loot','world_visuals','world_entities','world_combat','player_stats','native_ui','melee','bow','input_replay','campaign_flow')
 $resourceObjects=@()
 foreach($name in $resourceNames){
  $object=Join-Path $OutputDirectory "obj/$name.o"
@@ -54,7 +62,7 @@ try{
  Invoke-Checked $ranlib @('libresources.a')
  Invoke-Checked $ar @('qc','libminiz.a','obj/miniz.o','obj/miniz_tinfl.o')
  Invoke-Checked $ranlib @('libminiz.a')
- Invoke-Checked $cc @('-Wl,-q','-O3','-DNDEBUG','-Wl,-z,nocopyreloc','obj/main.o','obj/session_log.o','-o','vagante2vita','libresources.a','-lSceDisplay_stub','-lSceCtrl_stub','-lSceSysmem_stub','-lSceLibKernel_stub','libminiz.a','-lm')
+ Invoke-Checked $cc @('-Wl,-q',$optimizationFlag,'-DNDEBUG','-Wl,-z,nocopyreloc','obj/main.o','obj/session_log.o','-o','vagante2vita','libresources.a','-lSceDisplay_stub','-lSceCtrl_stub','-lSceSysmem_stub','-lSceLibKernel_stub','libminiz.a','-lm')
  Invoke-Checked (Join-Path $bin 'vita-elf-create.exe') @('vagante2vita','vagante2vita.velf')
  Invoke-Checked (Join-Path $bin 'vita-make-fself.exe') @('-c','vagante2vita.velf','eboot.bin')
  Invoke-Checked (Join-Path $bin 'vita-mksfoex.exe') @('-s',"APP_VER=$version",'-s','TITLE_ID=VAGV00006','Vagante2Vita','Vagante2Vita_param.sfo')

@@ -37,6 +37,51 @@ int main(void){
  assert(arrow_launch(&p,&w,90,100,90,100,20,0,1));arrows_step(&p,&w);
  assert(p.enemy_hits==2&&p.enemy_kills==1&&w.entities[0].hp==0&&!p.arrows[1].active);
  arrows_step(&p,&w);assert(p.enemy_hits==2&&p.enemy_kills==1);
+ memset(&p,0,sizeof(p));w.entities[0]=(WorldEntity){.kind=WORLD_KIND_BOSS,
+  .subtype=WORLD_BOSS_GOBLIN_KING,.x_q8=200*256,.y_q8=100*256,.hp=WORLD_GOBLIN_KING_HP};
+ assert(arrow_launch(&p,&w,190,106,205,106,10,0,1));
+ assert(p.enemy_hits==1&&p.enemy_kills==0&&fabsf(w.entities[0].hp-(WORLD_GOBLIN_KING_HP-1))<.001f);
+ assert(!p.arrows[0].active);
+ w.entities[0].hp=70;w.entities[0].boss_reward_spawned=0;w.entity_count=1;w.bosses_loaded=1;
+ memset(&p,0,sizeof(p));
+ assert(arrow_launch(&p,&w,190,106,205,106,10,0,70));
+ assert(p.enemy_hits==1&&p.enemy_kills==1&&w.entities[0].hp==0);
+ assert(w.bosses_defeated==1&&w.bosses_defeated_mask==(1u<<(WORLD_BOSS_GOBLIN_KING-WORLD_BOSS_GOBLIN_KING))&&w.entity_count==2&&w.entities[0].boss_reward_spawned);
+ assert(w.entities[1].kind==16&&w.entities[1].boss_reward);
+ memset(&p,0,sizeof(p));w.entity_count=1;w.bosses_loaded=1;w.bosses_defeated=0;
+ w.entities[0]=(WorldEntity){.kind=WORLD_KIND_BOSS,.subtype=WORLD_BOSS_DRAGON,
+  .x_q8=200*256,.y_q8=100*256,.hp=WORLD_DRAGON_HP};
+ assert(w.entities[0].subtype==WORLD_BOSS_DRAGON); assert(arrow_launch(&p,&w,190,106,205,106,10,0,WORLD_DRAGON_HP));
+ assert(p.enemy_kills==1&&w.entities[0].hp==0&&w.bosses_defeated==1);
+ assert(w.entity_count==2&&w.entities[1].kind==16&&w.entities[1].boss_reward);
+ memset(&p,0,sizeof(p));w.entity_count=1;w.bosses_loaded=1;w.bosses_defeated=0;
+ w.bosses_defeated_mask=0;
+ w.entities[0]=(WorldEntity){.kind=WORLD_KIND_BOSS,.subtype=WORLD_BOSS_WORM,
+  .x_q8=200*256,.y_q8=100*256,.hp=WORLD_WORM_HP};
+ assert(arrow_launch(&p,&w,190,104,205,104,10,0,1));
+ assert(p.enemy_hits==1&&p.enemy_kills==0&&fabsf(w.entities[0].hp-(WORLD_WORM_HP-1))<.001f);
+ assert(!p.arrows[0].active);
+ w.entities[0].hp=1;w.entities[0].boss_reward_spawned=0;memset(&p,0,sizeof(p));
+ assert(arrow_launch(&p,&w,190,104,205,104,10,0,1));
+ assert(p.enemy_hits==1&&p.enemy_kills==1&&w.entities[0].hp==0);
+ assert(w.bosses_defeated==1&&w.bosses_defeated_mask==(1u<<(WORLD_BOSS_WORM-WORLD_BOSS_GOBLIN_KING)));
+ assert(w.entity_count==2&&w.entities[0].boss_reward_spawned&&w.entities[1].kind==16&&w.entities[1].boss_reward);
+ World worm_world;memset(&worm_world,0,sizeof(worm_world));worm_world.ready=1;worm_world.width=128;worm_world.height=24;
+ worm_world.entity_count=1;worm_world.bosses_loaded=1;
+ worm_world.entities[0]=(WorldEntity){.kind=WORLD_KIND_BOSS,.subtype=WORLD_BOSS_WORM,
+  .x_q8=16*256,.y_q8=32*256,.hp=1.0f};
+ for(int tx=0;tx<128;tx++){worm_world.tiles[3*128+tx].platform=1;worm_world.tiles[4*128+tx].solid=1;}
+ for(unsigned tick=0;tick<420;tick++)world_enemies_step(&worm_world,1800,32,8,12,NULL);
+ float worm_tail_x,worm_tail_y,worm_head_x,worm_head_y;
+ world_worm_path_sample(&worm_world,&worm_world.entities[0],WORLD_WORM_SEGMENTS-1u,&worm_tail_x,&worm_tail_y);
+ world_worm_path_sample(&worm_world,&worm_world.entities[0],0,&worm_head_x,&worm_head_y);
+ assert(fabsf(worm_head_x-worm_tail_x)>400.0f);
+ memset(&p,0,sizeof(p));
+ assert(arrow_launch(&p,&worm_world,worm_tail_x-12.0f,worm_tail_y+4.0f,
+                     worm_tail_x,worm_tail_y+4.0f,12.0f,0.0f,1.0f));
+ assert(p.enemy_hits==1&&p.enemy_kills==1&&worm_world.entities[0].hp==0.0f);
+ assert(worm_world.bosses_defeated==1&&worm_world.bosses_defeated_mask==(1u<<(WORLD_BOSS_WORM-WORLD_BOSS_GOBLIN_KING)));
+ assert(worm_world.entities[0].boss_reward_spawned&&worm_world.entity_count==2&&worm_world.entities[1].boss_reward);
  const uint8_t enemy_types[]={9,10,11,12};
  const float enemy_widths[]={7,9,10,10},enemy_heights[]={12,10,10,7};
  for(unsigned i=0;i<4;i++){

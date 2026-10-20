@@ -5,7 +5,7 @@ enum { PLAYER_LEFT=1,PLAYER_RIGHT=2,PLAYER_UP=4,PLAYER_DOWN=8,PLAYER_JUMP=16,PLA
 typedef enum { PLAYER_STAND,PLAYER_WALK,PLAYER_RISE,PLAYER_FALL,PLAYER_DUCK,PLAYER_CLIMB,PLAYER_LOOK,PLAYER_HANG } PlayerMotion;
 typedef enum { PLAYER_DEATH_NONE,PLAYER_DEATH_SPIKES,PLAYER_DEATH_DART_TRAP,PLAYER_DEATH_ENEMY,PLAYER_DEATH_BOULDER } PlayerDeathCause;
 typedef struct {
- float x,y,vx,vy,w,h;int player_class,facing,on_ground,on_ladder,ducking;
+ float x,y,vx,vy,w,h;int player_class,facing,on_ground,on_ladder,ducking,webbed,hurt_flash;
  unsigned chests_opened,items_collected;
  int hp,max_hp,dead,death_cause,drop_ticks,hanging,hang_x,hang_y,hang_cooldown;unsigned previous,ticks,contacts;
  StartingStats stats;DerivedStats derived;StartingLoadout loadout;MeleeState melee;BowState bow;ArrowPool arrows;PlayerMotion motion;

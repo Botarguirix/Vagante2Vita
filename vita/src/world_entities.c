@@ -1,4 +1,12 @@
 #include "world.h"
+
+void world_record_boss_defeat(World *w,WorldEntity *boss){
+ if(!w||!boss||boss->kind!=WORLD_KIND_BOSS)return;
+ if(w->bosses_defeated<UINT32_MAX)w->bosses_defeated++;
+ if(boss->subtype==WORLD_BOSS_GOBLIN_KING)w->bosses_defeated_mask|=1u;
+ else if(boss->subtype==WORLD_BOSS_DRAGON)w->bosses_defeated_mask|=2u;
+ else if(boss->subtype==WORLD_BOSS_WORM)w->bosses_defeated_mask|=4u;
+}
 #include <math.h>
 #include <string.h>
 static unsigned u16(const unsigned char *p){return p[0]|(unsigned)p[1]<<8;}
@@ -77,21 +85,30 @@ int world_load_enemies(World *w,const char *path,FILE *log){
  if(!f){if(log)fprintf(log,"WORLD_ENEMIES ready=0 error=open\n");return 0;}
  if(fread(h,1,8,f)!=8||memcmp(h,"VWE3",4)||u16(h+6)!=16||u16(h+4)>64)goto bad;
  unsigned count=u16(h+4);
+ unsigned boss_count=0;
  for(unsigned i=0;i<count;i++){
-  if(fread(r,1,16,f)!=16||r[0]!=24||
-     !((r[1]>=9&&r[1]<=12)||r[1]==14)||u16(r+2))goto bad;
+  if(fread(r,1,16,f)!=16)goto bad;
+  int is_boss=r[0]==WORLD_KIND_BOSS&&
+      (r[1]==WORLD_BOSS_GOBLIN_KING||r[1]==WORLD_BOSS_DRAGON||r[1]==WORLD_BOSS_WORM)&&!u16(r+2);
+  int is_enemy=r[0]==24&&((r[1]>=9&&r[1]<=12)||r[1]==14||r[1]==84)&&!u16(r+2);
+  if(!is_boss&&!is_enemy)goto bad;
   int32_t x=i32(r+4),y=i32(r+8);if(x<0||y<0||x>=(int32_t)w->width*16*256||y>=(int32_t)w->height*16*256)goto bad;
-  next[i]=(WorldEntity){.kind=24,.subtype=r[1],.x=(int16_t)(x>>8),.y=(int16_t)(y>>8),.x_q8=x,.y_q8=y,.source_index=u32(r+12),.hp=2.0f};
+  float boss_hp=r[1]==WORLD_BOSS_GOBLIN_KING?WORLD_GOBLIN_KING_HP:
+                r[1]==WORLD_BOSS_DRAGON?WORLD_DRAGON_HP:
+                r[1]==WORLD_BOSS_WORM?WORLD_WORM_HP:0.0f;
+  next[i]=(WorldEntity){.kind=r[0],.subtype=r[1],.x=(int16_t)(x>>8),.y=(int16_t)(y>>8),.x_q8=x,.y_q8=y,.source_index=u32(r+12),.hp=is_boss?boss_hp:2.0f};
+  boss_count+=is_boss;
  }
  if(fgetc(f)!=EOF)goto bad;
  fclose(f);
  unsigned kept=0;
- for(unsigned i=0;i<w->entity_count;i++)kept+=w->entities[i].kind!=24;
+ for(unsigned i=0;i<w->entity_count;i++)kept+=w->entities[i].kind!=24&&w->entities[i].kind!=WORLD_KIND_BOSS;
  if(kept+count>WORLD_ENTITY_LIMIT)goto limit_closed;
  kept=0;
- for(unsigned i=0;i<w->entity_count;i++)if(w->entities[i].kind!=24)next[count+kept++]=w->entities[i];
+ for(unsigned i=0;i<w->entity_count;i++)if(w->entities[i].kind!=24&&w->entities[i].kind!=WORLD_KIND_BOSS)next[count+kept++]=w->entities[i];
  memcpy(w->entities,next,(kept+count)*sizeof(*next));w->entity_count=kept+count;
- if(log)fprintf(log,"WORLD_ENEMIES ready=1 count=%u parity=provisional\n",count);
+ w->bosses_loaded=boss_count;w->bosses_defeated=0;w->bosses_defeated_mask=0;
+ if(log)fprintf(log,"WORLD_ENEMIES ready=1 count=%u bosses=%u boss_behavior=provisional_combat_model parity=provisional\n",count,boss_count);
  return 1;
 bad:fclose(f);if(log)fprintf(log,"WORLD_ENEMIES ready=0 error=invalid_packet\n");return 0;
 limit_closed:if(log)fprintf(log,"WORLD_ENEMIES ready=0 error=capacity\n");return 0;

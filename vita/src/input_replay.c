@@ -5,7 +5,10 @@ static unsigned u32(const unsigned char *p){return u16(p)|u16(p+2)<<16;}
 int replay_load(InputReplay *r,const char *path,FILE *log){
  FILE *f=fopen(path,"rb");if(!f)return 0;
  InputReplay next;memset(&next,0,sizeof(next));unsigned char b[8];unsigned total=0;
- if(fread(b,1,8,f)!=8||memcmp(b,"VTS1",4)||u16(b+6))goto bad;
+ if(fread(b,1,8,f)!=8||memcmp(b,"VTS1",4)||(u16(b+6)&~7u))goto bad;
+ next.start_intro=!!(u16(b+6)&1u);
+ next.stop_after_first_floor=!!(u16(b+6)&2u);
+ next.fast_forward=!!(u16(b+6)&4u);
  next.count=u16(b+4);if(!next.count||next.count>REPLAY_LIMIT)goto bad;
  for(unsigned i=0;i<next.count;i++){
   if(fread(b,1,8,f)!=8||u16(b+6))goto bad;
@@ -15,7 +18,7 @@ int replay_load(InputReplay *r,const char *path,FILE *log){
  }
  if(fgetc(f)!=EOF||ferror(f))goto bad;
  fclose(f);next.active=1;*r=next;
- if(log)fprintf(log,"AUTOTEST enabled=1 steps=%u scheduled_ticks=%u source=external_replay physical_controller_verified=0\n",next.count,total);
+ if(log)fprintf(log,"AUTOTEST enabled=1 steps=%u scheduled_ticks=%u source=external_replay physical_controller_verified=0 fast_forward=%u\n",next.count,total,next.fast_forward);
  return 1;
  bad:fclose(f);if(log)fprintf(log,"AUTOTEST enabled=0 error=invalid_replay\n");return 0;
 }

@@ -8,7 +8,7 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/iteration.cmake")
 add_library(miniz STATIC ../third_party/miniz/miniz.c ../third_party/miniz/miniz_tinfl.c)
 target_include_directories(miniz PUBLIC ../third_party/miniz)
 target_compile_definitions(miniz PUBLIC MINIZ_NO_ARCHIVE_APIS MINIZ_NO_DEFLATE_APIS)
-add_library(resources STATIC src/resources.c src/scene.c src/menu.c src/world.c src/player.c src/loot.c src/world_visuals.c src/world_entities.c src/world_combat.c src/player_stats.c src/native_ui.c src/melee.c src/bow.c src/input_replay.c)
+add_library(resources STATIC src/resources.c src/scene.c src/menu.c src/world.c src/player.c src/loot.c src/world_visuals.c src/world_entities.c src/world_combat.c src/player_stats.c src/native_ui.c src/melee.c src/bow.c src/input_replay.c src/campaign_flow.c)
 target_include_directories(resources PRIVATE ../third_party/stb)
 target_compile_options(resources PRIVATE -ffp-contract=off)
 target_link_libraries(resources PUBLIC miniz m)
@@ -17,6 +17,10 @@ if(HOST_PROBE)
   add_executable(vagante-probe src/probe.c)
   target_link_libraries(vagante-probe resources)
   enable_testing()
+  add_executable(frame-scaler-test ../tests/frame_scaler_test.c)
+  target_include_directories(frame-scaler-test PRIVATE src)
+  target_compile_options(frame-scaler-test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+  add_test(NAME framebuffer-scaler-profiles COMMAND frame-scaler-test)
   add_executable(frame-upload-test ../tests/frame_upload_test.c)
   target_include_directories(frame-upload-test PRIVATE src)
   target_compile_options(frame-upload-test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
@@ -25,6 +29,10 @@ if(HOST_PROBE)
   target_include_directories(input-replay-test PRIVATE src)
   target_compile_options(input-replay-test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
   add_test(NAME explicit-input-replay COMMAND input-replay-test)
+  add_executable(campaign-flow-test ../tests/campaign_flow_test.c src/campaign_flow.c)
+  target_include_directories(campaign-flow-test PRIVATE src)
+  target_compile_options(campaign-flow-test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+  add_test(NAME campaign-exit-flow COMMAND campaign-flow-test)
   add_executable(menu-test ../tests/menu_test.c src/menu.c)
   target_include_directories(menu-test PRIVATE src)
   target_compile_options(menu-test PRIVATE -UNDEBUG)
@@ -33,7 +41,7 @@ if(HOST_PROBE)
   target_include_directories(session-log-test PRIVATE src)
   target_compile_options(session-log-test PRIVATE -UNDEBUG)
   add_test(NAME session-log-preservation COMMAND session-log-test)
-  add_executable(world-entities-test ../tests/world_entities_test.c src/world_entities.c src/world_combat.c src/world.c src/melee.c)
+  add_executable(world-entities-test ../tests/world_entities_test.c src/world_entities.c src/world_combat.c src/world.c src/melee.c src/loot.c)
   target_include_directories(world-entities-test PRIVATE src)
   target_compile_options(world-entities-test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
   target_link_libraries(world-entities-test m)
@@ -56,7 +64,7 @@ if(HOST_PROBE)
   target_compile_options(player-stats-test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
   target_link_libraries(player-stats-test m)
   add_test(NAME starting-loadout-and-derived-stats COMMAND player-stats-test)
-  add_executable(bow-test ../tests/bow_test.c src/bow.c src/world.c src/world_combat.c src/melee.c)
+  add_executable(bow-test ../tests/bow_test.c src/bow.c src/world.c src/world_combat.c src/melee.c src/loot.c)
   target_include_directories(bow-test PRIVATE src)
   target_compile_options(bow-test PRIVATE -UNDEBUG)
   target_link_libraries(bow-test m)
@@ -90,9 +98,34 @@ target_compile_definitions(vagante2vita PRIVATE
   VAGANTE_ITERATION="${VAGANTE_ITERATION}" VAGANTE_VERSION="${VITA_VERSION}")
 target_link_libraries(vagante2vita resources SceDisplay_stub SceCtrl_stub SceSysmem_stub SceLibKernel_stub)
 vita_create_self(eboot.bin vagante2vita UNSAFE)
-vita_create_vpk(Vagante2Vita-iteration${VAGANTE_ITERATION}.vpk ${VITA_TITLEID} eboot.bin VERSION ${VITA_VERSION} NAME "${VITA_APP_NAME}"
-  FILE sce_sys/icon0.png sce_sys/icon0.png
-  FILE sce_sys/pic0.png sce_sys/pic0.png
-  FILE sce_sys/livearea/contents/bg0.png sce_sys/livearea/contents/bg0.png
-  FILE sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
-  FILE sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml)
+file(RELATIVE_PATH VITA_ICON_SOURCE "${CMAKE_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/icon0.png")
+file(RELATIVE_PATH VITA_PIC_SOURCE "${CMAKE_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/pic0.png")
+file(RELATIVE_PATH VITA_BG_SOURCE "${CMAKE_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/bg0.png")
+file(RELATIVE_PATH VITA_STARTUP_SOURCE "${CMAKE_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/startup.png")
+file(RELATIVE_PATH VITA_TEMPLATE_SOURCE "${CMAKE_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/template.xml")
+set(VITA_VPK_NAME "Vagante2Vita-iteration${VAGANTE_ITERATION}.vpk")
+set(VITA_PARAM_SFO "${CMAKE_CURRENT_BINARY_DIR}/${VITA_VPK_NAME}_param.sfo")
+set(VITA_VPK "${CMAKE_CURRENT_BINARY_DIR}/${VITA_VPK_NAME}")
+add_custom_command(OUTPUT "${VITA_PARAM_SFO}"
+  COMMAND "${VITA_MKSFOEX}" -s "APP_VER=${VITA_VERSION}" -s "TITLE_ID=${VITA_TITLEID}"
+          "${VITA_APP_NAME}" "${VITA_PARAM_SFO}"
+  DEPENDS eboot.bin-self
+  COMMENT "Generating param.sfo for ${VITA_VPK_NAME}"
+  VERBATIM)
+add_custom_command(OUTPUT "${VITA_VPK}"
+  COMMAND "${VITA_PACK_VPK}" -s "${VITA_PARAM_SFO}" -b "${CMAKE_CURRENT_BINARY_DIR}/eboot.bin"
+          -a "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/icon0.png=sce_sys/icon0.png"
+          -a "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/pic0.png=sce_sys/pic0.png"
+          -a "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/bg0.png=sce_sys/livearea/contents/bg0.png"
+          -a "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/startup.png=sce_sys/livearea/contents/startup.png"
+          -a "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/template.xml=sce_sys/livearea/contents/template.xml"
+          "${VITA_VPK}"
+  DEPENDS "${VITA_PARAM_SFO}" eboot.bin-self
+          "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/icon0.png"
+          "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/pic0.png"
+          "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/bg0.png"
+          "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/startup.png"
+          "${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/livearea/contents/template.xml"
+  COMMENT "Building vpk ${VITA_VPK_NAME}"
+  VERBATIM)
+add_custom_target("${VITA_VPK_NAME}-vpk" ALL DEPENDS "${VITA_VPK}")

@@ -4,6 +4,132 @@ Revisadas el 17 de octubre de 2026. Se evaluaron para encontrar código que
 pudiera integrarse en el runtime actual (`vita/src`) y técnicas que ayuden a
 completar ACT_ONE.
 
+[`Decomp.wiki / Decompedia`](https://decomp.wiki/) cataloga proyectos de
+decompilación de videojuegos, herramientas y recursos por plataforma. No debe
+confundirse con [`decompilation.wiki`](https://decompilation.wiki/), la wiki
+técnica general sobre análisis binario que también revisamos. Ninguna contiene
+una base de código o decompilación de Vagante que podamos integrar. Decompedia
+describe matching decompilation como reconstruir código que, con el compilador
+y entorno originales, produzca el mismo binario. Este proyecto busca recuperar
+comportamiento y recrearlo para ARM/Vita; compilar un VPK no demuestra matching
+ni el pseudocódigo de Ghidra es fuente recompilable. Seguiremos registrando
+función/dirección y evidencia nativa en Ghidra, y validando por separado el
+comportamiento equivalente en Vita.
+
+La comprobación más reciente queda en [ITERATION118.md](ITERATION118.md):
+Decompedia orienta sobre matching y recursos de la comunidad, pero no aporta
+una ruta automática para este port; no subimos análisis propietarios a
+servicios compartidos.
+
+La revisión directa de la portada y sus páginas de recursos confirma que
+Decompedia agrupa proyectos por plataforma, compiladores, herramientas y
+recursos comunitarios. Sus enlaces centrales incluyen decomp.dev (seguimiento
+de progreso), decomp.me (práctica colaborativa de matching) y un servidor Ghidra
+compartido. No es un servicio de análisis automático al que debamos enviar el
+EXE. Las páginas de plataformas explican además que las herramientas de
+matching dependen de la arquitectura, el formato de objeto y la versión del
+compilador; por ejemplo, varias utilidades citadas para PS1/N64 esperan MIPS o
+ELF y no corresponden al PE x86 de Vagante.
+
+Aplicación para nuestro flujo: usar la wiki como índice de conceptos y
+referencias, y trasladar sólo prácticas independientes de plataforma:
+registrar binario/PDB coincidentes, separar hechos observados de hipótesis,
+documentar incertidumbres y verificar cada comportamiento en pruebas propias.
+No hay un repositorio o herramienta de la portada que sustituya Ghidra 12.1.4,
+el exportador local o la reconstrucción funcional ya implementada. El servidor
+Ghidra/decomp.me compartidos no son apropiados para nuestros artefactos
+privados. Esta revisión es de orientación técnica, no evidencia de paridad ni
+de una recompilación exacta.
+
+## Recursos de decompilación
+
+[`Decompedia`](https://github.com/decompals/decompedia) y su sitio
+[`decomp.wiki`](https://decomp.wiki/) describen principalmente la decompilación
+matching: reconstruir C/C++ que, con el compilador original y condiciones muy
+precisas, genere el mismo binario. También indexa proyectos, herramientas y
+recursos de distintas plataformas; no es un decompilador automático de Vagante
+ni contiene una reconstrucción pública del juego. Sus notas recalcan que el
+compilador/versión y la plataforma alteran los patrones generados. Las páginas
+por consola incluyen herramientas de comparación de assembly como asm-differ,
+m2c y permuters, pero varias asumen formatos/arquitecturas específicos (por
+ejemplo, ELF y MIPS) y no son plug-and-play para el ejecutable Win32 de Vagante.
+
+Aplicación concreta al proyecto: fijar y registrar hash, versión del EXE y
+compatibilidad PDB antes de atribuir evidencia; para cada comportamiento,
+conservar dirección, función, pseudocódigo/listing y datos usados; contrastar
+las ramas relevantes con instrucciones x86, llamadas, RTTI/PDB y constantes; y
+separar claramente el comportamiento observado en Ghidra de la aproximación
+del runtime Vita. El proyecto hace reconstrucción funcional para una plataforma
+nueva, no matching del ejecutable x86 original, por lo que perseguir igualdad
+de bytes no sería una métrica útil. Decompedia también enlaza decomp.me y un
+servidor Ghidra compartido; no se usarán para subir ejecutables, PDB, recursos
+privados ni pseudocódigo de la copia del usuario. Véanse [Decompedia: inicio](https://decomp.wiki/)
+y [Decompedia: PS1 y sus herramientas](https://decomp.wiki/en/platforms/playstation)
+como ejemplos, no como guías directas para Windows x86.
+
+La revisión de las páginas de recursos, PS1 y del proyecto
+[`decomp.me`](https://github.com/decompme/decomp.me) deja estas decisiones:
+
+- No usar `asm-differ`, m2c ni permuters como criterio de aceptación para el
+  port Vita: son herramientas de matching y algunas presuponen compilador,
+  objeto y arquitectura concretos que no corresponden al build ARM nuevo.
+- Mantener el ejecutable y datos comerciales de entrada en `_local`; no subir
+  a servicios compartidos (incluidos decomp.me o un servidor Ghidra) binarios,
+  PDB, pseudocódigo ni recursos extraídos de la copia del usuario.
+- Mejorar la trazabilidad local de cada afirmación de comportamiento con
+  hash/versión del ejecutable, dirección y nombre Ghidra, xrefs relevantes,
+  constante o campo observado, grado de confianza y prueba de runtime que lo
+  cubre. Una interpretación todavía ambigua debe quedar como hipótesis y no
+  como regla nativa confirmada.
+
+Se revisó también [`totekuh/ghidra-decomp`](https://github.com/totekuh/ghidra-decomp),
+un exportador masivo que genera un árbol buscable de funciones Ghidra, reutiliza
+el proyecto analizado y puede reanudar exportaciones. Requiere Ghidra 12 y
+PyGhidra 3; aún no se ha comprobado contra nuestra instalación, scripts ni
+proyecto actual. No se añade como dependencia ni se ejecuta sobre binarios
+privados hasta verificar compatibilidad y salida reproducible. El enfoque de
+exportar por función y guardar artefactos versionados coincide con nuestros
+scripts locales; podemos adoptar primero hashes y un manifiesto de evidencia
+sin reemplazar el flujo que ya funciona.
+
+## Hallazgos de las wikis y aplicación al análisis de Vagante
+
+La wiki técnica de [`decompilation.wiki`](https://decompilation.wiki/) organiza
+el proceso de análisis en recuperación de flujo de control, lifting a una
+representación intermedia, identificación de funciones, resolución de saltos,
+recuperación de tipos y recuperación de símbolos. Para nuestro trabajo, esto
+se traduce en verificar cada función y sus ramas en el listing x86 de Ghidra,
+apoyar las interpretaciones de campos en offsets/usos/RTTI/PDB, y mantener
+direcciones y xrefs como procedencia. No hace falta añadir otra IR/decompilador
+al port ahora: Ghidra ya proporciona el desensamblado y P-code para inspección.
+
+Aplicado a la rama Thief de `addRandomEnemies`, un gate RNG conocido no basta
+para afirmar que el enemigo se genera: todavía hay que comprobar la asociación
+con la entrada, el orden de candidatos, filtros, decremento de presupuesto y
+draw de coordenadas. Esta es una aplicación directa del análisis de CFG y
+límites de función descrito por la wiki, y coincide con lo que aún marca como
+pendiente [ITERATION125.md](ITERATION125.md).
+
+La wiki explica que la evaluación total de una decompilación no tiene una
+métrica universal aceptada. Por eso el ledger distingue evidencia estática,
+pruebas host, empaquetado VPK, sesión nativa de Vita3K y recorrido real del
+juego; contar funciones nombradas, líneas o VPKs no es un porcentaje de
+paridad. Las pruebas deben comparar cada regla con evidencia original cuando
+exista, y etiquetar como provisional lo que siga sin ground truth.
+
+Fuentes metodológicas: [visión general de CFG](https://decompilation.wiki/fundamentals/cfg-recovery/overview/),
+[program lifting](https://decompilation.wiki/fundamentals/cfg-recovery/lifting/),
+[identificación de funciones](https://decompilation.wiki/fundamentals/cfg-recovery/function-recovery/),
+[recuperación de tipos](https://decompilation.wiki/fundamentals/type-recovery/overview/),
+[recuperación de símbolos](https://decompilation.wiki/applied-research/symbol-recovery/),
+[evaluación](https://decompilation.wiki/fundamentals/evaluation/) y
+[reconstrucción de programas](https://decompilation.wiki/applications/program-reconstruction/).
+Estas páginas orientan el método; no contienen evidencia específica del código
+de Vagante. Decomp.wiki/Decompedia es útil para descubrir proyectos y recursos,
+pero las técnicas de matching listadas para consolas y compiladores concretos
+no son plug-and-play para el ejecutable Windows x86 ni sustituyen la
+reimplementación funcional para ARM/Vita.
+
 ## Repositorios de Vagante
 
 [`mtolly/vagante-extract`](https://github.com/mtolly/vagante-extract) extrae y

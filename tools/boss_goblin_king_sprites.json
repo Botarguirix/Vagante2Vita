@@ -1,0 +1,30 @@
+{
+  "format": "vagante-vita-boss-sprites",
+  "version": 1,
+  "boss": "goblin_king",
+  "entity_type": 49,
+  "evidence": {
+    "function": "BossGoblinKing::setLevel",
+    "address": "0x00515c70",
+    "source": "_local/decompiled/00515c70.c",
+    "frame_step_function": "Sprite::step",
+    "frame_step_address": "0x007b9720",
+    "speed_semantics": "timer_increments_once_per_step_and_advances_when_timer_exceeds_speed",
+    "status": "constructor_arguments_recovered_frame_timing_unverified"
+  },
+  "sprites": {
+    "stand": {"path": "bosses/goblin_king/stand.png", "cell": [32, 16], "speed_arg": 10, "offset": [-0.625, 2.0]},
+    "prep_hop": {"path": "bosses/goblin_king/prep_hop.png", "cell": [32, 16], "speed_arg": 10, "offset": [0.0, 0.0]},
+    "prep_leap": {"path": "bosses/goblin_king/prep_leap.png", "cell": [32, 16], "speed_arg": 10, "offset": [0.0, 0.0]},
+    "walk": {"path": "bosses/goblin_king/walk.png", "cell": [32, 16], "speed_arg": 5, "offset": [-0.625, 2.0]},
+    "jump": {"path": "bosses/goblin_king/jump.png", "cell": [32, 16], "speed_arg": 10, "offset": [-0.625, 2.0]},
+    "charge_attack": {"path": "bosses/goblin_king/charge_attack.png", "cell": [32, 16], "speed_arg": 6, "offset": [0.0, 0.0]},
+    "charge_axe": {"path": "bosses/goblin_king/charge_axe.png", "cell": [32, 16], "speed_arg": 6, "offset": [0.0, 0.0]},
+    "dead": {"path": "bosses/goblin_king/dead.png", "cell": [32, 16], "speed_arg": 10, "offset": [-0.625, 2.0]},
+    "roar": {"path": "bosses/goblin_king/roar.png", "cell": [32, 16], "speed_arg": 10, "offset": [0.0, 0.0]},
+    "leap": {"path": "bosses/goblin_king/leap.png", "cell": [32, 16], "speed_arg": 10, "offset": [0.0, 0.0]},
+    "throw": {"path": "bosses/goblin_king/throw.png", "cell": [32, 16], "speed_arg": 5, "offset": [0.0, 0.0]},
+    "hurt": {"path": "bosses/goblin_king/hurt.png", "cell": [28, 19], "speed_arg": 5, "offset": [0.0, 0.0]},
+    "hurt_mask": {"path": "bosses/goblin_king/hurt.png", "cell": [28, 19], "speed_arg": 5, "offset": [0.0, 1.401298464324817e-45]}
+  }
+}

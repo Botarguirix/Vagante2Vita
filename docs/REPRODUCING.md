@@ -86,6 +86,20 @@ genera loot ni comprueba atributos o capacidad de inventario.
 
 `python -m unittest discover -s tests -v` verifica truncamiento, rutas peligrosas, límites y duplicados del extractor con archivos sintéticos. La ejecución real del inspector y extractor contra el juego verifica compatibilidad de esta copia; no se sube al CI.
 
+En Windows, si LLVM y MSYS2 UCRT están instalados pero no hay MSVC, las pruebas
+C host se pueden compilar y ejecutar con el runtime UCRT configurado por el
+runner local:
+
+```powershell
+tools/run_host_tests_windows.ps1
+```
+
+Por defecto detecta `C:\Program Files\LLVM\bin\clang.exe` y
+`C:\msys64\ucrt64`; admite `-Clang` y `-MsysUcrt` para otras rutas. Guarda los
+binarios y `report.json` bajo `_local/host-tests-windows`. Esta ejecución cubre
+las 12 pruebas C definidas para HOST_PROBE; no sustituye VitaSDK ni valida el
+arranque o el renderer en Vita3K.
+
 Con `tools/run_act_one_route_probe.ps1`, `act-one-route-probe` recibe `act-one-world.vwi`, `act-one-entities.vwe` y una semilla y simula el movimiento con `player_step` hasta tocar la salida o agotar 180000 ticks. El runner busca clang/gcc/cc o acepta `-Compiler`, compila las fuentes C reales con warnings estrictos y guarda el ejecutable en `_local/host-route`. Ejemplo: `tools/run_act_one_route_probe.ps1 -World _local/world-data045/act-one/act-one-world.vwi -Entities _local/world-data045/act-one/act-one-entities.vwe -Seed 12345`. Un resultado `reached_exit=1` verifica la ruta bajo la física Vita implementada; no verifica por sí solo paridad del generador, combate/loot, una transición de piso o Vita3K. También está disponible el build CMake host con `-DHOST_PROBE=ON`.
 
 

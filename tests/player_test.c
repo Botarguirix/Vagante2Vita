@@ -7,13 +7,27 @@ static World flat(void){World w;memset(&w,0,sizeof(w));w.width=40;w.height=24;w.
  world_collision_flags(&w);return w;}
 int main(int argc,char **argv){
  World w=flat();NativePlayer p;assert(player_spawn(&p,&w,0));
+ /* Doorway entrance: choose the supported open side facing the goal, then
+    allow the first directional input to move into the corridor. */
+ w=flat();w.entrance_x=14;w.entrance_y=18;w.goal_x=20;w.goal_y=18;
+ for(int x=0;x<40;x++)w.tiles[19*40+x].type=0;
+ w.tiles[18*40+14].type=10;w.tiles[18*40+13].type=1;
+ w.tiles[18*40+15].type=0;w.tiles[19*40+15].type=6;world_collision_flags(&w);
+ assert(player_spawn(&p,&w,0));assert(p.x==15*16+4&&p.facing==1);
+ for(int i=0;i<30;i++)player_step(&p,&w,PLAYER_RIGHT);
+ assert(p.x>15*16+4&&!player_overlaps_solid(&p,&w));
+ /* A mirrored doorway has the same supported spawn on its left side. */
+ w.entrance_x=20;w.goal_x=10;w.tiles[18*40+20].type=10;
+ w.tiles[18*40+21].type=1;w.tiles[18*40+19].type=0;w.tiles[19*40+19].type=6;
+ world_collision_flags(&w);assert(player_spawn(&p,&w,0));assert(p.x==19*16+4&&p.facing==-1);
  /* A floor transition keeps health, attributes, inventory and current-world bindings. */
  w.melee.ready=1;w.melee.count=1;w.melee.weapons[0].type=45;w.bow.ready=1;
  NativePlayer previous,next;assert(player_spawn(&previous,&w,1));assert(player_spawn(&next,&w,1));
- previous.hp=47;previous.loadout.items[2].quantity=8;previous.stats.dexterity+=2;previous.derived.move_speed+=0.25f;previous.chests_opened=2;
+ previous.hp=47;previous.loadout.items[2].quantity=8;previous.stats.dexterity+=2;previous.derived.move_speed+=0.25f;previous.chests_opened=2;previous.items_collected=3;
  assert(player_carry_campaign_state(&next,&previous,&w));
  assert(next.hp==47&&next.max_hp==previous.max_hp&&next.stats.dexterity==previous.stats.dexterity);
  assert(fabsf(next.derived.move_speed-previous.derived.move_speed)<0.001f&&next.loadout.items[2].quantity==8&&next.chests_opened==2);
+ assert(next.items_collected==3);
  assert(next.melee.definition==&w.melee.weapons[0]&&next.bow.definition==&w.bow&&!next.bow.active&&!next.arrows.fired);
  NativePlayer wrong_class=previous;wrong_class.player_class=0;assert(!player_carry_campaign_state(&next,&wrong_class,&w));
  w.melee.ready=0;w.melee.count=0;w.bow.ready=0;
@@ -69,8 +83,9 @@ int main(int argc,char **argv){
  w=flat();assert(player_spawn(&p,&w,0));
  w.entities[0]=(WorldEntity){.kind=24,.subtype=10,.x_q8=(int32_t)(p.x*256),.y_q8=(int32_t)(p.y*256),.hp=2};w.entity_count=1;
  player_step(&p,&w,0);int bat_damage=p.max_hp-p.hp;assert(bat_damage>=1&&bat_damage<=6&&w.entities[0].contact_cooldown==30);
+ assert(p.hurt_flash==10);
  for(int i=0;i<29;i++)player_step(&p,&w,0);
- assert(p.hp==p.max_hp-bat_damage&&w.entities[0].contact_cooldown==1);
+ assert(p.hp==p.max_hp-bat_damage&&w.entities[0].contact_cooldown==1&&p.hurt_flash==0);
  int hp_before_second_bat_hit=p.hp;player_step(&p,&w,0);
  int second_bat_damage=hp_before_second_bat_hit-p.hp;
  assert(second_bat_damage>=(int)ceilf(p.derived.damage_taken_multiplier)&&
@@ -82,6 +97,24 @@ int main(int argc,char **argv){
  w=flat();assert(player_spawn(&p,&w,0));p.hp=1;
  w.entities[0]=(WorldEntity){.kind=24,.subtype=10,.x_q8=(int32_t)(p.x*256),.y_q8=(int32_t)(p.y*256),.hp=2};w.entity_count=1;
  player_step(&p,&w,0);assert(p.dead&&p.hp==0&&p.death_cause==PLAYER_DEATH_ENEMY);
+
+ /* Spider WEB_BALL applies its physical damage and snare before player motion. */
+ w=flat();assert(player_spawn(&p,&w,0));
+ w.entities[0]=(WorldEntity){.kind=24,.subtype=14,.hp=10,.projectile_active=1,
+   .spider_web_frames=90,.spider_web_x_q8=(int32_t)((p.x-1)*256),
+   .spider_web_y_q8=(int32_t)((p.y+4)*256),.spider_web_vx=4};w.entity_count=1;
+ int web_hp=p.hp;float web_x=p.x;player_step(&p,&w,PLAYER_RIGHT);
+ assert(p.hp==web_hp-7&&p.webbed==90&&p.hurt_flash==10&&fabsf(p.x-web_x)<0.001f);
+
+ /* Lurker's 16-tick tell produces one native damage event through player_step. */
+ w=flat();assert(player_spawn(&p,&w,0));
+ w.entities[0]=(WorldEntity){.kind=24,.subtype=11,.hp=10,
+   .x_q8=(int32_t)(p.x*256),.y_q8=(int32_t)(p.y*256)};w.entity_count=1;
+ int lurker_hp=p.hp;
+ for(unsigned tick=0;tick<17;tick++)player_step(&p,&w,0);
+ int player_lurker_damage=lurker_hp-p.hp;
+ assert(player_lurker_damage>=4&&player_lurker_damage<=16&&w.entities[0].lurker_hit);
+ player_step(&p,&w,0);assert(p.hp==lurker_hp-player_lurker_damage);
 
  /* Square Boulder contact is gated by the original 2*g speed threshold and
     one-hit-per-unit collision tracking. */
@@ -128,7 +161,19 @@ int main(int argc,char **argv){
 
  w=flat();assert(player_spawn(&p,&w,1));
   for(int ywall=18;ywall<21;ywall++){w.tiles[ywall*40+20].type=1;}world_collision_flags(&w);
-  for(int i=0;i<200;i++){player_step(&p,&w,PLAYER_RIGHT);}assert(p.x+p.w<=320.001f&&!player_overlaps_solid(&p,&w));
+ /* Contact from just below a tile boundary must clamp to the wall face,
+    rather than selecting the still-empty tile at the previous position. */
+ assert(player_spawn(&p,&w,0));p.x=311.75f;p.y=324.0f;p.on_ground=1;
+ player_step(&p,&w,PLAYER_RIGHT);
+ assert((p.contacts&WORLD_RIGHT)&&!player_overlaps_solid(&p,&w));
+ assert(p.x>=311.99f&&p.x+p.w<=320.001f);
+ assert(fabsf((p.x+p.w)-320.0f)<0.01f);
+ assert(player_spawn(&p,&w,0));p.x=336.25f;p.y=324.0f;p.on_ground=1;
+ player_step(&p,&w,PLAYER_LEFT);
+ assert((p.contacts&WORLD_LEFT)&&!player_overlaps_solid(&p,&w));
+ assert(fabsf(p.x-336.001f)<0.01f);
+ assert(player_spawn(&p,&w,1));
+  for(int i=0;i<200;i++){player_step(&p,&w,PLAYER_RIGHT);}assert(p.x+p.w<=320.001f&&p.x>=311.99f&&!player_overlaps_solid(&p,&w));
  /* A subpixel overlap at a wall edge must be snapped clear so gravity can
     carry the player below the wall instead of pinning its vertical motion. */
  w=flat();for(int tx=0;tx<40;tx++)w.tiles[21*40+tx].type=0;

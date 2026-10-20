@@ -180,3 +180,16 @@ class WaterField:
         fraction_percent = float32(float32(y - float32(fy)) * float32(100))
         return fraction_percent > float32(100 - self.fluid[i])
 
+    def native_enemy_probe_mass(self, tile_x, tile_y):
+        """Mass read by addRandomEnemies at the top-left 8px cell of a tile.
+
+        The native expression is `fluid[2 * (x + fluidWidth * y)]`; with
+        fluidWidth == 2 * levelWidth this is (2*x, 2*y) in the half-tile grid.
+        """
+        if type(tile_x) is not int or type(tile_y) is not int:
+            raise ValueError('Enemy water probe coordinates must be integers')
+        if not (0 <= tile_x < self.tile_width and 0 <= tile_y < self.tile_height):
+            return 0
+        index = (2 * tile_y) * self.width + 2 * tile_x
+        return self.fluid[index]
+

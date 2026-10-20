@@ -10,7 +10,7 @@ typedef struct {unsigned count,enabled;float damage_min,damage_max,knockback;Mel
 typedef struct {unsigned sprite,enabled,charge;float x,y,degrees,duration_factor,scale_x,scale_y;} MeleeFrame;
 typedef struct {unsigned type,sprite,duration,flags,frame_count,shape_count;float anchor_x,anchor_y;MeleeFrame frames[MELEE_FRAMES];MeleeShape shapes[MELEE_SHAPES];} MeleeDefinition;
 typedef struct {MeleeDefinition weapons[MELEE_WEAPONS];unsigned count,ready;} MeleeDatabase;
-typedef struct {const MeleeDefinition *definition;unsigned active,keyframe,timer,elapsed,charge_ticks,serial;float attack_speed;int facing;} MeleeState;
+typedef struct {const MeleeDefinition *definition;unsigned active,keyframe,timer,elapsed,charge_ticks,serial;float attack_speed,damage_bonus;int facing;} MeleeState;
 int melee_load(MeleeDatabase *database,const char *path,FILE *log);
 const MeleeDefinition *melee_find(const MeleeDatabase *database,unsigned type);
 int melee_start(MeleeState *state,const MeleeDefinition *definition,float attack_speed,int facing);

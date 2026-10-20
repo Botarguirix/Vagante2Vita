@@ -9,11 +9,19 @@ from pathlib import Path
 
 from tools.prepare_world_bundle import FORMAT, FORMAT_VERSION, validate_manifest
 from tools.prepare_act_one_campaign import prepare as prepare_campaign
-from tools.prepare_act_one_campaign import load_route_proof
+from tools.prepare_act_one_campaign import load_route_proof, validate_campaign_route_classes
 from tools.record_act_one_route import record
 
 
 class WorldPackageTests(unittest.TestCase):
+    def test_class_tagged_campaign_routes_must_use_one_class_for_all_floors(self):
+        proof = lambda player_class: {'version': 5, 'player_class': player_class}
+        self.assertEqual(validate_campaign_route_classes([proof(0), proof(0), proof(0)]), 0)
+        with self.assertRaisesRegex(ValueError, 'one player class'):
+            validate_campaign_route_classes([proof(1), proof(1), proof(0)])
+        with self.assertRaisesRegex(ValueError, 'cover all floors'):
+            validate_campaign_route_classes([proof(1), None, proof(1)])
+
     def make_package(self, root, name="intro-world.vwi", data=b"world"):
         target=root/name
         target.parent.mkdir(parents=True,exist_ok=True)
@@ -80,11 +88,25 @@ class WorldPackageTests(unittest.TestCase):
                 "lurker":("lurker_retract.png","lurker_attack.png","lurker_retract.png","lurker_retract.png","lurker_attack.png"),
                 "slime":("stand.png","walk.png","jump.png","jump.png","walk.png"),
                 "spider":("spider_idle.png","spider_walk.png","spider_jump.png","spider_hurt.png","spider_webshot.png"),
+                "thief":("idle.png","walk.png","jump.png","hurt.png","walk.png"),
             }
             for family,filenames in enemy_files.items():
                 for filename in filenames:
                     path=assets/"gfx"/"monster"/family/filename
                     path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b"enemy art")
+            boss_files={
+                "goblin_king":("stand.png","prep_hop.png","prep_leap.png","walk.png",
+                               "jump.png","charge_attack.png","charge_axe.png","dead.png",
+                               "roar.png","leap.png","throw.png","hurt.png"),
+                "baby_dragon":("baby_dragon_flying.png","dead.png","dive.png","fall.png",
+                               "flip.png","hurt.png","launch.png","launching_fireballs.png",
+                               "unconscious.png"),
+                "worm":("body.png","head.png","spitball.png"),
+            }
+            for folder,filenames in boss_files.items():
+                for filename in filenames:
+                    path=assets/"gfx"/"monster"/folder/filename
+                    path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b"boss art")
             packet=root/"world.vwi";packet.write_bytes(b"VWI2")
             terrain=root/"terrain.png";terrain.write_bytes(b"PNG")
             entities=root/"entities.vwe";entities.write_bytes(struct.pack("<4sHH",b"VWE2",1,16)+bytes(16))
@@ -125,6 +147,13 @@ class WorldPackageTests(unittest.TestCase):
             self.assertIn("entities/flower_1.png",manifest["files"])
             self.assertIn("entities/little_firefly.png",manifest["files"])
             self.assertIn("enemies/goblin/attack.png",manifest["files"])
+            self.assertIn("bosses/goblin_king/stand.png",manifest["files"])
+            self.assertIn("bosses/goblin_king/dead.png",manifest["files"])
+            self.assertIn("bosses/dragon/baby_dragon_flying.png",manifest["files"])
+            self.assertIn("bosses/worm/body.png",manifest["files"])
+            self.assertIn("bosses/worm/spitball.png",manifest["files"])
+            self.assertIn("bosses/worm/sprites.json",manifest["files"])
+            self.assertIn("bosses/goblin_king/sprites.json",manifest["files"])
             self.assertIn("item-loot.vlt",manifest["files"])
             self.assertIn("items/items.png",manifest["files"])
             self.assertIn("items/items-explosives.png",manifest["files"])

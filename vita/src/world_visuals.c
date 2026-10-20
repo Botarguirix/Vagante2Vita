@@ -7,12 +7,16 @@
 static Texture terrain,sprites[8],decor[3],attack_pose,weapon_atlas,bow_pose,bow_arm,arrow_sprite;
 static Texture actone_chest,actone_spikes,actone_darttrap,actone_boulder_trap,actone_breakable_wall;
 static Texture actone_boulder_blocker,actone_boulders,actone_shake_boulder;
+static Texture boss_goblin_king_stand,boss_goblin_king_charge;
+static Texture boss_dragon_flying,boss_dragon_spit;
+static Texture boss_worm_body,boss_worm_head,boss_worm_spit;
 static Texture loot_atlases[7];
-enum { ENEMY_GOBLIN,ENEMY_BAT,ENEMY_LURKER,ENEMY_SLIME,ENEMY_SPIDER,ENEMY_FAMILY_COUNT };
+enum { ENEMY_GOBLIN,ENEMY_BAT,ENEMY_LURKER,ENEMY_SLIME,ENEMY_SPIDER,ENEMY_THIEF,ENEMY_FAMILY_COUNT };
 enum { ENEMY_STAND,ENEMY_MOVE,ENEMY_AIR,ENEMY_HURT,ENEMY_ATTACK,ENEMY_STATE_COUNT };
 static Texture enemy_sprites[ENEMY_FAMILY_COUNT][ENEMY_STATE_COUNT];
-static const char *enemy_folders[ENEMY_FAMILY_COUNT]={"goblin","bat","lurker","slime","spider"};
+static const char *enemy_folders[ENEMY_FAMILY_COUNT]={"goblin","bat","lurker","slime","spider","thief"};
 static const char *enemy_names[ENEMY_FAMILY_COUNT][ENEMY_STATE_COUNT]={
+ {"stand.png","move.png","air.png","hurt.png","attack.png"},
  {"stand.png","move.png","air.png","hurt.png","attack.png"},
  {"stand.png","move.png","air.png","hurt.png","attack.png"},
  {"stand.png","move.png","air.png","hurt.png","attack.png"},
@@ -22,7 +26,7 @@ static const char *enemy_names[ENEMY_FAMILY_COUNT][ENEMY_STATE_COUNT]={
 static int enemy_family(uint8_t subtype){
  switch(subtype){case 9:return ENEMY_GOBLIN;case 10:return ENEMY_BAT;
   case 11:return ENEMY_LURKER;case 12:return ENEMY_SLIME;
-  case 14:return ENEMY_SPIDER;default:return -1;}
+  case 14:return ENEMY_SPIDER;case 84:return ENEMY_THIEF;default:return -1;}
 }
 static const char *loot_atlas_names[7]={"items.png","items-weapons.png","items-armor.png","potions.png","scrolls.png","spell_books.png","items-explosives.png"};
 static Texture actone_doodads[22];
@@ -36,10 +40,11 @@ static char cached_directory[256];
 static char cached_terrain_file[128];
 static uint32_t *terrain_full,*terrain_low;
 static void pixel(uint32_t *dst,const unsigned char *src);
-void free_world_visuals(void){free(terrain_low);terrain_low=NULL;terrain_full=NULL;free_texture(&terrain);free_texture(&attack_pose);free_texture(&weapon_atlas);free_texture(&bow_pose);free_texture(&bow_arm);free_texture(&arrow_sprite);free_texture(&actone_chest);free_texture(&actone_spikes);free_texture(&actone_darttrap);free_texture(&actone_boulder_trap);free_texture(&actone_breakable_wall);free_texture(&actone_boulder_blocker);free_texture(&actone_boulders);free_texture(&actone_shake_boulder);for(int i=0;i<ENEMY_FAMILY_COUNT;i++)for(int j=0;j<ENEMY_STATE_COUNT;j++)free_texture(&enemy_sprites[i][j]);for(int i=0;i<7;i++)free_texture(&loot_atlases[i]);for(int i=0;i<22;i++)free_texture(&actone_doodads[i]);for(int i=0;i<8;i++)free_texture(&sprites[i]);for(int i=0;i<3;i++)free_texture(&decor[i]);cached_class=-1;cached_directory[0]=0;cached_terrain_file[0]=0;}
+void free_world_visuals(void){free(terrain_low);terrain_low=NULL;terrain_full=NULL;free_texture(&terrain);free_texture(&attack_pose);free_texture(&weapon_atlas);free_texture(&bow_pose);free_texture(&bow_arm);free_texture(&arrow_sprite);free_texture(&actone_chest);free_texture(&actone_spikes);free_texture(&actone_darttrap);free_texture(&actone_boulder_trap);free_texture(&actone_breakable_wall);free_texture(&actone_boulder_blocker);free_texture(&actone_boulders);free_texture(&actone_shake_boulder);free_texture(&boss_goblin_king_stand);free_texture(&boss_goblin_king_charge);free_texture(&boss_dragon_flying);free_texture(&boss_dragon_spit);free_texture(&boss_worm_body);free_texture(&boss_worm_head);free_texture(&boss_worm_spit);for(int i=0;i<ENEMY_FAMILY_COUNT;i++)for(int j=0;j<ENEMY_STATE_COUNT;j++)free_texture(&enemy_sprites[i][j]);for(int i=0;i<7;i++)free_texture(&loot_atlases[i]);for(int i=0;i<22;i++)free_texture(&actone_doodads[i]);for(int i=0;i<8;i++)free_texture(&sprites[i]);for(int i=0;i<3;i++)free_texture(&decor[i]);cached_class=-1;cached_directory[0]=0;cached_terrain_file[0]=0;}
 int load_world_visuals_for_terrain(const char *directory,const char *terrain_file,int player_class,const World *world,FILE *log){
  if(!directory||!terrain_file||!terrain_file[0]||terrain_file[0]=='/'||strstr(terrain_file,"..")||player_class<0||player_class>=3||!world->ready||strlen(directory)>=sizeof(cached_directory)||strlen(terrain_file)>=sizeof(cached_terrain_file)||strlen(directory)+1+strlen(terrain_file)>=256)return 0;
- if(cached_class==player_class&&terrain.rgba&&!strcmp(cached_directory,directory)&&!strcmp(cached_terrain_file,terrain_file)&&terrain.w==world->width*16&&terrain.h==world->height*16)return 1;
+ int has_boss=0,has_dragon=0,has_worm=0;for(unsigned i=0;i<world->entity_count;i++){has_boss|=world->entities[i].kind==WORLD_KIND_BOSS&&world->entities[i].subtype==WORLD_BOSS_GOBLIN_KING;has_dragon|=world->entities[i].kind==WORLD_KIND_BOSS&&world->entities[i].subtype==WORLD_BOSS_DRAGON;has_worm|=world->entities[i].kind==WORLD_KIND_BOSS&&world->entities[i].subtype==WORLD_BOSS_WORM;}
+ if(cached_class==player_class&&terrain.rgba&&!strcmp(cached_directory,directory)&&!strcmp(cached_terrain_file,terrain_file)&&terrain.w==world->width*16&&terrain.h==world->height*16&&!!boss_goblin_king_stand.rgba==has_boss&&!!boss_goblin_king_charge.rgba==has_boss&&!!boss_dragon_flying.rgba==has_dragon&&!!boss_dragon_spit.rgba==has_dragon&&!!boss_worm_body.rgba==has_worm&&!!boss_worm_head.rgba==has_worm&&!!boss_worm_spit.rgba==has_worm)return 1;
  free_world_visuals();char path[256];
  snprintf(path,sizeof(path),"%s/%s",directory,terrain_file);
  if(!load_png_file(&terrain,path,log)||terrain.w!=world->width*16||terrain.h!=world->height*16)goto invalid;
@@ -90,9 +95,31 @@ int load_world_visuals_for_terrain(const char *directory,const char *terrain_fil
  for(int family=0;family<ENEMY_FAMILY_COUNT;family++)if(enemy_families&(1u<<family)){
   for(int state=0;state<ENEMY_STATE_COUNT;state++){
    snprintf(path,sizeof(path),"%s/enemies/%s/%s",directory,enemy_folders[family],enemy_names[family][state]);
-   if(!load_png_file(&enemy_sprites[family][state],path,log)||enemy_sprites[family][state].w%16||
-      (family==ENEMY_GOBLIN?enemy_sprites[family][state].h!=17:enemy_sprites[family][state].h%16))goto invalid;
+   int cell=family==ENEMY_THIEF?18:16;
+   if(!load_png_file(&enemy_sprites[family][state],path,log)||enemy_sprites[family][state].w%cell||
+      (family==ENEMY_GOBLIN?enemy_sprites[family][state].h!=17:
+       enemy_sprites[family][state].h%cell))goto invalid;
   }
+ }
+ if(has_boss){
+  snprintf(path,sizeof(path),"%s/bosses/goblin_king/stand.png",directory);
+  if(!load_png_file(&boss_goblin_king_stand,path,log)||boss_goblin_king_stand.w!=32||boss_goblin_king_stand.h!=16)goto invalid;
+  snprintf(path,sizeof(path),"%s/bosses/goblin_king/charge_attack.png",directory);
+  if(!load_png_file(&boss_goblin_king_charge,path,log)||boss_goblin_king_charge.w%32||boss_goblin_king_charge.h!=16)goto invalid;
+ }
+ if(has_dragon){
+  snprintf(path,sizeof(path),"%s/bosses/dragon/baby_dragon_flying.png",directory);
+  if(!load_png_file(&boss_dragon_flying,path,log)||boss_dragon_flying.w!=192||boss_dragon_flying.h!=48)goto invalid;
+  snprintf(path,sizeof(path),"%s/bosses/dragon/launching_fireballs.png",directory);
+  if(!load_png_file(&boss_dragon_spit,path,log)||boss_dragon_spit.w!=240||boss_dragon_spit.h!=48)goto invalid;
+ }
+ if(has_worm){
+  snprintf(path,sizeof(path),"%s/bosses/worm/body.png",directory);
+  if(!load_png_file(&boss_worm_body,path,log)||boss_worm_body.w!=512||boss_worm_body.h!=512)goto invalid;
+  snprintf(path,sizeof(path),"%s/bosses/worm/head.png",directory);
+  if(!load_png_file(&boss_worm_head,path,log)||boss_worm_head.w!=512||boss_worm_head.h!=512)goto invalid;
+  snprintf(path,sizeof(path),"%s/bosses/worm/spitball.png",directory);
+  if(!load_png_file(&boss_worm_spit,path,log)||boss_worm_spit.w!=64||boss_worm_spit.h!=16)goto invalid;
  }
  for(unsigned i=0;i<world->entity_count;i++){
   unsigned v=world->entities[i].variant;
@@ -279,20 +306,69 @@ void draw_world(uint32_t *p,const World *w,const NativePlayer *player,int reduct
     unsigned state=ENEMY_STAND;
     if(e->cooldown&&e->hit_attack_serial)state=ENEMY_HURT;
     else if(e->subtype==9&&(e->goblin_prep_timer||e->goblin_swing_frame))state=ENEMY_ATTACK;
+    else if(e->subtype==84&&e->thief_swing_frames)state=ENEMY_ATTACK;
     else if(airborne)state=ENEMY_AIR;
     else if(fabsf(e->vx)>.04f)state=ENEMY_MOVE;
     const Texture *sprite=&enemy_sprites[family][state];
-    int cell_h=family==ENEMY_GOBLIN?17:16;
+    int cell_w=family==ENEMY_THIEF?18:16;
+    int cell_h=family==ENEMY_GOBLIN?17:cell_w;
     unsigned frame_index=(unsigned)(player->ticks/6+e->source_index*3);
     if(state==ENEMY_STAND||state==ENEMY_HURT)frame_index=0;
     if(state==ENEMY_ATTACK)frame_index=e->goblin_swing_frame?e->goblin_swing_frame/5:0;
+    if(state==ENEMY_ATTACK&&e->subtype==84)frame_index=8-e->thief_swing_frames;
     int left=(int)lrintf(ex-camera.x),top=(int)lrintf(ey-camera.y);
-    int flip=family==ENEMY_GOBLIN?!e->goblin_facing_right:e->vx<-.01f;
-    draw_enemy_frame(p,sprite,left,top,16,cell_h,frame_index,flip,d,width,height);
+    int flip=family==ENEMY_GOBLIN?!e->goblin_facing_right:
+             e->subtype==84?!e->thief_facing_right:e->vx<-.01f;
+    draw_enemy_frame(p,sprite,left,top,cell_w,cell_h,frame_index,flip,d,width,height);
    }else{
     uint32_t color=0xffff00ff;int left=(e->x-camera.x)/d,top=(e->y-camera.y)/d;
     if(left>=0&&left<width&&top>=0&&top<height)p[top*width+left]=color;
    }
+  }
+  if(e->kind==WORLD_KIND_BOSS&&e->subtype==WORLD_BOSS_GOBLIN_KING&&e->hp>0){
+   int charging=e->boss_charge_active&&boss_goblin_king_charge.rgba;
+   const Texture *sprite=charging?&boss_goblin_king_charge:&boss_goblin_king_stand;
+   int left=(int)lrintf(e->x_q8/256.0f+(charging?0.0f:0.625f)-camera.x);
+   int top=(int)lrintf(e->y_q8/256.0f+(charging?0.0f:-2.0f)-camera.y);
+   unsigned frame=charging?(e->boss_charge_timer?(e->boss_charge_timer/7u)%4u:player->ticks/7u):0;
+   draw_enemy_frame(p,sprite,left,top,32,16,frame,!e->boss_facing_right,d,width,height);
+  }
+  if(e->kind==WORLD_KIND_BOSS&&e->subtype==WORLD_BOSS_DRAGON&&e->hp>0){
+   int spitting=e->dragon_attack_active&&boss_dragon_spit.rgba;
+   const Texture *dragon_sprite=spitting?&boss_dragon_spit:&boss_dragon_flying;
+   unsigned frame=spitting?(unsigned)((55u-e->dragon_attack_timer)/11u)%5u:(unsigned)(player->ticks/11u+e->source_index)%4u;
+   int left=(int)lrintf(e->x_q8/256.0f-camera.x);
+   int top=(int)lrintf(e->y_q8/256.0f-camera.y);
+   draw_enemy_frame(p,dragon_sprite,left,top,48,48,frame,!e->boss_facing_right,d,width,height);
+  }
+  if(e->kind==WORLD_KIND_BOSS&&e->subtype==WORLD_BOSS_WORM&&e->hp>0&&boss_worm_body.rgba&&boss_worm_head.rgba){
+    unsigned body_frames=boss_worm_body.w/32u,head_frames=boss_worm_head.w/32u;
+   unsigned anim=(unsigned)(e->worm_animation_frame);
+   for(unsigned segment=e->worm_segment_count;segment>0;segment--){
+    unsigned n=segment-1;float sx,sy,nx,ny;world_worm_path_sample(w,e,n,&sx,&sy);world_worm_path_sample(w,e,n?n-1:0,&nx,&ny);
+    float angle=atan2f(ny-sy,nx-sx);
+    unsigned frame=e->worm_behavior==7?1u:anim;
+    draw_rotated(p,&boss_worm_body,32,body_frames?frame%body_frames:0,sx-camera.x+16.0f,sy-camera.y+16.0f,angle,1,1,1,.5f,.5f,d,width,height);
+   }
+   unsigned head_frame=head_frames?(e->worm_behavior==7?1u:anim)%head_frames:0;
+   draw_enemy_frame(p,&boss_worm_head,(int)lrintf(e->x_q8/256.0f-12.0f-camera.x),(int)lrintf(e->y_q8/256.0f-12.0f-camera.y),32,32,head_frame,!e->boss_facing_right,d,width,height);
+  }
+  if(e->kind==WORLD_KIND_DRAGON_FIREBALL&&e->hp>0){
+   int left=(int)lrintf(e->x_q8/256.0f-camera.x)/d;
+   int top=(int)lrintf(e->y_q8/256.0f-camera.y)/d;
+   for(int py=0;py<5;py++)for(int px=0;px<5;px++){
+    int sx=left+px,sy=top+py;
+    if(sx>=0&&sx<width&&sy>=0&&sy<height&&
+       ((px==0||px==4)&&(py==0||py==4))==0)
+     p[sy*width+sx]=(px==2&&py==2)?0xffffff80:0xff40baff;
+   }
+  }
+  if(e->kind==WORLD_KIND_WORM_SPIT&&e->hp>0&&boss_worm_spit.rgba){
+   unsigned age=(e->cooldown<=180u)?180u-e->cooldown:0u;
+   unsigned frame=(age/6u)%4u;
+   draw_enemy_frame(p,&boss_worm_spit,
+       (int)lrintf(e->x_q8/256.0f-8.0f-camera.x),
+       (int)lrintf(e->y_q8/256.0f-8.0f-camera.y),16,16,frame,0,d,width,height);
   }
   if(e->kind==16){draw_prop(p,&actone_chest,e->x-camera.x,e->y-camera.y,16,(e->flags&WORLD_ENTITY_OPENED)?1:0,d,width,height);}
   else if(e->kind==17){draw_prop(p,&actone_spikes,e->x-camera.x,e->y-camera.y,16,0,d,width,height);}
@@ -345,7 +421,13 @@ void draw_world(uint32_t *p,const World *w,const NativePlayer *player,int reduct
   int sy=y*d-top;if(sy<0||sy>=24)continue;
   for(int x=x0;x<=x1;x++){
    int sx=x*d-left;if(sx<0||sx>=24)continue;if(player->facing<0)sx=23-sx;
-   pixel(&p[y*width+x],t->rgba+4*(((int)frame/cols*24+sy)*t->w+(int)frame%cols*24+sx));
+   uint8_t *source=t->rgba+4*(((int)frame/cols*24+sy)*t->w+(int)frame%cols*24+sx);
+   if(player->hurt_flash&&((player->hurt_flash/2)&1)){
+    if(source[3]){
+     static const uint8_t hurt_tint[4]={80,80,255,255};
+     pixel(&p[y*width+x],hurt_tint);
+    }
+   }else pixel(&p[y*width+x],source);
   }
  }
  draw_equipment(p,player,camera,d,width,height);

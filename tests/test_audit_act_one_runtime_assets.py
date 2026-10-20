@@ -4,7 +4,9 @@ import unittest
 import zlib
 from pathlib import Path
 
-from tools.audit_act_one_runtime_assets import png_dimensions, read_packet
+from tools.audit_act_one_runtime_assets import (
+    png_dimensions, read_packet, validate_enemy_record,
+)
 
 
 def png_chunk(kind, payload):
@@ -44,6 +46,26 @@ class RuntimeAssetAuditTests(unittest.TestCase):
             packet.write_bytes(packet.read_bytes()[:-1])
             with self.assertRaisesRegex(ValueError, "invalid record size"):
                 read_packet(packet, b"VWE2", 16)
+
+    def test_accepts_only_supported_enemy_and_provisional_boss_records(self):
+        normal = struct.pack("<BBHiiI", 24, 9, 0, 128, 256, 0)
+        boss = struct.pack("<BBHiiI", 26, 49, 0, 128, 256, 1)
+        dragon = struct.pack("<BBHiiI", 26, 50, 0, 128, 256, 2)
+        worm = struct.pack("<BBHiiI", 26, 51, 0, 128, 256, 3)
+        self.assertEqual(validate_enemy_record(normal, "floor.vwe", 80, 40), "goblin")
+        self.assertEqual(validate_enemy_record(boss, "floor.vwe", 80, 40), "goblin_king")
+        self.assertEqual(validate_enemy_record(dragon, "floor.vwe", 80, 40), "dragon")
+        self.assertEqual(validate_enemy_record(worm, "floor.vwe", 80, 40), "worm")
+        invalid_records = (
+            struct.pack("<BBHiiI", 24, 49, 0, 128, 256, 1),
+            struct.pack("<BBHiiI", 26, 52, 0, 128, 256, 1),
+            struct.pack("<BBHiiI", 26, 49, 1, 128, 256, 1),
+            struct.pack("<BBHiiI", 26, 49, 0, -1, 256, 1),
+        )
+        for record in invalid_records:
+            with self.subTest(record=record):
+                with self.assertRaises(ValueError):
+                    validate_enemy_record(record, "floor.vwe", 80, 40)
 
 
 if __name__ == "__main__":

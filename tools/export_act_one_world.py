@@ -112,8 +112,99 @@ def encode_entities(instances, width, height, tiles=None):
     return struct.pack('<4sHH', b'VWE2', len(records), 16) + b''.join(records), dict(counts)
 
 
+def plan_provisional_final_boss(floor_index, seed, spawn_geometry,
+                                native_tile_path=None, boss_subtype=None):
+    """Plan a deterministic gameplay test actor for supported ACT_ONE floors.
+
+    The native RNG state at addBoss and its boss-type cycle are not recovered,
+    so this deterministic placement is explicitly a gameplay test model. When
+    the verified tile route is available, prefer the surviving spawn anchor
+    closest to that route so the test encounter can be reached and cleared.
+    """
+    worm_route_test = floor_index == 1 and boss_subtype == 51
+    if floor_index not in (0, 2) and not worm_route_test:
+        return None
+    if boss_subtype is not None and boss_subtype not in (49, 50, 51):
+        raise ValueError('Unsupported provisional ACT_ONE boss subtype')
+    candidates = (spawn_geometry or {}).get('after_static_entity_filter')
+    if worm_route_test and not candidates and native_tile_path:
+        # Floor 1's recovered spawn-geometry filter has no surviving native
+        # anchors. Put the provisional test Worm on a late route waypoint so
+        # the entrance remains clear. This is a controlled gameplay fixture,
+        # not addBoss placement parity or a recovered native spawn.
+        if (not isinstance(native_tile_path, (list, tuple))
+                or any(not isinstance(point, (list, tuple)) or len(point) != 2
+                       or any(type(value) is not int or value < 0 for value in point)
+                       for point in native_tile_path)):
+            raise ValueError('Worm route-test tile path must contain nonnegative tile pairs')
+        route_index = min(len(native_tile_path) - 1,
+                          len(native_tile_path) * 3 // 4 + 1)
+        candidates = [{'tile': list(native_tile_path[route_index])}]
+    if not isinstance(seed, int) or isinstance(seed, bool) or not candidates:
+        raise ValueError('Provisional boss needs a seed and a verified spawn anchor or Worm route tile')
+    if native_tile_path:
+        if (not isinstance(native_tile_path, (list, tuple))
+                or any(not isinstance(point, (list, tuple)) or len(point) != 2
+                       or any(type(value) is not int or value < 0 for value in point)
+                       for point in native_tile_path)):
+            raise ValueError('Final-floor boss tile path must contain nonnegative tile pairs')
+    if worm_route_test:
+        index = 0
+    elif floor_index == 0:
+        if boss_subtype not in (49, 51):
+            # [20, 29] is the only tested Dragon anchor that supports a
+            # complete host route through combat and onward to the exit. It
+            # remains a deterministic test placement, not addBoss RNG parity.
+            preferred = [i for i, candidate in enumerate(candidates)
+                         if candidate.get('tile') == [20, 29]]
+            if preferred:
+                index = preferred[0]
+            elif native_tile_path:
+                index = min(range(len(candidates)), key=lambda i: (
+                    min(abs(candidates[i]['tile'][0] - point[0])
+                        + abs(candidates[i]['tile'][1] - point[1])
+                        for point in native_tile_path), i))
+            else:
+                index = seed % len(candidates)
+        elif native_tile_path:
+            index = min(range(len(candidates)), key=lambda i: (
+                min(abs(candidates[i]['tile'][0] - point[0])
+                    + abs(candidates[i]['tile'][1] - point[1])
+                    for point in native_tile_path), i))
+        else:
+            index = seed % len(candidates)
+    else:
+        if native_tile_path:
+            index = min(range(len(candidates)), key=lambda i: (
+                min(abs(candidates[i]['tile'][0] - point[0])
+                    + abs(candidates[i]['tile'][1] - point[1])
+                    for point in native_tile_path), i))
+        else:
+            index = seed % len(candidates)
+    anchor = candidates[index]
+    tile = anchor.get('tile') if isinstance(anchor, dict) else None
+    if (not isinstance(tile, (list, tuple)) or len(tile) != 2
+            or any(type(value) is not int or value < 0 for value in tile)):
+        raise ValueError('Final-floor boss anchor must be a nonnegative tile pair')
+    # These stable anchors are gameplay test placements, not addBoss RNG
+    # parity. Center each recovered collision body in its 16x16 tile.
+    dragon = floor_index == 0 and boss_subtype in (None, 50)
+    subtype = boss_subtype if boss_subtype is not None else (50 if dragon else 49)
+    body = 13 if subtype == 50 else 8
+    spawn_model = ('deterministic_floor_route_worm_route_test_anchor' if worm_route_test
+                   else 'deterministic_intro_dragon_test_anchor' if subtype == 50 and floor_index == 0
+                   else 'deterministic_final_floor_worm_test_anchor' if subtype == 51
+                   else 'deterministic_final_floor_test_anchor')
+    return dict(kind='boss', subtype=subtype,
+                world_pixel=[tile[0] * 16 + (16 - body) * 0.5,
+                             tile[1] * 16 + (16 - body) * 0.5], tile=list(tile),
+                native_parity=False,
+                spawn_model=spawn_model,
+                selection_index=index, candidate_count=len(candidates))
+
+
 def encode_enemies(enemies, width, height):
-    """Encode provisional ACT_ONE enemies in a separate private VWE3 packet."""
+    """Encode provisional ACT_ONE enemies and supported boss test actors."""
     if len(enemies) > 64:
         raise ValueError('ACT_ONE exceeds provisional enemy capacity')
     records = []
@@ -121,17 +212,31 @@ def encode_enemies(enemies, width, height):
     for index, enemy in enumerate(enemies):
         subtype = enemy.get('subtype')
         point = enemy.get('world_pixel')
-        if (subtype not in (9, 10, 11, 12, 14) or enemy.get('native_parity') is not False
+        is_boss = enemy.get('kind') == 'boss'
+        # The Worm VWE3 row owns a runtime-created 20-segment articulated body;
+        # segment state is reconstructed from the head record and is not
+        # serialized as twenty independent enemies.
+        valid_subtype = subtype in (49, 50, 51) if is_boss else subtype in (9, 10, 11, 12, 14, 84)
+        if (not valid_subtype or enemy.get('native_parity') is not False
                 or not isinstance(point, (list, tuple)) or len(point) != 2):
             raise ValueError('Invalid provisional ACT_ONE enemy')
+        if is_boss and enemy.get('spawn_model') not in (
+                'deterministic_final_floor_test_anchor',
+                'deterministic_final_floor_dragon_test_anchor',
+                'deterministic_final_floor_worm_test_anchor',
+                'deterministic_floor_route_worm_route_test_anchor',
+                'deterministic_intro_dragon_test_anchor'):
+            raise ValueError('Invalid provisional ACT_ONE boss spawn model')
         x, y = point
         if (type(x) not in (int, float) or type(y) not in (int, float)
                 or not math.isfinite(x) or not math.isfinite(y)
                 or not 0 <= x < width * 16 or not 0 <= y < height * 16):
             raise ValueError('Enemy coordinate is outside world bounds')
-        records.append(struct.pack('<BBHiiI', 24, subtype, 0, round(x * 256),
+        record_kind = 26 if is_boss else 24
+        records.append(struct.pack('<BBHiiI', record_kind, subtype, 0, round(x * 256),
                                    round(y * 256), index))
-        counts[subtype] += 1
+        counts[{49: 'boss_goblin_king', 50: 'boss_dragon', 51: 'boss_worm'}[subtype]
+               if is_boss else subtype] += 1
     return struct.pack('<4sHH', b'VWE3', len(records), 16) + b''.join(records), dict(counts)
 
 
@@ -174,7 +279,7 @@ def validate_spawn_geometry(tiles, entrance, reported):
     return expected
 
 
-def export(report, output, assets):
+def export(report, output, assets, provisional_boss_subtype=None):
     layout = report['tile_layout']
     required = (
         report.get('exact_generation_parity') is True,
@@ -217,8 +322,14 @@ def export(report, output, assets):
 
     entity_packet, entity_counts = encode_entities(
         layout.get('entity_locations', []), width, height, tiles)
+    boss = plan_provisional_final_boss(
+        report.get('floor_index'), report.get('seed'),
+        report.get('boss_spawn_geometry'),
+        layout.get('native_tile_path', {}).get('path'),
+        boss_subtype=provisional_boss_subtype)
+    layout['provisional_bosses'] = [boss] if boss else []
     enemy_packet, enemy_counts = encode_enemies(
-        layout.get('provisional_enemies', []), width, height)
+        layout.get('provisional_enemies', []) + layout['provisional_bosses'], width, height)
 
     image = Image.new('RGBA', (width * 16, height * 16), (32, 24, 16, 255))
     for layer in LAYERS:
@@ -266,8 +377,12 @@ def export(report, output, assets):
         entity_packet_sha256=hashlib.sha256(entity_packet).hexdigest(),
         enemy_packet_bytes=len(enemy_packet),
         enemy_packet_sha256=hashlib.sha256(enemy_packet).hexdigest(),
-        provisional_enemy_count=sum(enemy_counts.values()),
+        provisional_enemy_count=sum(
+            count for kind, count in enemy_counts.items()
+            if kind not in ('boss_goblin_king', 'boss_dragon', 'boss_worm')),
         provisional_enemy_counts=enemy_counts,
+        provisional_boss_count=int(boss is not None),
+        provisional_boss=boss,
         layout_file='act-one-layout.json',
         entity_count=sum(entity_counts.values()), entity_counts=entity_counts,
         terrain_sha256=hashlib.sha256((output / 'intro-terrain.png').read_bytes()).hexdigest(),
@@ -284,7 +399,7 @@ def export(report, output, assets):
                               path_steps=len(path['path']) - 1,
                               models_player_physics=path['models_player_physics'],
                               route_tiles=path['path']),
-        caveat=('The 60-tick water warmup reconstructs particle RNG using the recovered fresh 1024-slot pool. Empty book pedestals consume the recovered Item constructor and state-conditional skill-loop draws. Windows std::shuffle, G/H endpoint blockers (including BoulderTrap-linked Boulders), and the goal comparator are modeled, including the fewer-than-eight fallback. Other room-entity RNG and Python sort tie ordering remain unresolved, so endpoint results are not seed-exact. Chest, spikes, dart-trap, doodad, and boulder-trap behavior is approximated. BreakableWall has melee damage, connected-group destruction, and tile collision updates, but native damage filters, rotation, indestructible-tile metadata, visuals after tile destruction, and effects are incomplete. Standalone Boulder has an initial shake, fall, collision, and impact model but lacks subtype confirmation, exact shake, audio/particles, and full collision parity. Provisional ACT_ONE enemies are separate and non-parity.'))
+        caveat=('The 60-tick water warmup reconstructs particle RNG using the recovered fresh 1024-slot pool. The ACT_ONE room-entity ledger accounts for all catalogued constructors/setLevel hooks, including empty spellbook skill-loop draws. Windows std::shuffle, G/H endpoint blockers (including BoulderTrap-linked Boulders), and the goal comparator are modeled, including the fewer-than-eight fallback. Native endpoint candidate sets and MSVC sort tie ordering remain unverified, so endpoint results are not certified seed-exact. Chest, spikes, dart-trap, doodad, and boulder-trap behavior is approximated. BreakableWall has melee damage, connected-group destruction, and tile collision updates, but native damage filters, rotation, indestructible-tile metadata, visuals after tile destruction, and effects are incomplete. Standalone Boulder has an initial shake, fall, collision, and impact model but lacks subtype confirmation, exact shake, audio/particles, and full collision parity. Provisional ACT_ONE enemies and deterministic Dragon, Goblin King and Worm test encounters are non-parity; Worm movement/segment constraints and acid attack, native addBoss RNG, boss selection cycle and final reward/transition remain incomplete.'))
     (output / 'act-one-export.json').write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')
     return summary
 
@@ -294,8 +409,11 @@ def main():
     parser.add_argument('layout', type=Path)
     parser.add_argument('assets', type=Path)
     parser.add_argument('output', type=Path)
+    parser.add_argument('--provisional-boss-subtype', type=int, choices=(49, 50, 51),
+                        help='Override the deterministic test boss; does not reproduce native addBoss RNG')
     args = parser.parse_args()
-    print(json.dumps(export(json.loads(args.layout.read_text('utf-8')), args.output, args.assets), indent=2))
+    print(json.dumps(export(json.loads(args.layout.read_text('utf-8')), args.output, args.assets,
+                            args.provisional_boss_subtype), indent=2))
 
 
 if __name__ == '__main__':

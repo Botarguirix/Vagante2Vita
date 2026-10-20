@@ -14,6 +14,26 @@ int world_solid(const World *w,int x,int y){
  if((w->open_sky&&y<0)||(w->open_left&&x<0)||(w->open_right&&x>=w->width))return 0;
  return 1;
 }
+/* Host equivalent of Entity::testLine: rasterize the tile segment and fail
+   when any visited tile is solid. The native drawLine tie-break is still a
+   parity item for exact corner-grazing cases. */
+int world_line_of_sight(const World *w,float x0,float y0,float x1,float y1){
+ if(!w||!isfinite(x0)||!isfinite(y0)||!isfinite(x1)||!isfinite(y1))return 0;
+ int x=(int)floorf((float)lrintf(x0)/16.0f),y=(int)floorf((float)lrintf(y0)/16.0f);
+ int end_x=(int)floorf((float)lrintf(x1)/16.0f),end_y=(int)floorf((float)lrintf(y1)/16.0f);
+ int dx=abs(end_x-x),sx=x<end_x?1:-1;
+ int dy=-abs(end_y-y),sy=y<end_y?1:-1;
+ if(dx>WORLD_CAPACITY||-dy>WORLD_CAPACITY)return 0;
+ int error=dx+dy;
+ for(unsigned steps=0;steps<=WORLD_CAPACITY;steps++){
+  if(world_solid(w,x,y))return 0;
+  if(x==end_x&&y==end_y)return 1;
+  int twice=2*error;
+  if(twice>=dy){error+=dy;x+=sx;}
+  if(twice<=dx){error+=dx;y+=sy;}
+ }
+ return 0;
+}
 int world_goal_touched(const World *w,float left,float top,float width,float height){
  if(!w||!w->ready||!isfinite(left)||!isfinite(top)||!isfinite(width)||!isfinite(height)||width<=0||height<=0)return 0;
  float goal_left=(float)w->goal_x*16.0f,goal_top=(float)w->goal_y*16.0f;

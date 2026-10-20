@@ -125,7 +125,10 @@ int world_spawn_chest_loot(World *w,WorldEntity *chest,int level,uint32_t seed,u
  if(!w||!chest||!w->loot.ready||w->entity_count>=WORLD_ENTITY_LIMIT)return 0;
  w->loot.rng_state=seed?seed:0x6d2b79f5u;
  uint16_t type=0,sprite=0xffff;uint8_t atlas=0;
- if(!roll_pool(&w->loot,23,(uint32_t)level,0,&type,&atlas,&sprite))return 0;
+ int reward_level=level+(chest->boss_reward?3:0);
+ if(reward_level<0)reward_level=0;
+ if(reward_level>99999)reward_level=99999;
+ if(!roll_pool(&w->loot,23,(uint32_t)reward_level,0,&type,&atlas,&sprite))return 0;
  WorldEntity drop;memset(&drop,0,sizeof(drop));drop.kind=25;drop.item_type=type;drop.item_atlas=atlas;drop.item_sprite=sprite;
  drop.x_q8=chest->x_q8+4*256;drop.y_q8=chest->y_q8-12*256;
  drop.x=(int16_t)(drop.x_q8/256);drop.y=(int16_t)(drop.y_q8/256);drop.source_index=chest->source_index;
@@ -136,5 +139,17 @@ int world_spawn_chest_loot(World *w,WorldEntity *chest,int level,uint32_t seed,u
   break;
  }
  if(item_type)*item_type=type;
+ return 1;
+}
+int world_spawn_boss_reward_chest(World *w,WorldEntity *boss){
+ if(!w||!boss||boss->kind!=WORLD_KIND_BOSS||
+    (boss->subtype!=WORLD_BOSS_GOBLIN_KING&&boss->subtype!=WORLD_BOSS_DRAGON&&boss->subtype!=WORLD_BOSS_WORM)||boss->hp>0.0f||
+    boss->boss_reward_spawned||w->entity_count>=WORLD_ENTITY_LIMIT)return 0;
+ WorldEntity chest;memset(&chest,0,sizeof(chest));
+ chest.kind=16;chest.boss_reward=1;chest.source_index=boss->source_index;
+ chest.x_q8=boss->x_q8;chest.y_q8=boss->y_q8-4*256;
+ chest.x=(int16_t)(chest.x_q8/256);chest.y=(int16_t)(chest.y_q8/256);
+ w->entities[w->entity_count++]=chest;
+ boss->boss_reward_spawned=1;
  return 1;
 }

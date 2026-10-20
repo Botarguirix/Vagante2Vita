@@ -37,7 +37,7 @@ int melee_load(MeleeDatabase *db,const char *path,FILE *log){
  }
  if(fgetc(f)!=EOF||ferror(f))goto bad;
  fclose(f);next.ready=1;*db=next;
- if(log)fprintf(log,"MELEE_DATA ready=1 weapons=%u script=player-stab damage_application_pending=1\n",next.count);
+ if(log)fprintf(log,"MELEE_DATA ready=1 weapons=%u script=player-stab weapon_shape_damage=applied wielder_damage_bonus=applied\n",next.count);
  return 1;
  bad:fclose(f);if(log)fprintf(log,"MELEE_DATA ready=0 error=invalid_packet path=%s\n",path);return 0;
 }
@@ -86,7 +86,7 @@ float melee_damage_rect(const MeleeState *s,float cx,float bottom,float x,float 
   MeleePoint p[MELEE_VERTICES];unsigned n=melee_polygon(s,j,cx,bottom,p);if(!n)continue;
   int hit=contained(p,n,x,y)||contained(p,n,x+w,y)||contained(p,n,x,y+h)||contained(p,n,x+w,y+h);
   for(unsigned i=0;!hit&&i<n;i++)hit=segment(p[i],p[(i+1)%n],x,y,w,h);
-  if(hit){const MeleeShape *shape=&s->definition->shapes[j];float candidate=shape->damage_min+(shape->damage_max-shape->damage_min)*.5f;if(candidate>damage)damage=candidate;}
+  if(hit){const MeleeShape *shape=&s->definition->shapes[j];float candidate=shape->damage_min+(shape->damage_max-shape->damage_min)*.5f+s->damage_bonus;if(candidate>damage)damage=candidate;}
  }
  return damage;
 }

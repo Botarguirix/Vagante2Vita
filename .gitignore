@@ -1,5 +1,8 @@
 /_local/
 /build*/
+campaign-delivery/
+session-log-fixtures/
+vita/entity-test-packet.bin
 __pycache__/
 *.pyc
 *.exe

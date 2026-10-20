@@ -1,7 +1,7 @@
 #include "menu.h"
 const char *menu_screen_name(MenuScreen screen){
- const char *names[]={"TITLE","FADE_START","CLASS_PREVIEW","WORLD_BLOCKED","NOTICE","WORLD"};
- return screen>=MENU_TITLE&&screen<=MENU_WORLD?names[screen]:"INVALID";
+ const char *names[]={"TITLE","FADE_START","CLASS_PREVIEW","WORLD_BLOCKED","NOTICE","WORLD","ACT_ONE_COMPLETE"};
+ return screen>=MENU_TITLE&&screen<=MENU_COMPLETE?names[screen]:"INVALID";
 }
 void menu_tick(Menu *m){
  m->total_ticks++;
@@ -24,5 +24,8 @@ void menu_input(Menu *m,unsigned buttons){
   if(pressed&INPUT_BACK)m->screen=MENU_CLASS;
  }else if(m->screen==MENU_NOTICE){
   if(pressed&(INPUT_BACK|INPUT_ACCEPT))m->screen=MENU_TITLE;
+ }else if(m->screen==MENU_COMPLETE){
+  if(pressed&INPUT_ACCEPT)m->screen=MENU_CLASS;
+  if(pressed&INPUT_BACK)m->screen=MENU_TITLE;
  }
 }
