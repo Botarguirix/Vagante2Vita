@@ -195,9 +195,17 @@ def write_if_changed(path, text):
 def translated_names(src_dir):
     names = set()
     for p in pathlib.Path(src_dir).glob('*.cpp'):
+        source = p.read_text(encoding='utf-8', errors='replace')
         for m in re.finditer(r'^[^\s/#].*?\b((?:[A-Za-z_]\w*::)+~?[A-Za-z_]\w*|(?:[A-Za-z_]\w*::)*operator\W+)\s*[(={;]',
-                             p.read_text(encoding='utf-8', errors='replace'), re.M):
+                             source, re.M):
             names.add(m.group(1))
+        # Constructors and destructors have no return type, so they cannot match
+        # the declaration-shaped pattern above. Recognize only their qualified
+        # definitions to avoid mistaking calls such as std::fopen(...) for bodies.
+        for m in re.finditer(r'^([A-Za-z_]\w*)::\1\s*\(', source, re.M):
+            names.add(m.group(1) + '::' + m.group(1))
+        for m in re.finditer(r'^([A-Za-z_]\w*)::~\1\s*\(', source, re.M):
+            names.add(m.group(1) + '::~' + m.group(1))
         for m in re.finditer(r'^(?:int|auto)\s+(main)\s*\(', p.read_text(encoding='utf-8', errors='replace'), re.M):
             names.add('main')
     return names
