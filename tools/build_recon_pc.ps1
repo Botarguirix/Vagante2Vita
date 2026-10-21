@@ -12,8 +12,8 @@ python -I tools/pdb_stubs.py "$GameDir\vagante.pdb" "$GameDir\vagante.exe"
 if ($LASTEXITCODE) { throw 'pdb_stubs.py failed' }
 $env:MSYSTEM = 'UCRT64'; $env:CHERE_INVOKING = '1'
 & 'C:\msys64\usr\bin\bash.exe' -lc 'bash tools/build_recon_pc.sh'
+if ($LASTEXITCODE) { throw 'build failed (see _local/build-recon-pc.log)' }
 $exe = "$root\_local\build-recon-pc\vagante.exe"
-if (!(Test-Path $exe) -or (Get-Item $exe).LastWriteTime -lt (Get-Date).AddMinutes(-30)) { throw 'build failed (see _local/build-recon-pc.log)' }
 if ($Run) {
   $env:PATH = "C:\msys64\ucrt64\bin;$env:PATH"
   Push-Location (Split-Path $exe)

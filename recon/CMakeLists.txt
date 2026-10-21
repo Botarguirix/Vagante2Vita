@@ -16,7 +16,12 @@ if(NOT RECON_STUBS)
   message(FATAL_ERROR "recon/stubs is empty: run tools/pdb_stubs.py first")
 endif()
 
-add_executable(vagante ${RECON_SRC} ${RECON_STUBS} port/recon_stub.cpp)
+# Port helpers live in their own library: they must not see recon/include, whose generated
+# headers can shadow system ones (the game has a type "rpc" -> rpc.h, used by <windows.h>).
+add_library(recon_port STATIC port/recon_stub.cpp port/gl_info.cpp)
+target_compile_definitions(recon_port PRIVATE SFML_STATIC)
+
+add_executable(vagante ${RECON_SRC} ${RECON_STUBS})
 target_include_directories(vagante PRIVATE include port "${RAPIDJSON_INCLUDE}")
 target_precompile_headers(vagante PRIVATE include/recon_all.h)
 # Reconstructed code keeps MSVC-era idioms; keep warnings quiet until units are cleaned up.
@@ -24,5 +29,6 @@ target_compile_options(vagante PRIVATE -w)
 
 set(SFML_STATIC_LIBRARIES TRUE)
 find_package(SFML 2.5 REQUIRED COMPONENTS graphics window audio network system)
-target_link_libraries(vagante PRIVATE sfml-graphics sfml-window sfml-audio sfml-network sfml-system)
+target_link_libraries(recon_port PRIVATE sfml-graphics sfml-window sfml-system)
+target_link_libraries(vagante PRIVATE recon_port sfml-graphics sfml-window sfml-audio sfml-network sfml-system)
 target_compile_definitions(vagante PRIVATE SFML_STATIC)

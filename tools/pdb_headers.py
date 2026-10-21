@@ -237,8 +237,9 @@ class TypeDB:
                 elif k2 == 0x1404: stack.append(u32(d, p + 2)); p += 6
                 elif k2 == 0x1409: p += 6; out.append(('vftable', 0, 0, 0, None))
                 elif k2 == 0x140a: p += 10
-                elif k2 == 0x140b: p += 6
-                elif k2 == 0x150c: _, p = cstr(d, p + 6)
+                elif k2 == 0x140b: out.append(('friendclass', 0, u32(d, p + 2), 0, None)); p += 6
+                elif k2 == 0x150c:
+                    x = u32(d, p + 2); n, p = cstr(d, p + 6); out.append(('friendfn', 0, x, 0, n))
                 elif k2 == 0x150d:
                     a, x = u16(d, p), u32(d, p + 2); off, p = numeric(d, p + 6); n, p = cstr(d, p)
                     out.append(('member', a, x, off, n))
@@ -627,6 +628,14 @@ class Generator:
             end = o + max(db.size(g[3]) for g in group); i = j
         for k, a, x, o, n in F:                                    # static data
             if k == 'static': acc(a); lines.append('%sstatic %s;' % (sub, db.decl(x, n)))
+        for k, a, x, o, n in F:                                    # friends (access-independent)
+            if k == 'friendclass':
+                fi = db.udt(db.resolve(x))
+                if fi and fi['kind'] in CLASSLIKE and '<' not in fi['name'] and fi['name'] in self.game:
+                    lines.append('%sfriend %s %s;' % (sub, KEY[fi['kind']], db.spell(fi['name'])))
+            elif k == 'friendfn' and db.kind(x) == LF_PROCEDURE and re.fullmatch(r'[A-Za-z_]\w*', n):
+                d = db.r[x][1]
+                lines.append('%sfriend %s;' % (sub, db.decl(u32(d, 0), '%s(%s)' % (n, db.args(u32(d, 8))))))
         for m in self.methods(ti):                                 # methods
             pre = 'static ' if m['static'] else 'virtual ' if m['virtual'] else ''
             line = pre + m['decl'] + (' = 0' if m['pure'] else '') + ';'
