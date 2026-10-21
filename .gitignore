@@ -19,3 +19,7 @@ __pycache__/
 *.rep/
 
 /artifacts/
+
+# Generated from the user's vagante.pdb (tools/pdb_headers.py)
+/recon/include/
+/recon/layout_check.cpp

@@ -73,6 +73,38 @@ del juego. Se sigue con la rama A.
 Se descarta como base: el motor C con render por software (`sceDisplaySetFrameBuf`),
 que no tiene GPU ni audio.
 
+## Paso 1 completado: cabeceras desde el PDB
+
+`tools/pdb_headers.py` genera `recon/include/` (no versionado; se regenera desde
+el PDB de cada usuario):
+
+```
+python tools/pdb_inventory.py <vagante>/vagante.pdb
+python tools/pdb_headers.py <vagante>/vagante.pdb
+clang++ --target=i686-pc-windows-msvc -std=c++17 -fms-extensions -fsyntax-only -Irecon/include recon/layout_check.cpp
+```
+
+| Resultado | Valor |
+|---|---|
+| Tipos del juego reconstruidos | 571 (303 cabeceras de nivel superior; el resto anidados) |
+| Líneas generadas | ~20 000 |
+| Comprobaciones de layout (tamaño y offset de cada miembro) | 6 487, **todas pasan** en ABI MSVC x86 |
+| Tipos externos (std, sf, boost, Steam…) | 464, declarados en `compat/lib_types.h` |
+| Tipos con varias definiciones en el PDB | 423; en 299 se eligió por evidencia del código enlazado |
+
+Hallazgos del formato:
+
+- El PDB usa registros `LF_CLASS2`/`LF_STRUCTURE2` (0x1608/0x1609) de VS2022.
+- Hay definiciones duplicadas por `.obj` compilados con cabeceras viejas (por
+  ejemplo, dos `Player` de 31 168 y 31 136 bytes). Se elige la definición cuyos
+  métodos coinciden con los tipos de las funciones compiladas (`S_GPROC32_ID` → IPI).
+- Los tipos de Steam usan `#pragma pack(1)`; el valor de pack se deduce de los
+  offsets propios y de dónde se incrustan en otras clases.
+
+En modo `RECON_LAYOUT_CHECK`, los tipos externos son bloques opacos con tamaño y
+alineación exactos. El build real usará `compat/port_lib_types.h` (pendiente) con
+los tipos reales o sus sustitutos para Vita.
+
 ## Plan de la rama A
 
 1. **Cabeceras desde el PDB:** generar los `.h` de las 386 clases del juego (layout, bases, vtables).

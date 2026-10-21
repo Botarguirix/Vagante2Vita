@@ -47,6 +47,7 @@ def numeric(b, p):
 # ---------------------------------------------------------------- TPI
 
 LF_CLASS, LF_STRUCTURE, LF_INTERFACE, LF_UNION, LF_ENUM = 0x1504, 0x1505, 0x1519, 0x1506, 0x1507
+LF_CLASS2, LF_STRUCTURE2 = 0x1608, 0x1609  # VS2022: 32-bit property, count after vshape
 LF_FIELDLIST, LF_METHODLIST, LF_MFUNCTION = 0x1203, 0x1206, 0x1009
 LF_POINTER, LF_MODIFIER, LF_ARRAY, LF_PROCEDURE, LF_BITFIELD = 0x1002, 0x1001, 0x1503, 0x1008, 0x1205
 ACCESS = {0: '', 1: 'private', 2: 'protected', 3: 'public'}
@@ -130,6 +131,8 @@ def type_name(recs, ti, depth=0):
     if depth > 6 or ti not in recs: return 'T%x' % ti
     kind, d = recs[ti]
     try:
+        if kind in (LF_CLASS2, LF_STRUCTURE2):
+            _, p = numeric(d, 18); return cstr(d, p)[0]
         if kind in (LF_CLASS, LF_STRUCTURE, LF_INTERFACE):
             _, p = numeric(d, 16); return cstr(d, p)[0]
         if kind == LF_UNION:
@@ -151,6 +154,22 @@ def types(recs):
     classes, enums = {}, {}
     for ti, (kind, d) in recs.items():
         try:
+            if kind in (LF_CLASS2, LF_STRUCTURE2):
+                prop, fl = u32(d, 0), u32(d, 4); size, p = numeric(d, 18)
+                if prop & 0x80: continue
+                name, _ = cstr(d, p)
+                if name in classes and classes[name]['size'] >= size: continue
+                fields = parse_fieldlist(recs, fl)
+                classes[name] = dict(kind='class' if kind == LF_CLASS2 else 'struct', size=size,
+                                     bases=[type_name(recs, f['type']) for f in fields if f['k'] in ('base', 'vbase')],
+                                     has_vftable=any(f['k'] == 'vftable' for f in fields),
+                                     members=[dict(name=f['name'], offset=f['offset'], type=type_name(recs, f['type']))
+                                              for f in fields if f['k'] == 'member'],
+                                     statics=[f['name'] for f in fields if f['k'] == 'static'],
+                                     methods=sorted({f['name'] for f in fields if f['k'] == 'method'}),
+                                     method_count=sum(f['count'] for f in fields if f['k'] == 'method'),
+                                     virtual_methods=sum(1 for f in fields if f['k'] == 'method' and f.get('virtual')))
+                continue
             if kind in (LF_CLASS, LF_STRUCTURE, LF_INTERFACE, LF_UNION):
                 if kind == LF_UNION:
                     cnt, prop, fl = u16(d, 0), u16(d, 2), u32(d, 4); size, p = numeric(d, 8)
@@ -211,7 +230,8 @@ def module_functions(stream, sym_bytes):
         if kind in PROC:
             r = p + 4
             out.append(dict(name=cstr(stream, r + 35)[0], size=u32(stream, r + 12),
-                            rva_offset=u32(stream, r + 28), section=u16(stream, r + 32)))
+                            rva_offset=u32(stream, r + 28), section=u16(stream, r + 32),
+                            type=u32(stream, r + 24), type_is_id=kind in (0x1147, 0x1146)))
         p += 2 + ln
     return out
 
