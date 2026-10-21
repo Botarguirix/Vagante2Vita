@@ -105,6 +105,33 @@ En modo `RECON_LAYOUT_CHECK`, los tipos externos son bloques opacos con tamaño 
 alineación exactos. El build real usará `compat/port_lib_types.h` (pendiente) con
 los tipos reales o sus sustitutos para Vita.
 
+## Hito 1 completado: cabeceras compilando con librerías reales (PC y Vita)
+
+`pwsh tools/check_headers.ps1` regenera todo y ejecuta tres comprobaciones; las tres dan 0 errores:
+
+| Comprobación | Compilador | Qué valida |
+|---|---|---|
+| layout | clang, `i686-pc-windows-msvc` | 6 487 tamaños/offsets iguales al PDB |
+| pc | clang + MSYS2 UCRT | STL real, SFML 2.5.1, rapidjson 1.1.0 |
+| vita | `arm-vita-eabi-g++` 15.2 (VitaSDK 2026.08) | Las mismas cabeceras para PS Vita |
+
+Dependencias en `_local/deps/` (no versionadas): `SFML-2.5.1-sources.zip`
+(SHA-256 `BF1E0643…71BB7F`) y `rapidjson-1.1.0.zip` (`8E00C388…F6A3AB`).
+
+Hallazgos:
+
+- **SFML 2.4/2.5**: el juego usa `setUniform` (≥ 2.4) y la firma antigua de
+  `RenderTexture::create`; la API pública que usa son 1 268 funciones (`_local/pdb/sf_api.txt`).
+  MSYS2 solo trae SFML 3.0 (incompatible), por eso se usa 2.5.1 desde la fuente.
+- **rapidjson anterior a 1.0**: el juego usa `rapidjson::FileStream`, eliminado en 1.0;
+  `recon/port/port_lib_types.h` lo reimplementa. rapidjson 1.1.0 necesita un parche
+  para clang moderno (`GenericStringRef::operator=`), aplicado en la copia local.
+- **Vita**: lo único que falla de base es la detección de plataforma de SFML;
+  `tools/patch_sfml_vita.py` añade `SFML_SYSTEM_VITA`. Falta escribir los backends
+  de ventana/contexto (vitaGL) y entrada (SceCtrl) de SFML para Vita.
+- Los iteradores internos de la STL de MSVC (`std::_Tree_iterator<…>`) se traducen a
+  `std::map<K,V>::iterator`.
+
 ## Plan de la rama A
 
 1. **Cabeceras desde el PDB:** generar los `.h` de las 386 clases del juego (layout, bases, vtables).

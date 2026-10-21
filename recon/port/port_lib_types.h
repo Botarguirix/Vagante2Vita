@@ -54,6 +54,25 @@
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/stringbuffer.h>
 
+// The game was written against pre-1.0 rapidjson, whose FILE* wrapper 1.x removed.
+namespace rapidjson {
+class FileStream {
+public:
+    typedef char Ch;
+    explicit FileStream(std::FILE *fp) : fp_(fp), current_('\0'), count_(0) { Read(); }
+    char Peek() const { return current_; }
+    char Take() { char c = current_; Read(); return c; }
+    std::size_t Tell() const { return count_; }
+    void Put(char c) { std::fputc(c, fp_); }
+    void Flush() { std::fflush(fp_); }
+    char *PutBegin() { return 0; }
+    std::size_t PutEnd(char *) { return 0; }
+private:
+    void Read() { int c = std::fgetc(fp_); if (c != EOF) { current_ = (char)c; count_++; } else current_ = '\0'; }
+    std::FILE *fp_; char current_; std::size_t count_;
+};
+}
+
 // ---- boost: the game only keeps boost::filesystem::path by value
 namespace boost { namespace filesystem { using path = std::filesystem::path; } }
 
@@ -96,17 +115,15 @@ public:
 class ISteamUser; class ISteamUserStats; class ISteamFriends; class ISteamMatchmaking;
 class ISteamNetworking; class ISteamUGC; class ISteamRemoteStorage; class ISteamUtils; class ISteamApps;
 class ISteamMatchmakingPingResponse { public: virtual ~ISteamMatchmakingPingResponse() {} };
+struct SteamServersConnected_t; struct SteamServersDisconnected_t; struct SteamServerConnectFailure_t;
+struct SteamUGCQueryCompleted_t; struct SteamUGCRequestUGCDetailsResult_t;
 struct SteamUGCDetails_t { std::uint64_t m_nPublishedFileId = 0; char m_rgchTitle[129] = {}; };
 
 // ---- Windows-only types referenced by crash reporting and DirectInput code (not ported)
-#if !defined(_WIN32)
+// Never pull <windows.h> in here: the game headers only need these names to exist.
 struct _GUID { std::uint32_t Data1; std::uint16_t Data2, Data3; std::uint8_t Data4[8]; };
 struct IUnknown { virtual ~IUnknown() {} };
 struct HWND__;
-#else
-#  include <guiddef.h>
-#  include <unknwn.h>
-#endif
 struct __std_type_info_data { const char *_UndecoratedName; const char _DecoratedName[1]; };
 struct _IMAGEHLP_LINE64; struct _IMAGEHLP_SYMBOL64; struct _tagSTACKFRAME64; struct _tagADDRESS64;
 struct _CONTEXT; struct _EXCEPTION_POINTERS;

@@ -73,12 +73,43 @@ def simplify(s):
     j = match_close(s, i)
     if j is None: return s
     head, rest = s[:i], s[j + 1:]
+    r = simplify(rest)
+    tail = (' ' + r) if rest[:1].isspace() and r else r
     args = [simplify(a) for a in split_top(s[i + 1:j], ',')]
     if head.startswith('std::'):
         while args and args[-1].startswith(DROP): args.pop()
         if head == 'std::basic_string' and args in (['char'], ['wchar_t']):
-            return ('std::string' if args == ['char'] else 'std::wstring') + simplify(rest)
-    return head + '<' + ', '.join(args) + '>' + simplify(rest)
+            return ('std::string' if args == ['char'] else 'std::wstring') + tail
+        it = msvc_iterator(head, args)
+        if it: return it + tail
+    return head + '<' + ', '.join(args) + '>' + tail
+
+def peel(s, *heads):
+    """Strip nested single-argument wrappers: peel('a<b<X>>', 'a', 'b') -> 'X'."""
+    for h in heads:
+        if not (s.startswith(h + '<') and s.endswith('>')): return None
+        s = s[len(h) + 1:-1].strip()
+    return s
+
+def msvc_iterator(head, args):
+    """MSVC STL iterator internals -> standard container::iterator spelling."""
+    kind = {'std::_Tree_iterator': 'iterator', 'std::_Tree_const_iterator': 'const_iterator',
+            'std::_Vector_iterator': 'iterator', 'std::_Vector_const_iterator': 'const_iterator',
+            'std::_List_iterator': 'iterator', 'std::_List_const_iterator': 'const_iterator'}.get(head)
+    if not kind or len(args) != 1: return None
+    if 'Tree' in head:
+        x = peel(args[0], 'std::_Tree_val', 'std::_Tree_simple_types')
+        if x is None: return None
+        kv = peel(x, 'std::pair')
+        if kv:
+            k, v = [a.strip() for a in split_top(kv, ',')]
+            if k.endswith(' const'): return 'std::map<%s, %s>::%s' % (k[:-6], v, kind)
+        return 'std::set<%s>::%s' % (x, kind)
+    if 'Vector' in head:
+        x = peel(args[0], 'std::_Vector_val', 'std::_Simple_types')
+        return 'std::vector<%s>::%s' % (x, kind) if x else None
+    x = peel(args[0], 'std::_List_val', 'std::_List_simple_types')
+    return 'std::list<%s>::%s' % (x, kind) if x else None
 
 def instantiations(s):
     res, i = [], 0
