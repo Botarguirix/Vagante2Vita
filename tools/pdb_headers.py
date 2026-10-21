@@ -627,24 +627,36 @@ class Generator:
             end = o + max(db.size(g[3]) for g in group); i = j
         for k, a, x, o, n in F:                                    # static data
             if k == 'static': acc(a); lines.append('%sstatic %s;' % (sub, db.decl(x, n)))
-        seen = set()
-        for k, a, x, vo, n in F:                                   # methods
+        for m in self.methods(ti):                                 # methods
+            pre = 'static ' if m['static'] else 'virtual ' if m['virtual'] else ''
+            line = pre + m['decl'] + (' = 0' if m['pure'] else '') + ';'
+            acc(m['attr'])
+            lines.append(sub + line + ('  // vtbl +0x%X' % m['vo'] if m['vo'] is not None else ''))
+        lines.append(ind + '};')
+        if pack: lines.append('#pragma pack(pop)')
+
+    def methods(self, ti):
+        """Declared (non compiler-generated) methods of a record, deduplicated, in PDB order."""
+        db = self.db; info = db.udt(ti); short = split_q(info['name'])[-1]; out, seen = [], set()
+        for k, a, x, vo, n in db.fields(info['field']):
             if k != 'method' or a & 0x100 or n.startswith(('__', '`')) or db.kind(x) != LF_MFUNCTION: continue
             d = db.r[x][1]; rv, this, arglist = u32(d, 0), u32(d, 8), u32(d, 16); mprop = (a >> 2) & 7
             const = False
             if db.kind(this) == LF_POINTER:
                 pt = u32(db.r[this][1], 0)
                 const = db.kind(pt) == LF_MODIFIER and bool(u16(db.r[pt][1], 4) & 1)
-            sig = '%s(%s)%s' % (n, db.args(arglist), ' const' if const else '')
-            special = n == short or n.startswith('~') or (n.startswith('operator ') and not re.match(r'operator (new|delete)\b', n))
-            core = sig if special else db.decl(rv, sig)
-            pre = 'static ' if mprop == 2 else 'virtual ' if mprop in (1, 4, 5, 6) else ''
-            line = pre + core + (' = 0' if mprop in (5, 6) else '') + ';'
-            if line in seen: continue
-            seen.add(line); acc(a)
-            lines.append(sub + line + ('  // vtbl +0x%X' % vo if vo is not None else ''))
-        lines.append(ind + '};')
-        if pack: lines.append('#pragma pack(pop)')
+            args = db.args(arglist)
+            sig = '%s(%s)%s' % (n, args, ' const' if const else '')
+            ctor, dtor = n == short, n.startswith('~')
+            conv = n.startswith('operator ') and not re.match(r'operator (new|delete)\b', n)
+            decl = sig if (ctor or dtor or conv) else db.decl(rv, sig)
+            key = (decl, mprop == 2)
+            if key in seen: continue
+            seen.add(key)
+            out.append(dict(name=n, attr=a, vo=vo, rv=rv, arglist=arglist, const=const, decl=decl,
+                            ctor=ctor, dtor=dtor, conv=conv, static=mprop == 2,
+                            virtual=mprop in (1, 4, 5, 6), pure=mprop in (5, 6)))
+        return out
 
     def header(self, top, ns):
         db = self.db; inc = set()
@@ -690,6 +702,12 @@ class Generator:
             if ns: out.append('}' * len(ns))
         return '\n'.join(out) + '\n'
 
+def write_if_changed(path, text):
+    """Keep timestamps of unchanged files so incremental builds (and the PCH) stay valid."""
+    path = pathlib.Path(path)
+    if path.exists() and path.read_text(encoding='utf-8') == text: return False
+    path.write_text(text, encoding='utf-8'); return True
+
 def toposort(graph):
     order, state, cycles = [], {}, []
     def visit(n, stack):
@@ -702,43 +720,50 @@ def toposort(graph):
     for n in sorted(graph): visit(n, [n])
     return order, cycles
 
+def load(pdb_path, inventory):
+    """Parse the PDB once: (streams, ipi, TypeDB, Generator, compiled game functions with their types)."""
+    streams = msf_streams(pathlib.Path(pdb_path).read_bytes())
+    ipi = tpi_records(streams[4])
+    evidence, compiled = collections.defaultdict(set), {}
+    for m in dbi_modules(streams[3]):
+        if classify(m) != 'game' or m['stream'] == 0xffff: continue
+        unit = pathlib.PureWindowsPath(m['obj'] or m['name']).stem
+        for f in module_functions(streams[m['stream']], m['sym_bytes']):
+            t = f['type']
+            if f['type_is_id']:
+                k, d = ipi.get(t, (0, b''))
+                t = u32(d, 4) if k in (LF_FUNC_ID, LF_MFUNC_ID) else 0
+            compiled.setdefault(f['name'], dict(unit=unit, type=t, size=f['size']))
+            if t and '::' in f['name']: evidence[f['name'].rsplit('::', 1)[0]].add(t)
+    db = TypeDB(tpi_records(streams[2]), evidence)
+    fns = json.loads((pathlib.Path(inventory) / 'game_functions.json').read_text())
+    roots = {n.rsplit('::', 1)[0] for n in fns if '::' in n}
+    gen = Generator(db, {r for r in roots if gen_ok(r)})
+    return streams, ipi, db, gen, compiled
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('pdb', type=pathlib.Path)
     ap.add_argument('--inventory', type=pathlib.Path, default=pathlib.Path('_local/pdb'))
     ap.add_argument('--out', type=pathlib.Path, default=pathlib.Path('recon/include'))
     args = ap.parse_args()
-    streams = msf_streams(args.pdb.read_bytes())
-    ipi = tpi_records(streams[4])
-    evidence = collections.defaultdict(set)
-    for m in dbi_modules(streams[3]):
-        if classify(m) != 'game' or m['stream'] == 0xffff: continue
-        for f in module_functions(streams[m['stream']], m['sym_bytes']):
-            if '::' not in f['name']: continue
-            t = f['type']
-            if f['type_is_id']:
-                k, d = ipi.get(t, (0, b''))
-                t = u32(d, 4) if k in (LF_FUNC_ID, LF_MFUNC_ID) else 0
-            if t: evidence[f['name'].rsplit('::', 1)[0]].add(t)
-    db = TypeDB(tpi_records(streams[2]), evidence)
-    fns = json.loads((args.inventory / 'game_functions.json').read_text())
-    roots = {n.rsplit('::', 1)[0] for n in fns if '::' in n}
-    gen = Generator(db, {r for r in roots if gen_ok(r)})
+    streams, ipi, db, gen, _ = load(args.pdb, args.inventory)
     out = args.out; (out / 'compat').mkdir(parents=True, exist_ok=True)
-    for old in out.glob('*.h'): old.unlink()
-    graph, all_checks = {}, []
+    graph, all_checks, written = {}, [], {'fwd.h', 'all.h', 'free_functions.h', 'recon_all.h'}
     for top, ns in sorted(gen.tops.items()):
         text, inc, checks = gen.header(top, ns)
-        (out / fname(top)).write_text(text, encoding='utf-8')
+        write_if_changed(out / fname(top), text); written.add(fname(top))
         graph[top] = inc; all_checks += checks
-    (out / 'fwd.h').write_text(gen.fwd_h(), encoding='utf-8')
-    (out / 'compat' / 'lib_types.h').write_text(gen.lib_types_h(), encoding='utf-8')
+    for old in out.glob('*.h'):
+        if old.name not in written: old.unlink()
+    write_if_changed(out / 'fwd.h', gen.fwd_h())
+    write_if_changed(out / 'compat' / 'lib_types.h', gen.lib_types_h())
     order, cycles = toposort(graph)
-    (out / 'all.h').write_text('#pragma once\n' + ''.join('#include "%s"\n' % fname(t) for t in order), encoding='utf-8')
-    check = out.parent / 'layout_check.cpp'
-    check.write_text('// Generated: verifies reconstructed layouts against vagante.pdb (MSVC x86 ABI).\n'
+    write_if_changed(out / 'all.h', '#pragma once\n' + ''.join('#include "%s"\n' % fname(t) for t in order))
+    write_if_changed(out.parent / 'layout_check.cpp',
+                     '// Generated: verifies reconstructed layouts against vagante.pdb (MSVC x86 ABI).\n'
                      '#define RECON_LAYOUT_CHECK 1\n#define private public\n#define protected public\n'
-                     '#include "all.h"\n' + '\n'.join(all_checks) + '\n', encoding='utf-8')
+                     '#include "all.h"\n' + '\n'.join(all_checks) + '\n')
     report = dict(game_types=len(gen.game), headers=len(gen.tops), opaque=sorted(gen.opaque),
                   external_types=len(gen.ext), external_by_value=sum(e['byval'] for e in gen.ext.values()),
                   aliased_external=len(db.aliases), bad_template_heads=sorted(gen.bad_heads),

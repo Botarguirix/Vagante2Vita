@@ -114,6 +114,7 @@ public:
 };
 class ISteamUser; class ISteamUserStats; class ISteamFriends; class ISteamMatchmaking;
 class ISteamNetworking; class ISteamUGC; class ISteamRemoteStorage; class ISteamUtils; class ISteamApps;
+class ISteamController; class ISteamGameServer;
 class ISteamMatchmakingPingResponse { public: virtual ~ISteamMatchmakingPingResponse() {} };
 struct SteamServersConnected_t; struct SteamServersDisconnected_t; struct SteamServerConnectFailure_t;
 struct SteamUGCQueryCompleted_t; struct SteamUGCRequestUGCDetailsResult_t;
@@ -124,7 +125,7 @@ struct SteamUGCDetails_t { std::uint64_t m_nPublishedFileId = 0; char m_rgchTitl
 struct _GUID { std::uint32_t Data1; std::uint16_t Data2, Data3; std::uint8_t Data4[8]; };
 struct IUnknown { virtual ~IUnknown() {} };
 struct HWND__;
-struct __std_type_info_data { const char *_UndecoratedName; const char _DecoratedName[1]; };
+struct __std_type_info_data { const char *_UndecoratedName; char _DecoratedName[1]; };
 struct _IMAGEHLP_LINE64; struct _IMAGEHLP_SYMBOL64; struct _tagSTACKFRAME64; struct _tagADDRESS64;
 struct _CONTEXT; struct _EXCEPTION_POINTERS;
 struct _DIDATAFORMAT; struct _DIACTIONFORMATA; struct _DIDEVICEIMAGEINFOHEADERA; struct _DICONFIGUREDEVICESPARAMSA;
