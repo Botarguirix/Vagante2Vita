@@ -3,7 +3,7 @@
 # Generated inputs (tools/pdb_headers.py, tools/pdb_stubs.py) must exist first:
 #   recon/include/*.h, recon/stubs/*.cpp
 cmake_minimum_required(VERSION 3.16)
-project(vagante_recon CXX)
+project(vagante_recon C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -27,9 +27,16 @@ target_precompile_headers(vagante PRIVATE include/recon_all.h)
 # Reconstructed code keeps MSVC-era idioms; keep warnings quiet until units are cleaned up.
 target_compile_options(vagante PRIVATE -w)
 
-set(SFML_STATIC_LIBRARIES TRUE)
-find_package(SFML 2.5 REQUIRED COMPONENTS graphics window audio network system)
+option(RECON_SFML_SDL "Use SFML with the SDL2 backend (recon/sfml-sdl), as on the Vita" OFF)
+if(RECON_SFML_SDL OR VITA)
+  add_subdirectory(sfml-sdl "${CMAKE_BINARY_DIR}/sfml-sdl")
+  set(RECON_SFML sfml-sdl-graphics sfml-sdl-window sfml-sdl-audio sfml-sdl-network sfml-sdl-system)
+else()
+  set(SFML_STATIC_LIBRARIES TRUE)
+  find_package(SFML 2.5 REQUIRED COMPONENTS graphics window audio network system)
+  set(RECON_SFML sfml-graphics sfml-window sfml-audio sfml-network sfml-system)
+endif()
 find_package(ZLIB REQUIRED)
-target_link_libraries(recon_port PRIVATE sfml-graphics sfml-window sfml-system)
-target_link_libraries(vagante PRIVATE recon_port sfml-graphics sfml-window sfml-audio sfml-network sfml-system ZLIB::ZLIB)
+target_link_libraries(recon_port PRIVATE ${RECON_SFML})
+target_link_libraries(vagante PRIVATE recon_port ${RECON_SFML} ZLIB::ZLIB)
 target_compile_definitions(vagante PRIVATE SFML_STATIC)
