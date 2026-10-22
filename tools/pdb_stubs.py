@@ -202,10 +202,8 @@ def translated_names(src_dir):
         # Constructors and destructors have no return type, so they cannot match
         # the declaration-shaped pattern above. Recognize only their qualified
         # definitions to avoid mistaking calls such as std::fopen(...) for bodies.
-        for m in re.finditer(r'^([A-Za-z_]\w*)::\1\s*\(', source, re.M):
-            names.add(m.group(1) + '::' + m.group(1))
-        for m in re.finditer(r'^([A-Za-z_]\w*)::~\1\s*\(', source, re.M):
-            names.add(m.group(1) + '::~' + m.group(1))
+        for m in re.finditer(r'^((?:[A-Za-z_]\w*::)*([A-Za-z_]\w*))::(~?\2)\s*\(', source, re.M):
+            names.add(m.group(1) + '::' + m.group(3))
         for m in re.finditer(r'^(?:int|auto)\s+(main)\s*\(', p.read_text(encoding='utf-8', errors='replace'), re.M):
             names.add('main')
     return names

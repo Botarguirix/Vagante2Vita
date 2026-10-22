@@ -16,8 +16,13 @@ $argsCompile = @('-std=c++17', '-O0', '-g', '-DSFML_STATIC', "-I$root\recon\incl
   "-I$root\_local\deps\sfml-pc\include", '-c', $source, '-o', $object)
 & $compiler @argsCompile
 if ($LASTEXITCODE) { throw 'test compilation failed' }
-$objects = Get-ChildItem "$build\CMakeFiles\vagante.dir" -Recurse -Filter '*.obj' |
-  Where-Object { $_.FullName -notmatch '[\\/]src[\\/]main\.cpp\.obj$' }
+$linkRule = Get-Content "$build\build.ninja" | Where-Object { $_ -match '^build vagante\.exe: ' } |
+  Select-Object -First 1
+# Stub regeneration can remove a translation unit while its old object remains
+# on disk. Link precisely the current executable's inputs, not every stale .obj.
+$objects = [regex]::Matches($linkRule, 'CMakeFiles/vagante\.dir/[^ ]+\.obj') |
+  ForEach-Object { $_.Value } | Where-Object { $_ -ne 'CMakeFiles/vagante.dir/src/main.cpp.obj' } |
+  ForEach-Object { Get-Item -LiteralPath (Join-Path $build $_) }
 $libraries = (Get-Content "$build\build.ninja" | Where-Object { $_ -match '^  LINK_LIBRARIES = ' } |
   Select-Object -Last 1) -replace '^  LINK_LIBRARIES = ', ''
 if (!$libraries -or !$objects) { throw 'build the reconstruction before running tests' }

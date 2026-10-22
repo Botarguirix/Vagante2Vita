@@ -13,7 +13,7 @@ Las cabeceras generadas en `recon/include` se conservan sin editar.
 | 4. Input | Pendiente |
 | 5. Sprite | Pendiente |
 | 6. VFont | Pendiente |
-| 7. ResourceManager (bloque inicial solicitado) | Pendiente; `getLanguageString` traducida como dependencia de Config |
+| 7. ResourceManager (bloque inicial solicitado) | Nueve funciones traducidas y verificadas en PC con `data.vra`; catálogos y procesadores profundos pendientes. [Informe por función](RAMA_A_RESOURCEMANAGER_BLOQUE1.md) |
 | 8. Constantes de una unidad | Terminada para Config: cuatro constantes recuperadas |
 
 ## Config: funciones y evidencia

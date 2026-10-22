@@ -29,6 +29,7 @@ target_compile_options(vagante PRIVATE -w)
 
 set(SFML_STATIC_LIBRARIES TRUE)
 find_package(SFML 2.5 REQUIRED COMPONENTS graphics window audio network system)
+find_package(ZLIB REQUIRED)
 target_link_libraries(recon_port PRIVATE sfml-graphics sfml-window sfml-system)
-target_link_libraries(vagante PRIVATE recon_port sfml-graphics sfml-window sfml-audio sfml-network sfml-system)
+target_link_libraries(vagante PRIVATE recon_port sfml-graphics sfml-window sfml-audio sfml-network sfml-system ZLIB::ZLIB)
 target_compile_definitions(vagante PRIVATE SFML_STATIC)
