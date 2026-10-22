@@ -10,7 +10,7 @@ Las cabeceras generadas en `recon/include` se conservan sin editar.
 | 1. Log | Terminada previamente, commit `cc90031` |
 | 2. Config | Traducida y verificada en PC |
 | 3. Tablas de identificadores y Stats | Pendiente |
-| 4. Input | Pendiente |
+| 4. Input | Índice completo atendido; compilación/arranque PC y suite repetible pasan. [Informe por función y exclusiones](RAMA_A_INPUT.md) |
 | 5. Sprite | Pendiente |
 | 6. VFont | Pendiente |
 | 7. ResourceManager (bloque inicial solicitado) | Nueve funciones traducidas y verificadas en PC con `data.vra`; catálogos y procesadores profundos pendientes. [Informe por función](RAMA_A_RESOURCEMANAGER_BLOQUE1.md) |
