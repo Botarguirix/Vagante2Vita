@@ -40,3 +40,20 @@ find_package(ZLIB REQUIRED)
 target_link_libraries(recon_port PRIVATE ${RECON_SFML})
 target_link_libraries(vagante PRIVATE recon_port ${RECON_SFML} ZLIB::ZLIB)
 target_compile_definitions(vagante PRIVATE SFML_STATIC)
+
+if(VITA)
+  # PS Vita package. Game data is not inside the VPK: data.vra goes to ux0:data/Vagante/.
+  include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
+  set(VITA_APP_NAME "Vagante rama A")
+  set(VITA_TITLEID "VAGA00001")  # distinct from the rama B demo (VAGV00006)
+  set(VITA_VERSION "00.01")
+  set(VITA_MKSFOEX_FLAGS "${VITA_MKSFOEX_FLAGS} -d ATTRIBUTE2=12")  # extended memory mode
+  target_sources(vagante PRIVATE port/vita_gl_compat.c)
+  set_source_files_properties(port/vita_gl_compat.c PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+  # Static archives resolve left to right: system stubs and pthread must come last.
+  target_link_libraries(vagante PRIVATE -Wl,--whole-archive pthread -Wl,--no-whole-archive)
+  set(CMAKE_CXX_STANDARD_LIBRARIES "${CMAKE_CXX_STANDARD_LIBRARIES} -lSceAudio_stub -lSceAudioIn_stub -lpthread")
+  vita_create_self(eboot.bin vagante UNSAFE)
+  # The VPK itself is packed by tools/build_recon_vita.sh: vita.cmake passes unquoted paths to
+  # vita-pack-vpk, which crashes on paths with spaces ("C:/Users/Andy PC/...").
+endif()

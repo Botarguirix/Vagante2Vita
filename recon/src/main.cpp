@@ -14,6 +14,16 @@
 
 #define VLOG(level) if ((level) > Log::reportingLevel()) ; else Log().get(level)
 
+#if defined(__vita__)
+#include <unistd.h>
+// Vita process limits: a large newlib heap (textures are decoded on the CPU first) and a
+// main thread stack comparable to the 1 MB + 100 KB guarantee the Windows build asks for.
+extern "C" {
+int _newlib_heap_size_user = 256 * 1024 * 1024;
+unsigned int sceUserMainThreadStackSize = 4 * 1024 * 1024;
+}
+#endif
+
 namespace recon { const char *glVendor(); const char *glRenderer(); }  // port/gl_info.cpp
 
 namespace {
@@ -69,6 +79,9 @@ void logContextSettings(const sf::ContextSettings &cs) {
 }  // namespace
 
 int main(int argc, char **argv) {
+#if defined(__vita__)
+    chdir("ux0:data/Vagante/");  // data.vra, config/ and logs/ live next to each other, as on PC
+#endif
     sf::Clock startupClock;
     Log::init(LOG_DEBUG4);  // the original ignores the argument and sets reportingLevel to 10
 

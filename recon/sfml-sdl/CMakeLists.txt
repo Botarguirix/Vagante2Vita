@@ -12,12 +12,23 @@ endif()
 set(S "${SFML_SOURCE_DIR}/src/SFML")
 
 if(VITA)
-  find_library(VITAGL_LIB vitaGL REQUIRED)
-  set(SFML_GL_LIBS ${VITAGL_LIB} vitashark SceShaccCgExt taihen_stub SceShaccCg_stub mathneon SceKernelDmacMgr_stub
-      SceGxm_stub SceDisplay_stub SceCommonDialog_stub SceAppMgr_stub SceCtrl_stub SceTouch_stub SceHid_stub
-      SceAudio_stub SceAudioIn_stub SceIme_stub SceSysmodule_stub SceMotion_stub ScePower_stub)
+  # Static link lines from VitaSDK's sdl2.pc / freetype2.pc (sdl2_vitagl package).
+  set(VITA_INC "$ENV{VITASDK}/arm-vita-eabi/include")
+  set(SDL2_INCLUDE "${VITA_INC}/SDL2")
   set(SDL2_LIBS SDL2)
-  set(SDL2_INCLUDE "$ENV{VITASDK}/arm-vita-eabi/include/SDL2")
+  set(SFML_GL_LIBS vitaGL vitashark mathneon SceShaccCg_stub SceShaccCgExt taihen_stub SceKernelDmacMgr_stub SceIme_stub
+      SceGxm_stub SceDisplay_stub SceCtrl_stub SceAppMgr_stub SceAppUtil_stub SceAudio_stub SceAudioIn_stub
+      SceSysmodule_stub SceIofilemgr_stub SceCommonDialog_stub SceTouch_stub SceHid_stub SceMotion_stub
+      ScePower_stub SceProcessmgr_stub m)
+  set(FREETYPE_TARGET freetype png16 bz2 z)
+  set(FREETYPE_INCLUDE "${VITA_INC}/freetype2")
+  set(OPENAL_LIBRARY openal)
+  set(OPENAL_HEADER_DIR "${VITA_INC}/AL")
+  set(VORBISFILE_LIB vorbisfile)
+  set(VORBISENC_LIB vorbisenc)
+  set(VORBIS_LIB vorbis)
+  set(OGG_LIB ogg)
+  set(FLAC_LIB FLAC)
   set(PLATFORM_DIR Unix)
 elseif(WIN32)
   find_package(SDL2 REQUIRED)
@@ -33,7 +44,17 @@ else()
   set(PLATFORM_DIR Unix)
 endif()
 
-find_package(Freetype REQUIRED)
+if(NOT VITA)
+  find_package(Freetype REQUIRED)
+  set(FREETYPE_TARGET Freetype::Freetype)
+  find_package(OpenAL REQUIRED)
+  find_library(VORBISFILE_LIB vorbisfile REQUIRED)
+  find_library(VORBISENC_LIB vorbisenc REQUIRED)
+  find_library(VORBIS_LIB vorbis REQUIRED)
+  find_library(OGG_LIB ogg REQUIRED)
+  find_library(FLAC_LIB FLAC REQUIRED)
+  find_path(OPENAL_HEADER_DIR al.h PATH_SUFFIXES AL REQUIRED)
+endif()
 
 set(SFML_COMMON_INCLUDES "${CMAKE_CURRENT_LIST_DIR}" "${SFML_SOURCE_DIR}/include" "${SFML_SOURCE_DIR}/src")
 
@@ -57,16 +78,9 @@ if(SDL2_INCLUDE)
 endif()
 
 file(GLOB GRAPHICS_SRC "${S}/Graphics/*.cpp")
-sfml_sdl_module(graphics SOURCES ${GRAPHICS_SRC} INCLUDES "${SFML_SOURCE_DIR}/extlibs/headers/stb_image"
-                LIBS sfml-sdl-window Freetype::Freetype)
+sfml_sdl_module(graphics SOURCES ${GRAPHICS_SRC} INCLUDES "${SFML_SOURCE_DIR}/extlibs/headers/stb_image" ${FREETYPE_INCLUDE}
+                LIBS sfml-sdl-window ${FREETYPE_TARGET})
 
-find_package(OpenAL REQUIRED)
-find_library(VORBISFILE_LIB vorbisfile REQUIRED)
-find_library(VORBISENC_LIB vorbisenc REQUIRED)
-find_library(VORBIS_LIB vorbis REQUIRED)
-find_library(OGG_LIB ogg REQUIRED)
-find_library(FLAC_LIB FLAC REQUIRED)
-find_path(OPENAL_HEADER_DIR al.h PATH_SUFFIXES AL REQUIRED)
 file(GLOB AUDIO_SRC "${S}/Audio/*.cpp")
 sfml_sdl_module(audio SOURCES ${AUDIO_SRC} INCLUDES ${OPENAL_HEADER_DIR}
                 LIBS sfml-sdl-system ${OPENAL_LIBRARY} ${VORBISFILE_LIB} ${VORBISENC_LIB} ${VORBIS_LIB} ${FLAC_LIB} ${OGG_LIB})
