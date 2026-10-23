@@ -13,6 +13,7 @@
 #include "LogLevel.h"
 
 #include <cstdint>
+#include <condition_variable>
 #include <memory>
 #include <utility>
 
@@ -22,6 +23,15 @@ extern AttackScriptDatabase globalAttackScriptDb;
 extern PaletteDatabase globalPaletteDb;
 
 namespace {
+
+// Keep processors behind the completion of the primary queues, not merely
+// behind their dequeue. The original five immediate retries can otherwise all
+// run before the last image is published (observed for TASK_IMAGE_REPEAT on
+// monster/last_boss/environment/fog-texture.png). This scheduling adaptation
+// preserves recipes, retry limit and RNG order without changing the PDB layout.
+std::condition_variable primaryTasksFinished;
+int primaryTasksInFlight = 0; // guarded by M_TASKS
+thread_local bool primaryTaskTaken = false;
 
 std::uint32_t taskStringHash(const std::string &text) {
     std::uint32_t hash = 0x811c9dc5u;
@@ -85,15 +95,32 @@ void ResourceManager::queueTask(TaskType type, std::string path,
 }
 
 ResourceManager::Task *ResourceManager::getNextTask(bool preferGraphics) {
-    std::lock_guard<std::mutex> lock(mutexes[M_TASKS]);
+    std::unique_lock<std::mutex> lock(mutexes[M_TASKS]);
+    // A worker calls again only after executing the task returned last time.
+    if (primaryTaskTaken) {
+        primaryTaskTaken = false;
+        --primaryTasksInFlight;
+        primaryTasksFinished.notify_all();
+    }
     auto *first = preferGraphics ? &gfxTasks : &sfxTasks;
     auto *second = preferGraphics ? &sfxTasks : &gfxTasks;
-    for (auto *queue : {first, second, &processTasks}) {
-        if (!queue->empty()) {
-            auto task = std::make_unique<Task>(queue->front());
-            queue->pop();
-            return task.release();
+    for (;;) {
+        for (auto *queue : {first, second}) {
+            if (!queue->empty()) {
+                auto task = std::make_unique<Task>(queue->front());
+                queue->pop();
+                ++primaryTasksInFlight;
+                primaryTaskTaken = true;
+                return task.release();
+            }
         }
+        if (!primaryTasksInFlight) break;
+        primaryTasksFinished.wait(lock);
+    }
+    if (!processTasks.empty()) {
+        auto task = std::make_unique<Task>(processTasks.front());
+        processTasks.pop();
+        return task.release();
     }
     return nullptr;
 }

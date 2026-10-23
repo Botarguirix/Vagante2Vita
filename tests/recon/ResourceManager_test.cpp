@@ -127,9 +127,12 @@ void testInitialize(bool threads) {
     assert(ResourceManager::getConfig() == &config);
     ResourceManager::initialized.store(false);
     writeTestArchive();
-    ResourceManager::initialize(true, false, threads);
+    // Block 2 now queues the complete game, while this synthetic archive holds
+    // only one image. Exercise both scheduling modes in descriptor-only mode;
+    // ResourceManagerLoading_test covers complete loading with the owned VRA.
+    ResourceManager::initialize(true, true, threads);
     ResourceManager::finishInitialization(false);
-    assert(ResourceManager::isInitialized() && ResourceManager::isArchiveLoaded());
+    assert(ResourceManager::isInitialized() && !ResourceManager::isArchiveLoaded());
     assert(ResourceManager::taskThreads.empty());
     if (threads) {
         assert(ResourceManager::initThreadsAreDone());
