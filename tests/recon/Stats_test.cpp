@@ -41,6 +41,20 @@ void testRegistryAndCounters() {
     assert(Stats::unlocks.at("boomerang").background == Background::BG_BOOMERANG);
     assert(Stats::unlocks.at("tinkerer").background == Background::BG_GRAPPLING_HOOK);
     assert(Stats::unlocks.at("houndmaster_flail").background == Background::BG_FLAIL);
+    // The Stats registry must construct the newly translated Background unit
+    // using PDB enum values, including the stale Ghidra range 19..23.
+    for (const auto &entry : Stats::unlocks) {
+        if (entry.second.type != Unlockable::BACKGROUND) continue;
+        Background background(entry.second.background);
+        assert(background.type < Background::NUM_BACKGROUNDS);
+        assert(!background.name.empty() && background.name != "Undefined Background");
+        assert(!background.description.empty() && background.description != "Undefined Description");
+    }
+    for (const auto &key : {"potion_addict", "stoic", "boomerang", "tinkerer"}) {
+        const auto &unlock = Stats::unlocks.at(key);
+        assert(Background(unlock.background).name == unlock.name);
+    }
+    assert(Background(Stats::unlocks.at("houndmaster_flail").background).name == "Flail Wielder");
     assert(Stats::getProgressionInterval(99) == std::make_pair(0,100));
     assert(Stats::getProgressionInterval(100) == std::make_pair(0,100));
     assert(Stats::getProgressionInterval(101) == std::make_pair(100,210));

@@ -144,3 +144,32 @@ inventan el tamaño de runStats ni las reglas de sus resets; las pruebas fijan
 explícitamente el vector desde el fixture. Esto limita el alcance a los cuerpos
 recuperados que exige la regla común y no equivale a declarar terminado todo el
 sistema de progresión del juego.
+
+## Revisión después de Background y GUI (2026-10-24)
+
+La solicitud posterior vuelve a incluir Stats tras Background, GuiElement,
+GuiButton, GuiTextBox y GuiWindow. Se ejecutó de nuevo --unit Stats y se
+contrastaron los 16 nombres/17 cuerpos y las tres lambdas con Stats.cpp: no
+queda ninguna función con pseudocódigo de la unidad sin traducir. La traducción
+original ya estaba en el commit 78f5ade; no se duplica ni se altera su lógica.
+
+Se añade una prueba de integración: todos los Unlockable::BACKGROUND del
+registro crean un Background válido con nombre/descripción; se comprueban los
+valores 19–23 contra los nombres recuperados (Flail Wielder, Potion Addict,
+Stoic, Tinkerer y Boomerang), sin alterar RNG. Se conservan los cinco helpers
+sin pseudocódigo independiente y las anomalías documentadas arriba.
+
+Verificación final con todas las unidades presentes:
+`pwsh tools/build_recon_pc.ps1 -Run` compiló, ejecutó y cerró normalmente con
+**exit code: 0**. recon.log registra 47 funciones aún sin traducir del resto del
+programa; ninguna llamada de estas seis unidades durante ese arranque.
+`pwsh tools/run_recon_tests.ps1 -Unit Stats` pasó, incluida la integración
+Background. Logs locales: `_local/gui/Stats_final_build.log` y
+`_local/gui/Stats_final_test.log`. La ventana PC y las pruebas aisladas no
+acreditan gameplay ni ejecución en Vita.
+
+Informes de las unidades previas, con cada función y sus excepciones:
+[Background](RAMA_A_BACKGROUND.md), [GuiElement](RAMA_A_GUIELEMENT.md),
+[GuiButton](RAMA_A_GUIBUTTON.md), [GuiTextBox](RAMA_A_GUITEXTBOX.md) y
+[GuiWindow](RAMA_A_GUIWINDOW.md). Cada unidad pasó su build/ejecución PC y su
+prueba antes de su commit local. No se hizo push.
