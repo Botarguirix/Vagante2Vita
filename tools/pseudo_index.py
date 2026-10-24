@@ -24,6 +24,8 @@ def main():
     ap.add_argument('--index', type=pathlib.Path, default=pathlib.Path('_local/pdb/pseudo_index.json'))
     ap.add_argument('--show'); ap.add_argument('--unit')
     a = ap.parse_args()
+    import sys
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # pseudocode may contain non-ASCII
     if not a.index.exists() or not (a.show or a.unit):
         idx = build(a.src); a.index.write_text(json.dumps(idx, indent=0)); print('indexed', len(idx), 'names')
     idx = json.loads(a.index.read_text())
