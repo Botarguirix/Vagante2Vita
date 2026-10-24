@@ -78,6 +78,11 @@ float Sprite::percentComplete() {
 std::vector<Player::PlayerClass> PlayerCustomizeMenu::getClasses() { return playerClasses; }
 std::vector<int> PlayerCustomizeMenu::getPalettes() { return playerPalettes; }
 
+// --- Editors (Client::draw reads the flags directly; the editors are developer tools and stay null)
+bool LevelEditor::isEditing() { return editing; }
+bool WeaponEditor::isEditing() const { return m_isEditing; }
+bool PaletteEditor::isEditing() const { return m_isEditing; }
+
 // --- GameEngine
 Level *GameEngine::getLevel() { return currLevel; }
 std::vector<std::shared_ptr<Player>> &GameEngine::getPlayers() { return players; }

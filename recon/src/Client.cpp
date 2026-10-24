@@ -344,3 +344,61 @@ void Client::step() {
         RECON_UNIMPLEMENTED("Client::step (in-game section)");
     }
 }
+
+// Client::draw @ 00563020. The original passes the clamped frame time only to drawGui; every
+// other draw call receives 1.0f (xmm2 still holds the clamp constant at those call sites).
+void Client::draw(float frameTime) {
+    const float clamped = std::min(frameTime, 1.0f);
+    avgDrawFrameTime += (clamped - avgDrawFrameTime) * 0.025f;
+    sf::RenderTarget *target = &window;
+    if (doPostProcessing) {
+        target = renderTexture;
+        renderTexture->clear(sf::Color(0, 0, 0, 255));
+    }
+
+    bool drewMenu = false;
+    if ((progressionGuiMenuOpen && mainMenu->isOpen()) || netMenu->isOpen()) {
+        mainMenu->drawBackground(*target, 1.0f);
+        if (netMenu->isOpen()) {
+            netMenu->draw(*target);
+            drewMenu = true;
+        }
+    }
+    if (!drewMenu) {
+        if (mainMenu->isOpen() && !progressionGuiMenuOpen) {
+            mainMenu->draw(*target, 1.0f);
+            drewMenu = true;
+        } else if (levelEditor && levelEditor->isEditing()) {
+            levelEditor->draw(gameView);
+        } else if (weaponEditor && weaponEditor->isEditing()) {
+            weaponEditor->draw();
+        } else if (paletteEditor && paletteEditor->isEditing()) {
+            paletteEditor->draw();
+        } else {
+            drawGame(*target, 1.0f);
+            drawGui(*target, clamped);
+        }
+    }
+    if (drewMenu) gameGui.drawGameVersion(*target, gameEngine.networked, &config);
+
+    if (progressionGuiMenuOpen) {
+        target->setView(guiView);
+        progressionGui.drawMenu(*target);
+    } else if (!(levelEditor && levelEditor->isEditing()) && !(weaponEditor && weaponEditor->isEditing()) &&
+               !(paletteEditor && paletteEditor->isEditing()) && configGui->isOpen()) {
+        configGui->draw(*target, paused);
+    }
+    if (credits->isTriggered()) credits->draw(*target);
+
+    if (doPostProcessing) {
+        renderTexture->display();
+        sf::Shader *shader = ResourceManager::getShaderPointer("postprocessing.frag");
+        if (!shader) {
+            doPostProcessing = false;
+            return;
+        }
+        window.setView(renderTexture->getDefaultView());
+        renderSprite->setPosition(0.0f, 0.0f);
+        window.draw(*renderSprite, sf::RenderStates(shader));
+    }
+}
