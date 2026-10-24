@@ -159,6 +159,7 @@ int main(int argc, char **argv) {
         }
     }
     config.updateWindowSize(window);
+    VLOG(LOG_INFO) << "Window created.";
 
     GamepadInit gamepads{&steamInitialized, &steamControllerInitialized, &tryController, &input};
     if (!loadThreads) initGamepads(gamepads);

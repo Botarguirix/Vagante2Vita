@@ -45,7 +45,12 @@ WindowImplSDL::WindowImplSDL(VideoMode mode, const String& title, unsigned long 
 m_window   (sdl::displayWindow()),
 m_keyRepeat(true)
 {
+    sdl::trace("WindowImplSDL begin");
     sdl::glContext();
+#if defined(SFML_SYSTEM_VITA)
+    // The Vita has one fixed 960x544 screen: window geometry/title calls are not supported there.
+    (void)mode; (void)title; (void)style;
+#else
     SDL_SetWindowSize(m_window, static_cast<int>(mode.width), static_cast<int>(mode.height));
     SDL_SetWindowBordered(m_window, (style & (Style::Titlebar | Style::Close)) ? SDL_TRUE : SDL_FALSE);
     SDL_SetWindowResizable(m_window, (style & Style::Resize) ? SDL_TRUE : SDL_FALSE);
@@ -54,6 +59,8 @@ m_keyRepeat(true)
     SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     setTitle(title);
     SDL_ShowWindow(m_window);
+#endif
+    sdl::trace("WindowImplSDL done");
 #if !defined(SFML_SYSTEM_VITA)
     SDL_StartTextInput(); // on the Vita this would open the on-screen keyboard
 #endif
@@ -79,6 +86,9 @@ Vector2i WindowImplSDL::getPosition() const
 
 void WindowImplSDL::setPosition(const Vector2i& position)
 {
+#if defined(SFML_SYSTEM_VITA)
+    return;
+#endif
     SDL_SetWindowPosition(m_window, position.x, position.y);
 }
 
@@ -91,11 +101,17 @@ Vector2u WindowImplSDL::getSize() const
 
 void WindowImplSDL::setSize(const Vector2u& size)
 {
+#if defined(SFML_SYSTEM_VITA)
+    return;
+#endif
     SDL_SetWindowSize(m_window, static_cast<int>(size.x), static_cast<int>(size.y));
 }
 
 void WindowImplSDL::setTitle(const String& title)
 {
+#if defined(SFML_SYSTEM_VITA)
+    return;
+#endif
     std::string utf8;
     Utf32::toUtf8(title.begin(), title.end(), std::back_inserter(utf8));
     SDL_SetWindowTitle(m_window, utf8.c_str());
@@ -103,6 +119,9 @@ void WindowImplSDL::setTitle(const String& title)
 
 void WindowImplSDL::setIcon(unsigned int width, unsigned int height, const Uint8* pixels)
 {
+#if defined(SFML_SYSTEM_VITA)
+    return;
+#endif
     SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormatFrom(const_cast<Uint8*>(pixels), static_cast<int>(width),
                                                               static_cast<int>(height), 32, static_cast<int>(width * 4),
                                                               SDL_PIXELFORMAT_RGBA32);
@@ -115,6 +134,9 @@ void WindowImplSDL::setIcon(unsigned int width, unsigned int height, const Uint8
 
 void WindowImplSDL::setVisible(bool visible)
 {
+#if defined(SFML_SYSTEM_VITA)
+    return;
+#endif
     if (visible) SDL_ShowWindow(m_window);
     else SDL_HideWindow(m_window);
 }
@@ -126,6 +148,9 @@ void WindowImplSDL::setMouseCursorVisible(bool visible)
 
 void WindowImplSDL::setMouseCursorGrabbed(bool grabbed)
 {
+#if defined(SFML_SYSTEM_VITA)
+    return;
+#endif
     SDL_SetWindowGrab(m_window, grabbed ? SDL_TRUE : SDL_FALSE);
 }
 
@@ -142,6 +167,9 @@ void WindowImplSDL::setKeyRepeatEnabled(bool enabled)
 
 void WindowImplSDL::requestFocus()
 {
+#if defined(SFML_SYSTEM_VITA)
+    return;
+#endif
     SDL_RaiseWindow(m_window);
 }
 

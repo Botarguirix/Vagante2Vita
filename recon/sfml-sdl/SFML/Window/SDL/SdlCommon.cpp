@@ -1,5 +1,6 @@
 #include <SFML/Window/SDL/SdlCommon.hpp>
 #include <SFML/System/Err.hpp>
+#include <cstdio>
 
 namespace sf
 {
@@ -49,14 +50,30 @@ const KeyPair keys[] = {
 };
 } // namespace
 
+// Step trace for hardware debugging (sdl_trace.log next to the game data), flushed per line.
+void trace(const char* step)
+{
+    static std::FILE* file = std::fopen("sdl_trace.log", "w");
+    if (file)
+    {
+        std::fprintf(file, "%u %s\n", SDL_WasInit(0) ? SDL_GetTicks() : 0u, step);
+        std::fflush(file);
+    }
+}
+
 void ensureInitialized()
 {
     if (SDL_WasInit(SDL_INIT_VIDEO))
         return;
     SDL_SetMainReady();
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+    trace("SDL_Init begin");
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0)
+    {
+        trace(SDL_GetError());
         err() << "SDL_Init failed: " << SDL_GetError() << std::endl;
+    }
+    trace("SDL_Init done");
 }
 
 SDL_Window* displayWindow()
@@ -64,8 +81,10 @@ SDL_Window* displayWindow()
     if (!window)
     {
         ensureInitialized();
+        trace("SDL_CreateWindow begin");
         window = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 960, 544,
                                   SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE);
+        trace(window ? "SDL_CreateWindow done" : SDL_GetError());
         if (!window)
             err() << "SDL_CreateWindow failed: " << SDL_GetError() << std::endl;
     }
@@ -76,7 +95,10 @@ SDL_GLContext glContext()
 {
     if (!context)
     {
-        context = SDL_GL_CreateContext(displayWindow());
+        SDL_Window* w = displayWindow();
+        trace("SDL_GL_CreateContext begin");
+        context = SDL_GL_CreateContext(w);
+        trace(context ? "SDL_GL_CreateContext done" : SDL_GetError());
         if (!context)
             err() << "SDL_GL_CreateContext failed: " << SDL_GetError() << std::endl;
     }

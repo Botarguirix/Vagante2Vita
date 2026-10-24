@@ -20,7 +20,7 @@ set -e
 # Title id and version must match recon/CMakeLists.txt.
 sys="$root/vita/sce_sys"
 cd "$build"
-vita-mksfoex -s APP_VER=00.01 -s TITLE_ID=VAGA00001 -d ATTRIBUTE2=12 "Vagante rama A" param.sfo
+vita-mksfoex -s APP_VER=00.03 -s TITLE_ID=VAGA00001 -d ATTRIBUTE2=12 "Vagante rama A" param.sfo
 vita-pack-vpk -s param.sfo -b eboot.bin \
   -a "$sys/icon0.png=sce_sys/icon0.png" \
   -a "$sys/pic0.png=sce_sys/pic0.png" \

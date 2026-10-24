@@ -14,6 +14,9 @@ namespace priv
 {
 namespace sdl
 {
+// Appends a step to sdl_trace.log (hardware debugging).
+void trace(const char* step);
+
 // Initializes SDL video/joystick/game controller once.
 void ensureInitialized();
 
