@@ -17,27 +17,21 @@ bool readArchiveInteger(std::istream &input, std::uint32_t &value, unsigned int 
     return true;
 }
 
+// The archive is read from a forward-only zlib stream (no seeking), so lengths supplied by the
+// file are bounded instead of compared with the remaining size; a short read still fails.
+constexpr std::uint32_t kMaxArchiveName = 4096;
+constexpr std::uint32_t kMaxArchiveData = 64u * 1024u * 1024u;
+
 bool readArchiveName(std::istream &input, std::string &name) {
     std::uint32_t length = 0;
-    if (!readArchiveInteger(input, length)) return false;
-    // Check the remaining bytes before allocating a length supplied by the file.
-    const auto start = input.tellg();
-    input.seekg(0, std::ios::end);
-    const auto end = input.tellg();
-    input.seekg(start);
-    if (start < 0 || end < start || std::uint64_t(end - start) < length) return false;
+    if (!readArchiveInteger(input, length) || length > kMaxArchiveName) return false;
     name.resize(length);
     return length == 0 || bool(input.read(&name[0], length));
 }
 
 bool readArchiveData(std::istream &input, std::unique_ptr<char[]> &data,
                      std::uint32_t &size, bool terminate) {
-    if (!readArchiveInteger(input, size)) return false;
-    const auto start = input.tellg();
-    input.seekg(0, std::ios::end);
-    const auto end = input.tellg();
-    input.seekg(start);
-    if (start < 0 || end < start || std::uint64_t(end - start) < size) return false;
+    if (!readArchiveInteger(input, size) || size > kMaxArchiveData) return false;
     data = std::make_unique<char[]>(std::size_t(size) + (terminate ? 1 : 0));
     if (size != 0 && !input.read(data.get(), size)) return false;
     if (terminate) data[size] = '\0';
@@ -71,6 +65,52 @@ ResourceArchive::~ResourceArchive() {
     delete[] paletteData;
 }
 
+namespace {
+// Read-only streambuf that inflates data.vra on demand. The original inflated the whole archive
+// into a stringstream first; on the Vita (256 MB heap) the ~124 MB buffer plus its growth and the
+// per-resource copies run out of memory, so records are parsed straight from the zlib stream.
+class InflateStreambuf : public std::streambuf {
+public:
+    explicit InflateStreambuf(std::istream &source) : source_(source) {
+        ok_ = inflateInit(&stream_) == Z_OK;
+    }
+    ~InflateStreambuf() override { inflateEnd(&stream_); }
+    int status() const { return status_; }
+
+protected:
+    int_type underflow() override {
+        if (gptr() < egptr()) return traits_type::to_int_type(*gptr());
+        if (!ok_ || finished_) return traits_type::eof();
+        stream_.next_out = reinterpret_cast<Bytef *>(out_.data());
+        stream_.avail_out = static_cast<uInt>(out_.size());
+        while (stream_.avail_out == out_.size() && !finished_) {
+            if (stream_.avail_in == 0) {
+                source_.read(in_.data(), in_.size());
+                stream_.avail_in = static_cast<uInt>(source_.gcount());
+                stream_.next_in = reinterpret_cast<Bytef *>(in_.data());
+                if (stream_.avail_in == 0) { status_ = Z_DATA_ERROR; finished_ = true; break; }
+            }
+            const int result = inflate(&stream_, Z_NO_FLUSH);
+            if (result == Z_STREAM_END) finished_ = true;
+            else if (result != Z_OK && result != Z_BUF_ERROR) { status_ = result; finished_ = true; break; }
+        }
+        const std::size_t produced = out_.size() - stream_.avail_out;
+        if (produced == 0) return traits_type::eof();
+        setg(out_.data(), out_.data(), out_.data() + produced);
+        return traits_type::to_int_type(*gptr());
+    }
+
+private:
+    std::istream &source_;
+    z_stream stream_{};
+    std::array<char, 0x4000> in_{};
+    std::array<char, 0x10000> out_{};
+    bool ok_ = false;
+    bool finished_ = false;
+    int status_ = Z_OK;
+};
+} // namespace
+
 void ResourceArchive::load() {
     // ResourceArchive::load, 00739180. The counted resources are followed by three
     // uncounted text blobs, in room/palette/attack order (not map entries).
@@ -81,14 +121,8 @@ void ResourceArchive::load() {
         return;
     }
 
-    std::stringstream expanded(std::ios::in | std::ios::out | std::ios::binary);
-    const auto result = inflateFile(compressed, expanded);
-    if (result != Z_OK) {
-        loaded = false;
-        VLOG(LOG_ERROR) << "ResourceArchive::load: unable to decompress data.vra (" << result << ")";
-        return;
-    }
-    expanded.seekg(0);
+    InflateStreambuf inflater(compressed);
+    std::istream expanded(&inflater);
     std::uint32_t version = 0;
     std::uint32_t count = 0;
     if (!readArchiveInteger(expanded, version) || !readArchiveInteger(expanded, count, 2)) {
@@ -125,6 +159,12 @@ void ResourceArchive::load() {
             malformed();
             return;
         }
+    }
+
+    if (inflater.status() != Z_OK) {
+        loaded = false;
+        VLOG(LOG_ERROR) << "ResourceArchive::load: unable to decompress data.vra (" << inflater.status() << ")";
+        return;
     }
 
     cleanUpMemoryBlocks(true);
