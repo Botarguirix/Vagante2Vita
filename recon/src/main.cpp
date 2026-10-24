@@ -111,6 +111,11 @@ int main(int argc, char **argv) {
     (void)fullscreenConsole; (void)bottomLeftConsole;  // Win32 console placement only
 
     VLOG(LOG_INFO) << "Vagante Version " << version;
+    VLOG(LOG_INFO) << "Reconstruction build " << __DATE__ << " " << __TIME__
+#if defined(RECON_LAZY_IMAGES)
+                   << " (lazy images)"
+#endif
+                   ;
     VLOG(LOG_INFO) << getOperatingSystemName();
 
     bool steamInitialized = false;  // SteamAPI_Init() unless --ignore-steam; Steam is not ported

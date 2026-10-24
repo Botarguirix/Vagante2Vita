@@ -1,5 +1,8 @@
 #include "recon_all.h"
 #include "recon_lazy.h"
+#if defined(__vita__)
+#include <malloc.h>
+#endif
 
 #include <algorithm>
 #include <memory>
@@ -44,6 +47,9 @@ void ResourceManager::initialize(bool loadArchive, bool createOnly, bool useThre
 }
 
 void ResourceManager::finishInitialization(bool incremental) {
+#if defined(__vita__)
+    VLOG(LOG_INFO) << "Vita heap in use before finishInitialization: " << (mallinfo().uordblks / (1024 * 1024)) << " MB";
+#endif
     for (auto &thread : taskThreads) thread.join();
     taskThreads.clear();
     for (auto &entry : processImageJobs) {

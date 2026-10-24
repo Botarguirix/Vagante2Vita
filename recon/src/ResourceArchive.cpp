@@ -4,6 +4,9 @@
 #include <cstdint>
 #include <memory>
 #include <zlib.h>
+#if defined(__vita__)
+#include <malloc.h>
+#endif
 
 #define VLOG(level) if ((level) > Log::reportingLevel()) ; else Log().get(level)
 
@@ -177,6 +180,9 @@ void ResourceArchive::load() {
     attackData = attacks.release();
     loaded = true;
     VLOG(LOG_DEBUG) << "ResourceArchive::load: Successfully loaded data.vra resource indices into memory.";
+#if defined(__vita__)
+    VLOG(LOG_INFO) << "Vita heap in use after data.vra: " << (mallinfo().uordblks / (1024 * 1024)) << " MB";
+#endif
 }
 
 ResourceBlock *ResourceArchive::getMemoryBlock(std::string name) {
