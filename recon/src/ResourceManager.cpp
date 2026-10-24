@@ -1,4 +1,5 @@
 #include "recon_all.h"
+#include "recon_lazy.h"
 
 #include <algorithm>
 #include <memory>
@@ -91,6 +92,8 @@ const sf::Texture *ResourceManager::getNewLoadingTexture() {
     if (!textureLock) return nullptr;
     const auto texture = textures.find("gui/loading.png");
     if (texture != textures.end()) return texture->second;
+    recon::lazy::prepare("gui/loading.png", images, mutexes[M_IMAGES],
+                         [](bool s, bool m, bool o) { loadImage("gui/loading.png", s, m, o); });
     std::unique_lock<std::mutex> imageLock(mutexes[M_IMAGES], std::try_to_lock);
     if (!imageLock) return nullptr;
     const auto image = images.find("gui/loading.png");
@@ -143,10 +146,18 @@ const sf::Texture *ResourceManager::getTexture(std::string name, bool texturesAl
     if (lockRequired && !texturesAlreadyLocked && !textureLock.try_lock()) return nullptr;
     const auto found = textures.find(name);
     if (found != textures.end()) return found->second;
+    recon::lazy::prepare(name, images, mutexes[M_IMAGES], [&](bool s, bool m, bool o) { loadImage(name, s, m, o); });
     std::unique_lock<std::mutex> imageLock(mutexes[M_IMAGES], std::defer_lock);
     if (lockRequired && !imageLock.try_lock()) return nullptr;
     const auto image = images.find(name);
-    if (image != images.end()) return uploadTexture(name.c_str(), image, &images, &textures);
+    if (image != images.end()) {
+        sf::Texture *texture = uploadTexture(name.c_str(), image, &images, &textures);
+        if (recon::lazy::enabled()) {
+            if (!imageLock.owns_lock()) imageLock.lock();
+            recon::lazy::release(name, images);  // the GPU copy is all the game draws from
+        }
+        return texture;
+    }
     if (lockRequired) return nullptr;
     VLOG(LOG_ERROR) << "ResourceManager::getTexture: Unable to get texture: \"" << name << "\"";
     return errorTexture;

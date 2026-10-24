@@ -1,4 +1,5 @@
 #include "recon_all.h"
+#include "recon_lazy.h"
 #include <algorithm>
 #include <memory>
 #define VLOG(level) if ((level) > Log::reportingLevel()) ; else Log().get(level)
@@ -40,6 +41,7 @@ bool ResourceManager::processPaletteSwap(const std::string &name,
                                          const PaletteDatabase::Palette &palette) {
     const std::string key = name + group.name + palette.name;
     if (cache && archive && archive->isLoaded()) cache->getMemoryBlock(key);
+    recon::lazy::prepare(name, images, mutexes[M_IMAGES], [&](bool s, bool m, bool o) { loadImage(name, s, m, o); });
     std::unique_ptr<ImageResource> image;
     {
         std::lock_guard<std::mutex> lock(mutexes[M_IMAGES]);
@@ -71,10 +73,15 @@ const sf::Texture *ResourceManager::getTextureMask(std::string name) {
     if (loading && !textureLock.try_lock()) return nullptr;
     const auto texture = textureMasks.find(name);
     if (texture != textureMasks.end()) return texture->second;
+    recon::lazy::prepare(name, imagesMasks, mutexes[M_IMAGES_MASKS], [&](bool s, bool m, bool o) { loadImage(name, s, m, o); });
     std::unique_lock<std::mutex> imageLock(mutexes[M_IMAGES_MASKS], std::defer_lock);
     if (loading && !imageLock.try_lock()) return nullptr;
     const auto image = imagesMasks.find(name);
-    if (image != imagesMasks.end()) return uploadTexture(name.c_str(), image, &imagesMasks, &textureMasks);
+    if (image != imagesMasks.end()) {
+        sf::Texture *texture = uploadTexture(name.c_str(), image, &imagesMasks, &textureMasks);
+        if (recon::lazy::enabled()) { if (!imageLock.owns_lock()) imageLock.lock(); recon::lazy::release(name, imagesMasks); }
+        return texture;
+    }
     if (loading) return nullptr;
     VLOG(LOG_ERROR) << "ResourceManager::getTextureMask: Unable to get texture: \"" << name << '"';
     return errorTexture;
@@ -85,11 +92,50 @@ const sf::Texture *ResourceManager::getTextureOutlineMask(std::string name) {
     if (loading && !textureLock.try_lock()) return nullptr;
     const auto texture = textureOutlineMasks.find(name);
     if (texture != textureOutlineMasks.end()) return texture->second;
+    recon::lazy::prepare(name, imagesMasksOutline, mutexes[M_IMAGES_OUTLINES], [&](bool s, bool m, bool o) { loadImage(name, s, m, o); });
     std::unique_lock<std::mutex> imageLock(mutexes[M_IMAGES_OUTLINES], std::defer_lock);
     if (loading && !imageLock.try_lock()) return nullptr;
     const auto image = imagesMasksOutline.find(name);
-    if (image != imagesMasksOutline.end()) return uploadTexture(name.c_str(), image, &imagesMasksOutline, &textureOutlineMasks);
+    if (image != imagesMasksOutline.end()) {
+        sf::Texture *texture = uploadTexture(name.c_str(), image, &imagesMasksOutline, &textureOutlineMasks);
+        if (recon::lazy::enabled()) { if (!imageLock.owns_lock()) imageLock.lock(); recon::lazy::release(name, imagesMasksOutline); }
+        return texture;
+    }
     if (loading) return nullptr;
     VLOG(LOG_ERROR) << "ResourceManager::getTextureOutlineMask: Unable to get texture: \"" << name << '"';
     return errorTexture;
 }
+
+// ResourceManager::getTextureAltPalette @ 0074d370: the texture of one palette variant
+// (key texture + group + palette, as built by processPaletteSwap), uploaded on first request.
+// With RECON_LAZY_IMAGES the variant itself is generated here, on first use.
+const sf::Texture *ResourceManager::getTextureAltPalette(const std::string &texture, const std::string &group,
+                                                         const std::string &palette) {
+    const PaletteDatabase::PaletteGroup paletteGroup = globalPaletteDb.getPaletteGroup(group);
+    const auto variant = paletteGroup.palettes.find(palette);
+    if (variant == paletteGroup.palettes.end()) return getTexture(texture, false);
+    const std::string key = texture + paletteGroup.name + variant->second.name;
+    {
+        std::lock_guard<std::mutex> lock(mutexes[M_TEXTURES_PALETTES]);
+        const auto found = texturePaletteSwaps.find(key);
+        if (found != texturePaletteSwaps.end()) return found->second;
+    }
+    bool generated;
+    {
+        std::lock_guard<std::mutex> lock(mutexes[M_IMAGES_PALETTES]);
+        generated = imagesPaletteSwaps.count(key) != 0;
+    }
+    if (!generated && recon::lazy::enabled() && !processPaletteSwap(texture, paletteGroup, variant->second))
+        return getTexture(texture, false);
+    std::lock_guard<std::mutex> textureLock(mutexes[M_TEXTURES_PALETTES]);
+    std::lock_guard<std::mutex> imageLock(mutexes[M_IMAGES_PALETTES]);
+    const auto image = imagesPaletteSwaps.find(key);
+    if (image == imagesPaletteSwaps.end()) return getTexture(texture, false);
+    sf::Texture *uploaded = uploadTexture(key.c_str(), image, &imagesPaletteSwaps, &texturePaletteSwaps);
+    if (recon::lazy::enabled()) {
+        delete image->second;  // the GPU copy is all the game draws from
+        imagesPaletteSwaps.erase(image);
+    }
+    return uploaded;
+}
+

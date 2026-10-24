@@ -4,6 +4,7 @@
 #include "ResourceArchive.h"
 #include "ResourceBlock.h"
 #include "ResourceMutexes.h"
+#include "recon_lazy.h"
 #include "Config.h"
 #include "ESoundBuffer.h"
 #include "EMusic.h"
@@ -148,6 +149,14 @@ bool ResourceManager::loadImage(std::string path, bool smooth,
         archive->addResourceLocationDescriptor(path, ResourceArchive::RESOURCETYPE_TEXTURE);
     }
     if (createArchiveOnly) return true;
+    if (recon::lazy::deferLoad(path, smooth, makeMask, makeOutline)) {
+        // Port (RECON_LAZY_IMAGES): decoded on first use; pin the compressed PNG until then.
+        if (archive && archive->isLoaded() && config && config->loadFromArchive) {
+            std::lock_guard<std::mutex> lock(mutexes[M_ARCHIVE]);
+            if (!archive->getManagedMemoryBlock(gfxPath + path)) return false;
+        }
+        return true;
+    }
 
     auto resource = std::make_unique<ImageResource>();
     if (archive && archive->isLoaded() && config && config->loadFromArchive) {
@@ -287,7 +296,15 @@ void ResourceManager::runTasks(bool preferGraphics) {
             }
             break;
         case TASK_PROCESS_PALETTE_GROUP:
-            if (!createArchiveOnly) {
+            if (!createArchiveOnly && recon::lazy::enabled()) {
+                // Port: record every variant; getTextureAltPalette generates it on first use.
+                const auto group = globalPaletteDb.getPaletteGroup(task->path);
+                std::lock_guard<std::mutex> lock(recon::lazy::registryLock());
+                for (const auto &textureName : group.textureNames)
+                    for (const auto &palette : group.palettes)
+                        recon::lazy::paletteRequests()[textureName + group.name + palette.second.name] =
+                            recon::lazy::PaletteRequest{textureName, group.name, palette.first};
+            } else if (!createArchiveOnly) {
                 const auto group = globalPaletteDb.getPaletteGroup(task->path);
                 for (const auto &textureName : group.textureNames) {
                     for (const auto &palette : group.palettes) {
@@ -302,6 +319,13 @@ void ResourceManager::runTasks(bool preferGraphics) {
             }
             break;
         case TASK_IMAGE_REPEAT:
+            if (!createArchiveOnly && recon::lazy::enabled()) {
+                recon::lazy::Entry entry;
+                if (recon::lazy::find(task->path, entry)) {
+                    recon::lazy::setRepeat(task->path);  // applied when the image is decoded
+                    break;
+                }
+            }
             if (!createArchiveOnly) {
                 std::lock_guard<std::mutex> imagesLock(mutexes[M_IMAGES]);
                 const auto found = images.find(task->path);
@@ -353,6 +377,9 @@ void ResourceManager::runTasks(bool preferGraphics) {
         case TASK_PROCESS_VFONT:
         case TASK_PROCESS_VFONT_MINUS:
             if (!createArchiveOnly) {
+                recon::lazy::prepare(task->path, images, mutexes[M_IMAGES], [&](bool s, bool m, bool o) {
+                    loadImage(task->path, s, m, o);
+                });
                 ImageResource *image;
                 {
                     std::lock_guard<std::mutex> lock(mutexes[M_IMAGES]);

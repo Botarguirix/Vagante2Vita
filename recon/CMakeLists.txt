@@ -41,6 +41,12 @@ target_link_libraries(recon_port PRIVATE ${RECON_SFML})
 target_link_libraries(vagante PRIVATE recon_port ${RECON_SFML} ZLIB::ZLIB)
 target_compile_definitions(vagante PRIVATE SFML_STATIC)
 
+# On-demand image loading (recon/port/recon_lazy.h). Required on the Vita; optional on PC to test it.
+option(RECON_LAZY_IMAGES "Decode images and palette variants on first use instead of at startup" OFF)
+if(RECON_LAZY_IMAGES OR VITA)
+  target_compile_definitions(vagante PRIVATE RECON_LAZY_IMAGES)
+endif()
+
 if(VITA)
   # PS Vita package. Game data is not inside the VPK: data.vra goes to ux0:data/Vagante/.
   include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
