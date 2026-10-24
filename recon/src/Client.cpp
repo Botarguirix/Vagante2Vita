@@ -58,7 +58,7 @@ Client::Client(sf::RenderWindow &window, Input &input, Config &config, UGCBrowse
 
     credits = new Credits(window, *configGui, gameEngine);
     debugNetId = -1;
-    chatTextBox.hidden = true;  // GuiTextBox +0x2C
+    chatTextBox.setHidden(true);  // inline setter (GuiElement::hidden +0x2C)
 
     VLOG(LOG_DEBUG) << "Client::argc:" << argc;
     for (int i = 0; i < argc; ++i) VLOG(LOG_DEBUG) << "\t" << argv[i];
@@ -69,7 +69,7 @@ Client::Client(sf::RenderWindow &window, Input &input, Config &config, UGCBrowse
     fairyTransitionBackdropSprite.setOrigin(0.0f, 0.0f);
     fairyTransitionForegroundSprite.setOrigin(0.0f, 0.0f);
     emptyTransitionSprite.setOrigin(0.0f, 0.0f);
-    levelTextSlideInTween.endWaitTime = 60.0f;
+    levelTextSlideInTween.setEndWaitTime(60.0f);  // inline setter (+0x14)
 
     gameView.setSize(640.0f, 360.0f);
     window.setView(gameView);
