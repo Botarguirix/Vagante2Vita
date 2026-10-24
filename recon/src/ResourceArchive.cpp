@@ -75,7 +75,10 @@ namespace {
 class InflateStreambuf : public std::streambuf {
 public:
     explicit InflateStreambuf(std::istream &source) : source_(source) {
-        ok_ = inflateInit(&stream_) == Z_OK;
+        // Port: tools/make_uncompressed_vra.py writes the same records without zlib (no 0x78
+        // header) so the Vita skips ~20 s of inflate; such files are passed through unchanged.
+        raw_ = source_.peek() != 0x78;
+        ok_ = raw_ || inflateInit(&stream_) == Z_OK;
     }
     ~InflateStreambuf() override { inflateEnd(&stream_); }
     int status() const { return status_; }
@@ -84,6 +87,13 @@ protected:
     int_type underflow() override {
         if (gptr() < egptr()) return traits_type::to_int_type(*gptr());
         if (!ok_ || finished_) return traits_type::eof();
+        if (raw_) {
+            source_.read(out_.data(), out_.size());
+            const std::streamsize got = source_.gcount();
+            if (got <= 0) { finished_ = true; return traits_type::eof(); }
+            setg(out_.data(), out_.data(), out_.data() + got);
+            return traits_type::to_int_type(*gptr());
+        }
         stream_.next_out = reinterpret_cast<Bytef *>(out_.data());
         stream_.avail_out = static_cast<uInt>(out_.size());
         while (stream_.avail_out == out_.size() && !finished_) {
@@ -109,6 +119,7 @@ private:
     std::array<char, 0x4000> in_{};
     std::array<char, 0x10000> out_{};
     bool ok_ = false;
+    bool raw_ = false;
     bool finished_ = false;
     int status_ = Z_OK;
 };

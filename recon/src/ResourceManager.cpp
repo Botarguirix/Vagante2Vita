@@ -183,6 +183,14 @@ sf::Shader *ResourceManager::getShaderPointer(std::string name) {
 }
 
 bool ResourceManager::loadShader(std::string name, sf::Shader::Type type) {
+#if defined(__vita__)
+    // Port: SFML loads shaders through the ARB entry points and this one uses fixed-function
+    // varyings (gl_TexCoord, gl_Color); vitaGL supports neither. postprocessing.frag only applies
+    // gamma, which is the identity at the default 1.0, so the Vita draws without it for now.
+    VLOG(LOG_INFO) << "ResourceManager::loadShader: skipped on PS Vita: " << name;
+    (void)type;
+    return false;
+#endif
     if (archive && !archive->isLoaded()) {
         std::lock_guard<std::mutex> lock(mutexes[M_ARCHIVE]);
         archive->addResourceLocationDescriptor(name, ResourceArchive::RESOURCETYPE_SHADER);
