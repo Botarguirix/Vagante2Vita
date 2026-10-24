@@ -196,7 +196,9 @@ def translated_names(src_dir):
     names = set()
     for p in pathlib.Path(src_dir).glob('*.cpp'):
         source = p.read_text(encoding='utf-8', errors='replace')
-        for m in re.finditer(r'^[^\s/#].*?\b((?:[A-Za-z_]\w*::)+~?[A-Za-z_]\w*|(?:[A-Za-z_]\w*::)*operator\W+)\s*[(={;]',
+        # Match operators first: otherwise operator= is misread as the method
+        # named "operator" followed by an initializer, leaving duplicate stubs.
+        for m in re.finditer(r'^[^\s/#].*?\b((?:[A-Za-z_]\w*::)*operator\W+|(?:[A-Za-z_]\w*::)+~?[A-Za-z_]\w*)\s*[(={;]',
                              source, re.M):
             names.add(m.group(1))
         # Constructors and destructors have no return type, so they cannot match
