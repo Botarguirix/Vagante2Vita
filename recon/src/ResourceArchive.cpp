@@ -181,15 +181,33 @@ void ResourceArchive::load() {
 
 ResourceBlock *ResourceArchive::getMemoryBlock(std::string name) {
     const auto found = memoryBlocks.find(name);
-    if (found != memoryBlocks.end()) return found->second;
+    if (found != memoryBlocks.end()) {
+#if defined(__vita__)
+        // Vita memory budget (port change): unmanaged blocks are only read once while loading
+        // (images, sounds, shaders), and the original frees them all at the end of loading with
+        // cleanUpMemoryBlocks(false). Here each one is handed over and freed on the next request,
+        // so compressed data does not pile up next to the decoded images.
+        if (!found->second->isManaged()) {
+            static std::unique_ptr<ResourceBlock> handedOver;
+            handedOver.reset(found->second);
+            memoryBlocks.erase(found);
+            return handedOver.get();
+        }
+#endif
+        return found->second;
+    }
     VLOG(LOG_ERROR) << "ResourceArchive::getMemoryBlockUnable to find " << name << " in vagante archive!";
     return nullptr;
 }
 
 ResourceBlock *ResourceArchive::getManagedMemoryBlock(std::string name) {
-    auto *block = getMemoryBlock(std::move(name));
-    if (block) block->setManaged(true);
-    return block;
+    const auto found = memoryBlocks.find(name);
+    if (found == memoryBlocks.end()) {
+        VLOG(LOG_ERROR) << "ResourceArchive::getMemoryBlockUnable to find " << name << " in vagante archive!";
+        return nullptr;
+    }
+    found->second->setManaged(true);
+    return found->second;
 }
 
 bool ResourceArchive::isLoaded() const { return loaded; }

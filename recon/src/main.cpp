@@ -15,6 +15,7 @@
 #define VLOG(level) if ((level) > Log::reportingLevel()) ; else Log().get(level)
 
 #if defined(__vita__)
+#include <malloc.h>
 #include <unistd.h>
 // Vita process limits: a large newlib heap (textures are decoded on the CPU first) and a
 // main thread stack comparable to the 1 MB + 100 KB guarantee the Windows build asks for.
@@ -225,6 +226,9 @@ int main(int argc, char **argv) {
     Skill::initSkillStringIdentifiers();
     Stats::init();
     VLOG(LOG_INFO) << "Loading finished.";
+#if defined(__vita__)
+    VLOG(LOG_INFO) << "Vita heap in use: " << (mallinfo().uordblks / (1024 * 1024)) << " MB of " << (_newlib_heap_size_user / (1024 * 1024)) << " MB";
+#endif
 
     if (window.isOpen()) {
         Client client(window, input, config, ugcBrowser, argc, argv);
