@@ -47,6 +47,7 @@ m_keyRepeat(true)
 {
     sdl::trace("WindowImplSDL begin");
     sdl::glContext();
+    sdl::trace("WindowImplSDL context ok");
 #if defined(SFML_SYSTEM_VITA)
     // The Vita has one fixed 960x544 screen: window geometry/title calls are not supported there.
     (void)mode; (void)title; (void)style;

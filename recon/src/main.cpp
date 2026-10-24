@@ -86,6 +86,9 @@ int main(int argc, char **argv) {
     Log::init(LOG_DEBUG4);  // the original ignores the argument and sets reportingLevel to 10
 
     bool fullscreenConsole = false, bottomLeftConsole = false, loadThreads = true;
+#if defined(__vita__)
+    loadThreads = false;  // as --load-threads-off: std::thread stacks are small on the Vita
+#endif
     bool ignoreLoadScreen = false, ignoreSteam = false;
     const std::string version = GAME_VERSION + PATCH_VERSION;
     for (int i = 1; i < argc; ++i) {
