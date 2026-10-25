@@ -37,3 +37,38 @@ Verificación ejecutada:
   bytes aleatorios y límites, DirectInput/XInput y VERSION.
 
 Esto verifica el puente de APIs y el enlace del host; no acredita gameplay ni Vita.
+
+## Tarea 2: OpenAL Soft
+
+`recomp/host/openal.c`: implementa los 28 imports OpenAL32 del inventario. Nueva
+tabla `win32_openal`, declarada en win32.h y registrada en lookup de support.c.
+Todos usan cdecl. Los floats se leen como float32 de la pila; arrays, datos PCM,
+atributos de contexto y parámetros de salida se convierten con G, preservando
+NULL. Los identificadores ALuint de buffers/sources pasan sin transformación.
+
+Los ALCdevice/ALCcontext se guardan en una tabla con tipo, protegida por mutex,
+y se exponen como tokens 0x50001 en adelante. No se reutilizan tokens: rechaza
+handles caducados, ajenos o de otro tipo. Hay 4095 tokens por ejecución; si se
+agotan, se destruye el objeto host recién creado y se devuelve NULL. Hacer
+current el contexto NULL libera el contexto actual. La vida útil concurrente
+de dispositivos/contextos sigue siendo responsabilidad del llamador OpenAL.
+
+Enlace PC estático: build_host.py define AL_LIBTYPE_STATIC y agrega stdc++ y
+avrt (OpenAL Soft usa C++ y el backend WASAPI requiere AvSetMmThreadCharacteristicsW).
+SDL2/OpenGL y las otras bibliotecas existentes se conservan. También se rechaza
+con mensaje claro una compilación sin unit_*.c: se observó lift_all.py regenerando
+las unidades durante un intento, que dejó momentáneamente sólo table.c. No se
+modificó ni interrumpió ese proceso. El primer intento de enlace OpenAL falló
+por esa regeneración y por la configuración del enlace estático, ya corregida.
+
+Prueba reproducible: `python -I tests/host/run_tests.py openal`.
+Resultado observado: los 28 imports están registrados; backend null de OpenAL
+Soft, carga/consulta de PCM, fuentes, parámetros float, cola/desencolado y borrado
+funcionan; se verifica pila cdecl y rechazo de tokens inválidos/caducados.
+El backend null verifica el flujo de audio, no una salida audible.
+
+Compilación completa de esta tarea: `python -I recomp/build_host.py` terminó con
+`built .../host/vagante_host.exe` (salida en artifacts/host-openal-build.log).
+Se agregó el propio script a las dependencias de los objetos host: cambiar sus
+flags debe recompilarlos, evitando reutilizar un openal.o construido para DLL al
+enlazar la biblioteca estática. No fuerza a regenerar el código del lifter.
