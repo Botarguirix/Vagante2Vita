@@ -143,3 +143,11 @@ void Credits::resized(sf::RenderWindow &target) {
     fitView(view, target.getSize(), menuScale(target.getSize(), configGui.getConfig().forcePerfectPixelScaling));
     target.setView(view);
 }
+
+// Room dimensions/tiles expanded in RoomDatabase::roomsFitVertically @0075eb90
+// and randomizeRooms @0075ed40: tiles+0xD0, tileW/H+0xDC/E0, room span+0xE4/E8.
+int Room::getWidth() { return tileW; }
+int Room::getHeight() { return tileH; }
+Tile **Room::getTiles() { return tiles; }
+int Room::getWidthInRooms() { return widthInRooms; }
+int Room::getHeightInRooms() { return heightInRooms; }
