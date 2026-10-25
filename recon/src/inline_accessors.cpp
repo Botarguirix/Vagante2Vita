@@ -2,6 +2,7 @@
 // function of their own in vagante.exe and do not appear in any unit's function list.
 // Their bodies are inferred from the expanded code at the call sites (noted per function).
 #include "recon_all.h"
+#define VLOG(level) if ((level) > Log::reportingLevel()) ; else Log().get(level)
 
 // --- MainMenu (Client::step @ 0055e500: on ConfigGui::doRunCredits it stores fadingOutTarget = 3
 //     and fadingOut = true)
@@ -151,3 +152,31 @@ int Room::getHeight() { return tileH; }
 Tile **Room::getTiles() { return tiles; }
 int Room::getWidthInRooms() { return widthInRooms; }
 int Room::getHeightInRooms() { return heightInRooms; }
+
+// PlayerCustomizeMenu::step/menu @00707f84/007091f9 read Entity::level (+0x1A0).
+Level *Entity::getLevel() { return level; }
+// PlayerCustomizeMenu::removePlayer @00708e00ff copies currWeapon at Player+0x76B8.
+std::shared_ptr<Weapon> Player::getCurrWeapon() { return currWeapon; }
+// PlayerCustomizeMenu::removePlayer @00708d00ff expands Level::removeEntity,
+// obtaining the entities vector through Level+0xFD0 before erase/setLevel(nullptr).
+std::vector<std::shared_ptr<Entity>> *Level::getEntities() { return entities; }
+
+// Inline controls used by Client/PlayerMenu; field stores also recovered in
+// PlayerCustomizeMenu::PlayerCustomizeMenu @00707b80 and menu @00709100.
+void PlayerCustomizeMenu::setPlayersRef(std::vector<std::shared_ptr<Player>> *value) { players=value; }
+void PlayerCustomizeMenu::setPlayerMenusRef(std::vector<std::shared_ptr<PlayerMenu>> *value) { guis=value; }
+void PlayerCustomizeMenu::setCaravan(std::shared_ptr<Caravan> value) { caravan=std::move(value); }
+std::shared_ptr<Caravan> PlayerCustomizeMenu::getCaravan() { return caravan; }
+void PlayerCustomizeMenu::setHidden(bool value) { hidden=value; }
+bool PlayerCustomizeMenu::isOpen() { return open; }
+void PlayerCustomizeMenu::setNetworked(bool value) { networked=value; }
+
+// Required by PlayerCustomizeMenu::menu @007091a2. Getter body @0071e430:
+// availableClasses +0x3398 indexed by unsigned playerClass +0x33C8 modulo size.
+Player::PlayerClass PlayerMenu::getPlayerClass() {
+    if(availableClasses.empty()) {
+        VLOG(LOG_ERROR)<<"PlayerMenu::getPlayerClass: there are no available classes!";
+        return Player::CLASS_KNIGHT;
+    }
+    return availableClasses[static_cast<unsigned>(playerClass)%availableClasses.size()];
+}
