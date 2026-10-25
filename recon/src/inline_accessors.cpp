@@ -112,3 +112,34 @@ bool PaletteEditor::isEditing() const { return m_isEditing; }
 Level *GameEngine::getLevel() { return currLevel; }
 std::vector<std::shared_ptr<Player>> &GameEngine::getPlayers() { return players; }
 std::vector<std::shared_ptr<PlayerMenu>> &GameEngine::getPlayerMenus() { return playerMenus; }
+
+// --- resized() of the menus: expanded inside Client::resized @ 00567750. Each fits the 640x360
+//     design area into the window (ConfigGui ignores pixel-perfect scaling and centers on 256,180).
+namespace {
+float menuScale(const sf::Vector2u &size, bool perfectPixels) {
+    float scale = std::min(static_cast<float>(size.x) / 640.0f, static_cast<float>(size.y) / 360.0f);
+    if (perfectPixels) scale = static_cast<float>(static_cast<int>(scale));
+    return scale;
+}
+void fitView(sf::View &view, const sf::Vector2u &size, float scale) {
+    const float inverse = 1.0f / scale;
+    view.setSize(static_cast<float>(static_cast<int>(static_cast<float>(size.x) * inverse)),
+                 static_cast<float>(static_cast<int>(static_cast<float>(size.y) * inverse)));
+}
+}
+
+void ConfigGui::resized() {
+    fitView(view, window.getSize(), menuScale(window.getSize(), false));
+    view.setCenter(256.0f, 180.0f);
+    window.setView(view);
+}
+
+void MainMenu::resized() {
+    fitView(view, window.getSize(), menuScale(window.getSize(), configGui.getConfig().forcePerfectPixelScaling));
+    window.setView(view);
+}
+
+void Credits::resized(sf::RenderWindow &target) {
+    fitView(view, target.getSize(), menuScale(target.getSize(), configGui.getConfig().forcePerfectPixelScaling));
+    target.setView(view);
+}
