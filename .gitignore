@@ -24,3 +24,4 @@ __pycache__/
 /recon/include/
 /recon/layout_check.cpp
 /recon/stubs/
+/local/
