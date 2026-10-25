@@ -130,4 +130,49 @@ La ventana guest de 256 MiB deja 184 MiB para su heap, 48 MiB para VirtualAlloc
 y 24 MiB para imagen, pilas, TLS y huecos. El presupuesto y la precisión x87
 sobre ARM aún requieren observación; no se cambiaron las reglas del runtime.
 
-Mediciones finales: se incorporarán aquí al terminar el enlace y empaquetado.
+Resultado final observado (build ARM, sin prueba de gameplay):
+
+| Medida | Bytes | MiB |
+|---|---:|---:|
+| .text ARM | 23,095,184 | 22.03 |
+| .rodata | 1,058,452 | 1.01 |
+| .data | 15,902 | 0.02 |
+| .bss | 2,521,404 | 2.40 |
+| eboot.bin comprimido | 15,967,739 | 15.23 |
+| VPK | 15,888,198 | 15.15 |
+
+Se compilaron 168 unidades generadas y 183 objetos totales. La primera
+compilación completa duró unos 1154 s; repetir el build final recompiló sólo
+2 objetos, ninguna unidad generada, y terminó en 29.9 s. El enlace final
+incluye pthread con whole-archive, como rama A.
+
+SHA-256 del VPK:
+`1b24da9521dde82ce7d067678a308dd47fdfaa6ecca1910a8c20bc84ea5bd628`.
+
+SHA-256 de eboot.bin:
+`88de9aed6c12ae52a747dec7bec574554e753254d0410b1099ca08f861bb3cfe`.
+
+SHA-256 de la instantánea C:
+`697d299b40fb100272e05a36b3c437d15d7981a19679617ca12676f2994fadfd`.
+
+check_vpk.py de vita-port verificó 7 entradas, TITLE_ID VAGA00002, APP_VER 00.01,
+CATEGORY gd, ATTRIBUTE2=12, SELF y LiveArea: cero errores y cero advertencias.
+Se verificaron CRC y lista cerrada del ZIP. Todas las pruebas host de APIs,
+XInput, compatibilidad GL y las seis pruebas Python terminaron bien.
+Evidencia local en artifacts/: vita-build-final.log, vita-vpk-check.log,
+host-final-tests.log, vita-gl-final-tests.log y vita-build-tests.log; las medidas
+estructuradas están junto al VPK en build-metrics.json.
+
+La suma de .text/.rodata/.data/.bss es 25.45 MiB. Con guest + heap +
+pila, la base calculada es 321.45 MiB, antes de alineación, otras
+secciones y asignaciones dinámicas de SDL/OpenAL/vitaGL. El tamaño del código no
+bloquea por sí solo la rama C, pero no demuestra que el juego quepa al cargar
+recursos ni que rinda bien. La ventana PC actual es mayor que la ventana de
+256 MiB de este VPK. Falta probar arranque, memoria, entrada, audio y render en
+Vita física; no se lanzó Vita3K ni se presenta como gameplay validado.
+
+Coordinación: el commit concurrente 908d389 incorporó los archivos de esta tarea
+que estaban preparados en el índice junto a los cambios PC del otro trabajo.
+Se conservó ese commit sin modificar su historial. Este cierre documenta las
+medidas y pruebas finales en un commit local separado. No se editaron los
+archivos reservados del lifter/runtime/window/kernel32/threads/main.
