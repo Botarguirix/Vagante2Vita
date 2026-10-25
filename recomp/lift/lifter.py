@@ -289,7 +289,8 @@ class Lifter:
             return self.write(ins, ops[0], f"(uint8_t){CONDITIONS[base[3:]]}(c)")
         if base.startswith("cmov") and base[4:] in CONDITIONS:
             return f"if ({CONDITIONS[base[4:]]}(c)) {{ {self.write(ins, ops[0], self.read(ins, ops[1]))} }}"
-        if base in ("movsb", "movsw", "movsd", "stosb", "stosw", "stosd") and prefix in ("", "rep") and not ops:
+        if base in ("movsb", "movsw", "movsd", "stosb", "stosw", "stosd") and prefix in ("", "rep") and not any(
+                op.type == X.X86_OP_REG and ins.reg_name(op.reg).startswith("xmm") for op in ops):
             size = {"b": 1, "w": 2, "d": 4}[base[-1]]
             kind = "movs" if base.startswith("movs") else "stos"
             return f"op_rep_{kind}(c, {size}, {int(prefix == 'rep')}, 0x{ins.address:08x}u);"
@@ -307,6 +308,34 @@ class Lifter:
             return f"if (c->ecx.d == 0) {self.branch(fn, ops[0].imm & 0xFFFFFFFF)}"
         if base == "call":
             return self.lift_call(ins, nxt)
+        if base in ("lfence", "mfence", "sfence"):
+            return "__atomic_thread_fence(__ATOMIC_SEQ_CST);"
+        if base == "pause" or base.startswith("prefetch"):
+            return ";"
+        if base in ("bsf", "bsr") and ops[0].size == 4:  # source 0: ZF=1, destination unchanged
+            fn = "__builtin_ctz(s)" if base == "bsf" else "31 - __builtin_clz(s)"
+            return (f"{{ uint32_t s = {self.read(ins, ops[1])}; c->zf = s == 0; "
+                    f"if (s) {{ {self.write(ins, ops[0], f'(uint32_t)({fn})')} }} }}")
+        if base == "bswap":
+            r = self.reg(ins, ops[0].reg)
+            return f"{r} = __builtin_bswap32({r});"
+        if base == "cmpxchg":  # accumulator == dst ? (ZF=1, dst = src) : (ZF=0, acc = dst); flags of cmp
+            n, t = BITS[ops[0].size], CTYPE[ops[0].size]
+            acc = {1: "c->eax.b.l", 2: "c->eax.w", 4: "c->eax.d"}[ops[0].size]
+            src = self.reg(ins, ops[1].reg)
+            if ops[0].type == X.X86_OP_MEM:
+                return (f"{{ {t} *p = ({t} *)G({self.address(ins, ops[0])}); {t} expected = {acc}; "
+                        f"int ok = __atomic_compare_exchange_n(p, &expected, {src}, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); "
+                        f"(void)op_sub{n}(c, {acc}, expected); if (!ok) {acc} = expected; }}")
+            dst = self.reg(ins, ops[0].reg)
+            return (f"{{ {t} d = {dst}; (void)op_sub{n}(c, {acc}, d); "
+                    f"if (c->zf) {dst} = {src}; else {acc} = d; }}")
+        if base == "cmpxchg8b":  # edx:eax == m64 ? (ZF=1, m64 = ecx:ebx) : (ZF=0, edx:eax = m64)
+            return (f"{{ uint64_t *p = (uint64_t *)G({self.address(ins, ops[0])}); "
+                    "uint64_t expected = (uint64_t)c->edx.d << 32 | c->eax.d; "
+                    "uint64_t desired = (uint64_t)c->ecx.d << 32 | c->ebx.d; "
+                    "c->zf = __atomic_compare_exchange_n(p, &expected, desired, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); "
+                    "c->eax.d = (uint32_t)expected; c->edx.d = (uint32_t)(expected >> 32); }")
         if base == "lahf":  # AF is not tracked (always 0); bit 1 is always set
             return ("c->eax.b.h = (uint8_t)(c->sf << 7 | c->zf << 6 | c->pf << 2 | 2 | c->cf);")
         try:

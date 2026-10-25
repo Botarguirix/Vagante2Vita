@@ -98,7 +98,13 @@ def main() -> None:
     report = ROOT / "artifacts/recomp" / image.sha256 / "discovery.json"
     if not report.exists():
         raise SystemExit("run recomp/discover.py first")
-    entries = sorted(int(f["entry"], 16) for f in json.loads(report.read_text())["functions"])
+    entries = {int(f["entry"], 16) for f in json.loads(report.read_text())["functions"]}
+    # Functions known to the PDB but not reached by discovery (destructors and handlers that
+    # only exception tables or vtables point to): artifacts/pdb_seeds.txt, one hex address per line.
+    seeds = ROOT / "artifacts/pdb_seeds.txt"
+    if seeds.exists():
+        entries |= {int(line, 16) for line in seeds.read_text().split() if line}
+    entries = sorted(entries)
     gen = ROOT / "artifacts/recomp" / image.sha256 / "gen"
     gen.mkdir(parents=True, exist_ok=True)
     if args.compile_only:

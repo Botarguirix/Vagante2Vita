@@ -206,6 +206,14 @@ _Noreturn void guest_fault(Cpu *c, uint32_t address, const char *what) {
             "  eax=%08x ecx=%08x edx=%08x ebx=%08x esp=%08x ebp=%08x esi=%08x edi=%08x\n",
             guest_fault_text, c->eax.d, c->ecx.d, c->edx.d, c->ebx.d, c->esp.d, c->ebp.d,
             c->esi.d, c->edi.d);
+#ifdef T123_TRACE_CALLS
+    fprintf(stderr, "  last guest functions entered (oldest first):");
+    for (unsigned k = 0; k < 64; k++) {
+        uint32_t f = guest_trace_ring[(guest_trace_pos + k) & 63];
+        if (f) fprintf(stderr, " %08x", f);
+    }
+    fprintf(stderr, "\n");
+#endif
     if (guest_fault_trap)
         longjmp(*guest_fault_trap, 1);
     exit(3);

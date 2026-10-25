@@ -74,7 +74,7 @@ TESTS.update({
     "cvtsd2si": ins("f20f2dc1"), "cvtsi2ss": ins("f30f2ac0"), "cvtsi2sd": ins("f20f2ac0"),
     "cvttss2si m": ins("f30f2c4610"),
     "shufps 1b": ins("0fc6c11b"), "shufps e4": ins("0fc6c1e4"), "shufpd 1": ins("660fc6c101"),
-    "pshufd 4e": ins("660f70c14e"), "unpcklps": ins("0f14c1"), "unpckhps": ins("0f15c1"),
+    "pshufd 4e": ins("660f70c14e"), "pshuflw 1b": ins("f20f70c11b"), "pshufhw 4e": ins("f30f70c14e"), "unpcklps": ins("0f14c1"), "unpckhps": ins("0f15c1"),
     "unpcklpd": ins("660f14c1"), "movlhps": ins("0f16c1"), "movhlps": ins("0f12c1"),
     "paddd": ins("660ffec1"), "psubd": ins("660ffac1"), "paddw": ins("660ffdc1"),
     "psubw": ins("660ff9c1"), "paddb": ins("660ffcc1"), "paddq": ins("660fd4c1"),

@@ -94,7 +94,11 @@ extern _Thread_local GuestThread guest_thread_state;
 /* Guest addresses below GUEST_WINDOW are backed by host memory. On PC the host
    reserves the whole 4 GiB range (so stray accesses fault); on the Vita it is a
    single block of GUEST_WINDOW bytes. */
-#define GUEST_WINDOW 0x08000000u
+/* Vagante keeps every decoded image in the guest heap: 1 GiB on PC; the Vita build sets
+   its own size (its memory is the limit there). */
+#ifndef GUEST_WINDOW
+#define GUEST_WINDOW 0x40000000u
+#endif
 extern uint8_t *guest_base;
 #define G(a) (guest_base + (uint32_t)(a))
 

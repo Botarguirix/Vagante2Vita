@@ -20,15 +20,15 @@
 /* Guest memory map, identical on PC and Vita. Everything the guest can dereference
  * lies below GUEST_WINDOW (128 MiB), so on the Vita it is one memory block:
  *   0x00110000 stack (2 MiB)      0x00400000 image (vagante.exe, to 0x00BF9000)
- *   0x00C00000 TIB, PEB, thread TIBs   0x01000000 thread stacks   0x01800000 heap (312 MiB)
- *   0x15000000 VirtualAlloc (48 MiB)
+ *   0x00C00000 TIB, PEB, thread TIBs   0x01000000 thread stacks   0x01800000 heap (to the
+ *   VirtualAlloc area)   GUEST_WINDOW - 48 MiB: VirtualAlloc (48 MiB)
  * Fake call targets and module handles sit above the window: they are compared
  * and called, never read. */
 enum {
     GUEST_STACK_BASE = 0x00110000u, GUEST_STACK_SIZE = 0x00200000u,
     GUEST_TIB = 0x00C00000u, GUEST_PEB = 0x00C01000u,
-    GUEST_HEAP_BASE = 0x01800000u, GUEST_HEAP_SIZE = 0x13800000u,
-    GUEST_VIRTUAL_BASE = 0x15000000u, GUEST_VIRTUAL_SIZE = 0x03000000u,
+    GUEST_HEAP_BASE = 0x01800000u, GUEST_HEAP_SIZE = GUEST_WINDOW - 0x03000000u - 0x01800000u,
+    GUEST_VIRTUAL_BASE = GUEST_WINDOW - 0x03000000u, GUEST_VIRTUAL_SIZE = 0x03000000u,
     GUEST_FAKE_BASE = 0x7F000000u,
     FAKE_MODULE_KERNEL32 = 0x7C800000u, FAKE_MODULE_OTHER = 0x7C900000u,
 };
@@ -74,6 +74,7 @@ extern const ApiEntry win32_kernel32[];
 extern const ApiEntry win32_user[];   /* user.c: USER32, GDI32, WINMM, OLE, IMM, VERSION */
 extern const ApiEntry win32_gl[]; /* gl.c: OpenGL 1.1, guest stdcall */
 extern const ApiEntry win32_openal[]; /* openal.c: OpenAL Soft, guest cdecl */
+extern const ApiEntry win32_window[]; /* window.c: USER32 windows, GDI32, WGL on SDL2 */
 extern const ApiEntry win32_stubs[];  /* stubs.c: Steam, networking, crypto, DirectInput */
 void crt_native_init(void);
 

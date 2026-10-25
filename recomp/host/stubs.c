@@ -21,7 +21,10 @@ C(SteamAPI_UnregisterCallback, 0)
 C(SteamGameServer_GetHSteamUser, 0)
 C(SteamGameServer_RunCallbacks, 0)
 C(SteamGameServer_Shutdown, 0)
-C(SteamInternal_ContextInit, 0)
+/* SteamInternal_ContextInit(data): data is {init callback, counter, CSteamAPIContext}; the real
+   steam_api always returns &data->context, whose interface pointers stay NULL without
+   Steam (the inline accessors such as SteamUGC() read through it). */
+API(SteamInternal_ContextInit) { ret_cdecl(c, ARG(c, 0) ? ARG(c, 0) + 8 : 0); }
 C(SteamInternal_FindOrCreateGameServerInterface, 0)
 C(SteamInternal_FindOrCreateUserInterface, 0)
 C(SteamInternal_GameServer_Init, 0)
@@ -58,7 +61,7 @@ NET(ioctlsocket, 3)
 NET(listen, 2)
 NET(recv, 4)
 NET(recvfrom, 6)
-NET(select, 5)
+NET(offline_select, 5)
 NET(send, 4)
 NET(sendto, 6)
 NET(setsockopt, 5)
@@ -132,9 +135,35 @@ API(GetUserNameA) {
     memcpy(G(out), "Player", 7);
     ret_stdcall(c, 1, 2);
 }
+/* DirectInput8Create must succeed: Vagante's EJoystick allocates its joystick table only
+   then and reads it unconditionally afterwards. The object is a guest COM object whose
+   vtable entries are host functions (registered below as "DI8.<method>"); it enumerates
+   no devices, so pads come only through XInput. All methods are stdcall with `this`. */
+S(DI8_QueryInterface, 0x80004002u, 3)        /* E_NOINTERFACE */
+S(DI8_AddRef, 1, 1)
+S(DI8_Release, 0, 1)
+S(DI8_CreateDevice, 0x80040154u, 4)          /* DIERR_DEVICENOTREG */
+S(DI8_EnumDevices, 0, 5)                     /* DI_OK, no callback */
+S(DI8_GetDeviceStatus, 1, 2)                 /* DI_NOTATTACHED */
+S(DI8_RunControlPanel, 0, 3)
+S(DI8_Initialize, 0, 3)
+S(DI8_FindDevice, 0x80040154u, 4)
+S(DI8_EnumDevicesBySemantics, 0, 6)
+S(DI8_ConfigureDevices, 0, 5)
 API(DirectInput8Create) {
-    if (ARG(c, 3)) wr32(ARG(c, 3), 0);
-    ret_stdcall(c, 0x80004001u, 5);
+    static uint32_t object;
+    if (!object) {
+        static const char *methods[] = {"DI8.QueryInterface", "DI8.AddRef", "DI8.Release", "DI8.CreateDevice",
+                                        "DI8.EnumDevices", "DI8.GetDeviceStatus", "DI8.RunControlPanel",
+                                        "DI8.Initialize", "DI8.FindDevice", "DI8.EnumDevicesBySemantics",
+                                        "DI8.ConfigureDevices"};
+        uint32_t vtable = heap_alloc(4 * 11, 1);
+        for (unsigned i = 0; i < 11; i++) wr32(vtable + 4 * i, api_address(methods[i]));
+        object = heap_alloc(8, 1);
+        wr32(object, vtable);
+    }
+    if (ARG(c, 3)) wr32(ARG(c, 3), object);
+    ret_stdcall(c, 0, 5);
 }
 /* XINPUT_STATE is 16 bytes on x86: packet DWORD, buttons WORD, two BYTE
    triggers and four signed WORD axes. Write explicitly, never use host layout. */
@@ -246,7 +275,7 @@ const ApiEntry win32_stubs[] = {
     E(htonl), E(htons), {"ntohl", htonl}, {"ntohs", htons}, E(WSAStartup), E(WSACleanup),
     E(WSAGetLastError), E(WSASetLastError), E(socket), E(accept), E(bind), E(closesocket), E(connect),
     E(getpeername), E(getsockname), E(getsockopt), E(ioctlsocket), E(listen), E(recv), E(recvfrom),
-    E(select), E(send), E(sendto), E(setsockopt), E(__WSAFDIsSet), E(WSAIoctl), E(freeaddrinfo),
+    {"select", offline_select}, E(send), E(sendto), E(setsockopt), E(__WSAFDIsSet), E(WSAIoctl), E(freeaddrinfo),
     E(getaddrinfo), E(gethostname), E(inet_addr), E(inet_ntoa),
     LDAP(143, ldap_init), LDAP(200, ldap_memfree), LDAP(211, ldap_set_option), LDAP(22, ldap_err2string),
     LDAP(26, ldap_first_entry), LDAP(27, ldap_next_entry), LDAP(30, ldap_get_dn),
@@ -256,6 +285,11 @@ const ApiEntry win32_stubs[] = {
     E(IdnToAscii), E(CertFreeCertificateContext), E(CryptAcquireContextA), E(CryptGenRandom),
     E(CryptReleaseContext), E(CryptCreateHash), E(CryptDestroyHash), E(CryptDestroyKey), E(CryptEncrypt),
     E(CryptGetHashParam), E(CryptHashData), E(CryptImportKey), E(GetUserNameA),
+    {"DI8.QueryInterface", DI8_QueryInterface}, {"DI8.AddRef", DI8_AddRef}, {"DI8.Release", DI8_Release},
+    {"DI8.CreateDevice", DI8_CreateDevice}, {"DI8.EnumDevices", DI8_EnumDevices},
+    {"DI8.GetDeviceStatus", DI8_GetDeviceStatus}, {"DI8.RunControlPanel", DI8_RunControlPanel},
+    {"DI8.Initialize", DI8_Initialize}, {"DI8.FindDevice", DI8_FindDevice},
+    {"DI8.EnumDevicesBySemantics", DI8_EnumDevicesBySemantics}, {"DI8.ConfigureDevices", DI8_ConfigureDevices},
     E(DirectInput8Create), E(XInputGetState), E(GetFileVersionInfoSizeA), E(GetFileVersionInfoA), E(VerQueryValueA),
     {NULL, NULL},
 };

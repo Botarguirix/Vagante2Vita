@@ -132,7 +132,7 @@ class Sse:
         return self.move_scalar(ins, ops, 4)
 
     def op_movsd(self, ins, ops):
-        if not ops:  # string movsd is handled by the main lifter
+        if not any(_xreg(ins, op) is not None for op in ops):  # string movsd: main lifter
             raise SseUnsupported("movsd string")
         return self.move_scalar(ins, ops, 8)
 
@@ -308,6 +308,17 @@ class Sse:
         d, imm = self.dst(ins, ops[0]), ops[2].imm
         return self.block(self.load(ins, ops[1], 16),
                           " ".join(f"{d}.d[{k}] = s.d[{imm >> (2 * k) & 3}];" for k in range(4)))
+
+    def op_pshuflw(self, ins, ops):
+        d, imm = self.dst(ins, ops[0]), ops[2].imm
+        return self.block(self.load(ins, ops[1], 16),
+                          " ".join(f"{d}.w[{k}] = s.w[{imm >> (2 * k) & 3}];" for k in range(4)),
+                          f"{d}.q[1] = s.q[1];")
+
+    def op_pshufhw(self, ins, ops):
+        d, imm = self.dst(ins, ops[0]), ops[2].imm
+        return self.block(self.load(ins, ops[1], 16), f"{d}.q[0] = s.q[0];",
+                          " ".join(f"{d}.w[{4 + k}] = s.w[{4 + (imm >> (2 * k) & 3)}];" for k in range(4)))
 
     def unpack(self, ins, ops, lane: str, count: int, high: bool) -> str:
         d = self.dst(ins, ops[0])
