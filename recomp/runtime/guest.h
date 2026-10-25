@@ -35,12 +35,26 @@ typedef struct {
     uint8_t tag_empty; /* bitmask of empty physical registers */
 } X87;
 
+/* SSE register: viewed as bytes, words, dwords, qwords, floats or doubles. */
+typedef union {
+    uint8_t b[16];
+    uint16_t w[8];
+    int16_t sw[8];
+    uint32_t d[4];
+    int32_t i[4];
+    uint64_t q[2];
+    float f[4];
+    double g[2];
+} Xmm;
+
 typedef struct Cpu {
     GuestReg eax, ecx, edx, ebx, esp, ebp, esi, edi;
     uint8_t cf, zf, sf, of, pf, df;
     uint8_t id_flag; /* EFLAGS.ID, toggled by the CRT to probe for cpuid */
     uint32_t fs_base;
     X87 fpu;
+    Xmm xmm[8];
+    uint32_t mxcsr; /* kept for ldmxcsr/stmxcsr; conversions use round-to-nearest */
 } Cpu;
 
 /* Fixed Windows user-mode selectors, for code that stores segment registers. */
@@ -98,6 +112,68 @@ static inline void wr8(uint32_t a, uint8_t v) { *G(a) = v; }
 static inline void wr16(uint32_t a, uint16_t v) { memcpy(G(a), &v, 2); }
 static inline void wr32(uint32_t a, uint32_t v) { memcpy(G(a), &v, 4); }
 static inline void wr64(uint32_t a, uint64_t v) { memcpy(G(a), &v, 8); }
+
+/* -- SSE ------------------------------------------------------------------------------- */
+/* Load n bytes into the low part of a register value; the rest is zero (as movss/movsd
+   /movq from memory do). */
+static inline Xmm xld(uint32_t a, unsigned n) { Xmm v; memset(&v, 0, 16); memcpy(&v, G(a), n); return v; }
+static inline void xst(uint32_t a, const Xmm *v, unsigned n) { memcpy(G(a), v, n); }
+static inline float rdf32(uint32_t a) { float v; memcpy(&v, G(a), 4); return v; }
+static inline double rdf64(uint32_t a) { double v; memcpy(&v, G(a), 8); return v; }
+
+/* float/double -> int32 as cvt(t)ss2si: out of range or NaN gives 0x80000000. */
+static inline int32_t sse_f2i(double v, int truncate) {
+    if (!(v > -2147483649.0 && v < 2147483648.0)) return INT32_MIN;
+    double r = truncate ? (v < 0 ? -__builtin_floor(-v) : __builtin_floor(v)) : __builtin_nearbyint(v);
+    if (r < -2147483648.0 || r > 2147483647.0) return INT32_MIN;
+    return (int32_t)r;
+}
+
+/* (u)comiss/(u)comisd: ZF,PF,CF from the comparison; OF=SF=0. */
+static inline void sse_comis(Cpu *c, double a, double b) {
+    c->of = c->sf = 0;
+    if (a != a || b != b) { c->zf = c->pf = c->cf = 1; return; }
+    c->pf = 0;
+    c->zf = a == b;
+    c->cf = a < b;
+}
+
+/* cmpXXss/sd/ps/pd predicate imm8 (0 eq, 1 lt, 2 le, 3 unord, 4 neq, 5 nlt, 6 nle, 7 ord). */
+static inline int sse_cmp(int pred, double a, double b) {
+    int unord = a != a || b != b;
+    switch (pred & 7) {
+    case 0: return !unord && a == b;
+    case 1: return !unord && a < b;
+    case 2: return !unord && a <= b;
+    case 3: return unord;
+    case 4: return unord || a != b;
+    case 5: return unord || !(a < b);
+    case 6: return unord || !(a <= b);
+    default: return !unord;
+    }
+}
+/* add/sub/mul/div: when an operand is NaN, x86 returns the first NaN operand, quieted.
+   C may evaluate a commutative operation with the operands swapped, so the payload
+   is chosen explicitly. -DSSE_FAST_NAN drops the checks (payload then unspecified). */
+#ifdef SSE_FAST_NAN
+#define SSE_ARITH_F(a, op, b) ((a) op (b))
+#define SSE_ARITH_D(a, op, b) ((a) op (b))
+#else
+static inline float sse_qnanf(float v) { uint32_t u; memcpy(&u, &v, 4); u |= 0x00400000u; memcpy(&v, &u, 4); return v; }
+static inline double sse_qnand(double v) { uint64_t u; memcpy(&u, &v, 8); u |= 0x0008000000000000ull; memcpy(&v, &u, 8); return v; }
+#define SSE_ARITH_F(a, op, b) ({ float a_ = (a), b_ = (b); \
+    a_ != a_ ? sse_qnanf(a_) : b_ != b_ ? sse_qnanf(b_) : a_ op b_; })
+#define SSE_ARITH_D(a, op, b) ({ double a_ = (a), b_ = (b); \
+    a_ != a_ ? sse_qnand(a_) : b_ != b_ ? sse_qnand(b_) : a_ op b_; })
+#endif
+
+/* minss/maxss return the second operand when either is NaN or both are zero. */
+static inline float sse_minf(float a, float b) { return a < b ? a : b; }
+static inline float sse_maxf(float a, float b) { return a > b ? a : b; }
+static inline double sse_mind(double a, double b) { return a < b ? a : b; }
+static inline double sse_maxd(double a, double b) { return a > b ? a : b; }
+static inline int16_t sse_sat16(int32_t v) { return v > 32767 ? 32767 : v < -32768 ? -32768 : (int16_t)v; }
+static inline uint8_t sse_satu8(int32_t v) { return v > 255 ? 255 : v < 0 ? 0 : (uint8_t)v; }
 
 static inline void push32(Cpu *c, uint32_t v) { c->esp.d -= 4; wr32(c->esp.d, v); }
 static inline uint32_t pop32(Cpu *c) { uint32_t v = rd32(c->esp.d); c->esp.d += 4; return v; }

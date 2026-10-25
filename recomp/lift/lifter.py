@@ -15,6 +15,7 @@ from pathlib import Path
 from capstone import x86_const as X
 
 from recomp.analysis.discover import Discovery, Function
+from recomp.lift.sse import Sse, SseUnsupported
 
 REG32 = {"eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"}
 REG16 = {"ax": "eax", "cx": "ecx", "dx": "edx", "bx": "ebx", "sp": "esp", "bp": "ebp",
@@ -78,6 +79,7 @@ class Lifter:
         self.entries = entries
         self.lifted: set[int] = set()
         self.traps: set[int] = set()
+        self.sse = Sse(self)
 
     # -- operands -------------------------------------------------------------------------
     def reg(self, ins, reg_id) -> str:
@@ -287,7 +289,7 @@ class Lifter:
             return self.write(ins, ops[0], f"(uint8_t){CONDITIONS[base[3:]]}(c)")
         if base.startswith("cmov") and base[4:] in CONDITIONS:
             return f"if ({CONDITIONS[base[4:]]}(c)) {{ {self.write(ins, ops[0], self.read(ins, ops[1]))} }}"
-        if base in ("movsb", "movsw", "movsd", "stosb", "stosw", "stosd") and prefix in ("", "rep"):
+        if base in ("movsb", "movsw", "movsd", "stosb", "stosw", "stosd") and prefix in ("", "rep") and not ops:
             size = {"b": 1, "w": 2, "d": 4}[base[-1]]
             kind = "movs" if base.startswith("movs") else "stos"
             return f"op_rep_{kind}(c, {size}, {int(prefix == 'rep')}, 0x{ins.address:08x}u);"
@@ -305,7 +307,12 @@ class Lifter:
             return f"if (c->ecx.d == 0) {self.branch(fn, ops[0].imm & 0xFFFFFFFF)}"
         if base == "call":
             return self.lift_call(ins, nxt)
-        raise Unsupported(m)
+        if base == "lahf":  # AF is not tracked (always 0); bit 1 is always set
+            return ("c->eax.b.h = (uint8_t)(c->sf << 7 | c->zf << 6 | c->pf << 2 | 2 | c->cf);")
+        try:
+            return self.sse.lift(ins)
+        except SseUnsupported as exc:
+            raise Unsupported(f"{m} ({exc})" if str(exc) != base else m)
 
     def lift_bit_op(self, ins, base: str) -> str:
         """bt/bts/btr/btc r/m32, r32|imm8. A register offset on a memory operand
