@@ -206,8 +206,11 @@ def translated_names(src_dir):
         # definitions to avoid mistaking calls such as std::fopen(...) for bodies.
         for m in re.finditer(r'^((?:[A-Za-z_]\w*::)*([A-Za-z_]\w*))::(~?\2)\s*\(', source, re.M):
             names.add(m.group(1) + '::' + m.group(3))
-        for m in re.finditer(r'^(?:int|auto)\s+(main)\s*\(', p.read_text(encoding='utf-8', errors='replace'), re.M):
-            names.add('main')
+        # Non-member definitions also suppress stubs (e.g. magVector2f). Require
+        # the body so declarations/calls cannot accidentally mark a stub done.
+        for m in re.finditer(r'^(?:void|bool|char|int|unsigned(?: int)?|float|double|auto)\s+'
+                             r'([A-Za-z_]\w*)\s*\([^;{}]*\)\s*(?:->\s*[^;{}]+)?\s*\{', source, re.M):
+            names.add(m.group(1))
     return names
 
 def main():
