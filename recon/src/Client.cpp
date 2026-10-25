@@ -402,3 +402,151 @@ void Client::draw(float frameTime) {
         window.draw(*renderSprite, sf::RenderStates(shader));
     }
 }
+
+// Client::handleInput @ 00550ea0. Routes this frame's input to whichever screen has focus:
+// progression GUI, credits, options, network menu, main menu, or the players in game. Afterwards
+// it handles pause/escape and the chat box. Left out: the F9 level editor (developer tool) and
+// the per-frame input record sent to the server (networking is not ported).
+void Client::handleInput() {
+    Level *level = gameEngine.getLevel();
+    input.step();
+    if (frameStepMode && !debugDoStepFrame && focused) {
+        handleDebugInput();
+        return;
+    }
+
+    if (focused) {
+        if (progressionGuiMenuOpen) {
+            progressionGui.handleInput(&input);
+        } else if (credits->isTriggered()) {
+            for (unsigned int i = 0; i < 4; ++i)
+                if (input.isPressed(Input::ACTION_MELEE, i) || input.isPressed(Input::ACTION_JUMP, i) ||
+                    input.isPressed(Input::ACTION_SKILL, i) || input.isPressed(Input::ACTION_RANGE, i))
+                    credits->actionPress();
+        } else if (configGui->isOpen()) {
+            if (configGui->getScreen() != ConfigGui::UNLOCKS_SCREEN) {
+                for (unsigned int i = 0; i < 4; ++i) {
+                    if (input.isPressed(Input::ACTION_MELEE, i) || input.isPressed(Input::ACTION_JUMP, i) ||
+                        input.isPressed(Input::ACTION_RANGE, i))
+                        configGui->actionPress();
+                    else if (input.isReleased(Input::ACTION_MELEE, i) || input.isReleased(Input::ACTION_JUMP, i) ||
+                             input.isReleased(Input::ACTION_RANGE, i))
+                        configGui->actionRelease();
+                    if (input.isPressed(Input::ACTION_UP, i)) configGui->up();
+                    if (input.isPressed(Input::ACTION_DOWN, i)) configGui->down();
+                    if (input.isPressed(Input::ACTION_LEFT, i)) configGui->left();
+                    if (input.isPressed(Input::ACTION_RIGHT, i)) configGui->right();
+                }
+            }
+        } else if (netMenu->isOpen()) {
+            if (!input.enteringText) {
+                for (unsigned int i = 0; i < 4; ++i) {
+                    if (input.isPressed(Input::ACTION_MELEE, i) || input.isPressed(Input::ACTION_JUMP, i) ||
+                        input.isPressed(Input::ACTION_RANGE, i))
+                        netMenu->action(true);
+                    else if (input.isReleased(Input::ACTION_MELEE, i) || input.isReleased(Input::ACTION_JUMP, i) ||
+                             input.isReleased(Input::ACTION_RANGE, i))
+                        netMenu->action(false);
+                    if (input.isPressed(Input::ACTION_UP, i)) netMenu->up(false);
+                    else if (input.isHeld(Input::ACTION_UP, i)) netMenu->up(true);
+                    if (input.isPressed(Input::ACTION_DOWN, i)) netMenu->down(false);
+                    else if (input.isHeld(Input::ACTION_DOWN, i)) netMenu->down(true);
+                    if (input.isPressed(Input::ACTION_LEFT, i)) netMenu->left(false);
+                    else if (input.isHeld(Input::ACTION_LEFT, i)) netMenu->left(true);
+                    if (input.isPressed(Input::ACTION_RIGHT, i)) netMenu->right(false);
+                    else if (input.isHeld(Input::ACTION_RIGHT, i)) netMenu->right(true);
+                }
+            }
+        } else if (mainMenu->isOpen()) {
+            for (unsigned int i = 0; i < 4; ++i) {
+                if (input.isPressed(Input::ACTION_MELEE, i) || input.isPressed(Input::ACTION_JUMP, i) ||
+                    input.isPressed(Input::ACTION_RANGE, i))
+                    mainMenu->action(true);
+                else if (input.isReleased(Input::ACTION_MELEE, i) || input.isReleased(Input::ACTION_JUMP, i) ||
+                         input.isReleased(Input::ACTION_RANGE, i))
+                    mainMenu->action(false);
+                if (input.isPressed(Input::ACTION_UP, i)) mainMenu->up();
+                if (input.isPressed(Input::ACTION_DOWN, i)) mainMenu->down();
+            }
+        } else if (!paused) {
+            // F9 toggles the level editor here in the original (developer tool, not ported).
+            const auto &players = gameEngine.getPlayers();
+            for (unsigned int i = 0; i < players.size(); ++i) {
+                if (gameEngine.networked && i != myPlayerIndex) continue;
+                const unsigned int controller = gameEngine.networked ? 0 : i;
+                if (!input.controllers[controller].usingJoystick && (input.enteringText || input.skipInputThisFrame))
+                    input.skipInputThisFrame = false;
+                else
+                    gameEngine.handlePlayerInput(input, i, controller);
+            }
+        }
+
+        // Escape (keyboard) or the pause action (any controller) closes the topmost screen.
+        const bool enteringText = input.enteringText;
+        bool escape = false;
+        if (input.isKeyPressed(sf::Keyboard::Escape)) {
+            if (enteringText) input.setEnteringText(nullptr, 0, false);
+            else escape = true;
+        } else if (!enteringText) {
+            for (unsigned int i = 0; i < 4; ++i)
+                if (input.isPressed(Input::ACTION_PAUSE, i)) escape = true;
+        }
+        if (escape) {
+            if (credits->isTriggered()) {
+                credits->actionPress();
+            } else if (progressionGuiMenuOpen) {
+                progressionGuiMenuOpen = false;
+                if (configGui->isOpen()) configGui->setScreen(ConfigGui::MAIN_SCREEN);
+            } else {
+                configGui->toggle();
+                if (level) level->cumulativeCombatTextDamage = config.cumulativeCombatText;
+            }
+        }
+
+        // Chat box (in game only).
+        if (!mainMenu->isOpen()) {
+            if (chatTextBox.isHidden()) {
+                if (!configGui->isOpen() &&
+                    (input.isPressed(Input::ACTION_CHAT, 0) || input.isKeyPressed(sf::Keyboard::Return))) {
+                    chatTextBox.setHidden(false);
+                    chatTextBox.bindString(&chatString);
+                    chatTextBox.startEnteringText(false);
+                }
+            } else if (!input.enteringText) {
+                chatTextBox.stopEnteringText();
+                chatTextBox.setHidden(true);
+                if (input.enteredTextPressedReturn && !chatString.empty()) {
+                    enteredTextHistory.push_back(chatString);
+                    if (gameEngine.networked && netState == CLIENT_CONNECTED_AUTHENTICATED) sendChatMessage(chatString);
+                }
+                chatString = "";
+                enteredTextHistoryIndex = -1;
+            } else if (input.isKeyPressed(sf::Keyboard::Up)) {
+                int index = enteredTextHistoryIndex;
+                if (index == -1) index = static_cast<int>(enteredTextHistory.size());
+                if (index > 0) {
+                    --index;
+                    enteredTextHistoryIndex = index;
+                    if (index < static_cast<int>(enteredTextHistory.size())) chatString = enteredTextHistory[index];
+                    input.setTextCursorToEnd();
+                }
+            } else if (input.isKeyPressed(sf::Keyboard::Down) && enteredTextHistoryIndex != -1) {
+                if (enteredTextHistoryIndex < static_cast<int>(enteredTextHistory.size()) - 1) {
+                    ++enteredTextHistoryIndex;
+                    chatString = enteredTextHistory[enteredTextHistoryIndex];
+                } else {
+                    chatString = "";
+                    enteredTextHistoryIndex = -1;
+                }
+                input.setTextCursorToEnd();
+            }
+        }
+    }
+
+    // While typing, keep the last six chat lines fully visible.
+    if (input.enteringText) {
+        const int first = std::max(0, static_cast<int>(chatLines.size()) - 6);
+        for (int i = static_cast<int>(chatLines.size()) - 1; i >= first; --i) chatLines[i].lifeTimer = 240.0f;
+    }
+    gameGui.showTimer = (gameEngine.isSomeMenuOpen() || paused || gameEngine.intermission) && !gameEngine.intro;
+}

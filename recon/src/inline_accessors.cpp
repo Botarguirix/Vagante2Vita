@@ -34,6 +34,21 @@ void NetMenu::setOpen(bool value) {
     }
 }
 
+// NetMenu::up/down (Client::handleInput @ 00550ea0): a fresh press restarts the key-repeat delay
+// (30 frames), a held direction only keeps the flag set. Indices follow Input::Actions (UP 3, DOWN 2
+// in the action enum; the menu's own direction slots are 1 for up and 3 for down).
+void NetMenu::up(bool held) {
+    if (animateInTimer != 0 || selectingCustomWorld) return;
+    directionHeld[1] = true;
+    if (!held) framesHoldingDirection[1] = std::pair<int, int>(0, 30);
+}
+
+void NetMenu::down(bool held) {
+    if (animateInTimer != 0 || selectingCustomWorld) return;
+    directionHeld[3] = true;
+    if (!held) framesHoldingDirection[3] = std::pair<int, int>(0, 30);
+}
+
 // --- ConfigGui (Client::step tests "open || closingTimer > 0" before stepping it, and on leaving
 //     the progression screen stores screen = 0 and switchTimer = 10)
 bool ConfigGui::isOpen() { return open || closingTimer > 0; }
@@ -42,6 +57,16 @@ ConfigGui::ConfigScreen ConfigGui::getScreen() { return screen; }
 void ConfigGui::setScreen(ConfigGui::ConfigScreen value) {
     screen = value;
     switchTimer = 10;
+}
+
+// Client::handleInput forwards confirm presses to the hovered element once the open/close
+// animation has finished.
+void ConfigGui::actionPress() {
+    if (openingTimer == 0 && closingTimer == 0 && hoveredElement) hoveredElement->action(true);
+}
+
+void ConfigGui::actionRelease() {
+    if (openingTimer == 0 && closingTimer == 0 && hoveredElement) hoveredElement->action(false);
 }
 
 bool ConfigGui::doRunCredits() {
