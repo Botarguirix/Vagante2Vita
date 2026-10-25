@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compile/run host bridge tests without running commercial game code.
 
-  python -I tests/host/run_tests.py [stubs|openal|gl ...]
+  python -I tests/host/run_tests.py [stubs|openal|gl|xinput ...]
 OpenAL uses its null backend; GL uses a hidden, real SDL OpenGL context.
 """
 import os
@@ -17,13 +17,15 @@ GROUPS = {
     "stubs": {"steam_api.dll", "WS2_32.dll", "WLDAP32.dll", "ADVAPI32.dll", "CRYPT32.dll", "Normaliz.dll", "DINPUT8.dll", "XINPUT9_1_0.dll", "VERSION.dll"},
     "openal": {"OpenAL32.dll"},
     "gl": {"OPENGL32.dll"},
+    "xinput": {"XINPUT9_1_0.dll"},
 }
-LIBS = {"stubs": [], "openal": ["-DAL_LIBTYPE_STATIC", "-static", "-lopenal", "-lstdc++", "-lole32", "-lwinmm", "-luuid", "-lavrt", "-lpthread"],
+LIBS = {"stubs": ["-lSDL2", "-lpthread"], "xinput": ["-lSDL2", "-lpthread"], "openal": ["-DAL_LIBTYPE_STATIC", "-static", "-lopenal", "-lstdc++", "-lole32", "-lwinmm", "-luuid", "-lavrt", "-lpthread"],
         "gl": ["-lSDL2", "-lopengl32", "-lpthread"]}
 
 def coverage(unit):
-    source = (ROOT / f"recomp/host/{unit}.c").read_text(encoding="utf-8-sig")
-    table = source.split(f"const ApiEntry win32_{unit}[]", 1)[1]
+    source_unit = "stubs" if unit == "xinput" else unit
+    source = (ROOT / f"recomp/host/{source_unit}.c").read_text(encoding="utf-8-sig")
+    table = source.split(f"const ApiEntry win32_{source_unit}[]", 1)[1]
     names = set(re.findall(r"\bE\((\w+)\)", table))
     names.update(re.findall(r'\{\s*"([^\"]+)"', table))
     names.update("WLDAP32.dll#" + n for n in re.findall(r"\bLDAP\((\d+),", table))
@@ -52,7 +54,7 @@ def main():
         out.parent.mkdir(parents=True, exist_ok=True)
         command = [str(GCC), "-std=gnu11", "-Wall", "-Wextra", "-Wno-unused-parameter",
                    "-Irecomp/runtime", "-Irecomp/host", f"tests/host/{unit}_test.c",
-                   f"recomp/host/{unit}.c", *LIBS[unit], "-o", str(out)]
+                   f"recomp/host/{'stubs' if unit == 'xinput' else unit}.c", *LIBS[unit], "-o", str(out)]
         subprocess.run(command, cwd=ROOT, env=ENV, check=True)
         subprocess.run([str(out)], cwd=ROOT, env=ENV, check=True, timeout=60)
 

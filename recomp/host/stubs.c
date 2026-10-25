@@ -2,6 +2,8 @@
 #include "win32.h"
 #include <stdlib.h>
 #include <string.h>
+#include <SDL2/SDL.h>
+#include <pthread.h>
 #define API(name) static void name(Cpu *c)
 #define S(name, value, argc) API(name) { ret_stdcall(c, value, argc); }
 #define C(name, value) API(name) { ret_cdecl(c, value); }
@@ -134,7 +136,98 @@ API(DirectInput8Create) {
     if (ARG(c, 3)) wr32(ARG(c, 3), 0);
     ret_stdcall(c, 0x80004001u, 5);
 }
-S(XInputGetState, 1167, 2)
+/* XINPUT_STATE is 16 bytes on x86: packet DWORD, buttons WORD, two BYTE
+   triggers and four signed WORD axes. Write explicitly, never use host layout. */
+static struct {
+    SDL_GameController *pad;
+    uint32_t packet;
+    unsigned char previous[12];
+    int sampled;
+} xinput_slots[4];
+static pthread_mutex_t xinput_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static int16_t xinput_y(Sint16 axis) {
+    /* Saturate the one asymmetric endpoint: negating -32768 cannot fit. */
+    return axis == INT16_MIN ? INT16_MAX : (int16_t)-axis;
+}
+static uint8_t xinput_trigger(Sint16 axis) {
+    return axis <= 0 ? 0 : (uint8_t)((unsigned)axis * 255u / 32767u);
+}
+static void xinput_refresh(void) {
+    SDL_GameControllerUpdate();
+    for (unsigned i = 0; i < 4; ++i) {
+        if (xinput_slots[i].pad && !SDL_GameControllerGetAttached(xinput_slots[i].pad)) {
+            SDL_GameControllerClose(xinput_slots[i].pad);
+            xinput_slots[i].pad = NULL;
+            xinput_slots[i].sampled = 0;
+        }
+    }
+    for (int device = 0; device < SDL_NumJoysticks(); ++device) {
+        if (!SDL_IsGameController(device)) continue;
+        SDL_JoystickID id = SDL_JoystickGetDeviceInstanceID(device);
+        unsigned slot;
+        for (slot = 0; slot < 4; ++slot)
+            if (xinput_slots[slot].pad && SDL_JoystickInstanceID(
+                SDL_GameControllerGetJoystick(xinput_slots[slot].pad)) == id) break;
+        if (slot < 4) continue;
+        for (slot = 0; slot < 4 && xinput_slots[slot].pad; ++slot) {}
+        if (slot == 4) break;
+        xinput_slots[slot].pad = SDL_GameControllerOpen(device);
+    }
+}
+API(XInputGetState) {
+    uint32_t index = ARG(c, 0), out = ARG(c, 1);
+    if (index >= 4) { ret_stdcall(c, 1167, 2); return; }
+    if (!out) { ret_stdcall(c, 87, 2); return; }
+    pthread_mutex_lock(&xinput_lock);
+    if (!(SDL_WasInit(SDL_INIT_GAMECONTROLLER) & SDL_INIT_GAMECONTROLLER)) {
+        /* SDL owns and closes controllers when its subsystem shuts down. */
+        for (unsigned i = 0; i < 4; ++i) {
+            xinput_slots[i].pad = NULL;
+            xinput_slots[i].sampled = 0;
+        }
+        pthread_mutex_unlock(&xinput_lock);
+        ret_stdcall(c, 1167, 2); return;
+    }
+    xinput_refresh();
+    SDL_GameController *pad = xinput_slots[index].pad;
+    if (!pad) {
+        pthread_mutex_unlock(&xinput_lock);
+        ret_stdcall(c, 1167, 2); return;
+    }
+    static const struct { SDL_GameControllerButton button; uint16_t bit; } buttons[] = {
+        {SDL_CONTROLLER_BUTTON_DPAD_UP, 0x0001}, {SDL_CONTROLLER_BUTTON_DPAD_DOWN, 0x0002},
+        {SDL_CONTROLLER_BUTTON_DPAD_LEFT, 0x0004}, {SDL_CONTROLLER_BUTTON_DPAD_RIGHT, 0x0008},
+        {SDL_CONTROLLER_BUTTON_START, 0x0010}, {SDL_CONTROLLER_BUTTON_BACK, 0x0020},
+        {SDL_CONTROLLER_BUTTON_LEFTSTICK, 0x0040}, {SDL_CONTROLLER_BUTTON_RIGHTSTICK, 0x0080},
+        {SDL_CONTROLLER_BUTTON_LEFTSHOULDER, 0x0100}, {SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, 0x0200},
+        {SDL_CONTROLLER_BUTTON_A, 0x1000}, {SDL_CONTROLLER_BUTTON_B, 0x2000},
+        {SDL_CONTROLLER_BUTTON_X, 0x4000}, {SDL_CONTROLLER_BUTTON_Y, 0x8000},
+    };
+    unsigned char state[12] = {0};
+    uint16_t mask = 0;
+    for (unsigned b = 0; b < sizeof buttons / sizeof buttons[0]; ++b)
+        if (SDL_GameControllerGetButton(pad, buttons[b].button)) mask |= buttons[b].bit;
+    memcpy(state, &mask, 2);
+    state[2] = xinput_trigger(SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_TRIGGERLEFT));
+    state[3] = xinput_trigger(SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT));
+    int16_t axes[] = {
+        SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_LEFTX),
+        xinput_y(SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_LEFTY)),
+        SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_RIGHTX),
+        xinput_y(SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_RIGHTY)),
+    };
+    memcpy(state + 4, axes, 8);
+    if (!xinput_slots[index].sampled || memcmp(state, xinput_slots[index].previous, 12)) {
+        ++xinput_slots[index].packet;
+        memcpy(xinput_slots[index].previous, state, 12);
+        xinput_slots[index].sampled = 1;
+    }
+    wr32(out, xinput_slots[index].packet);
+    memcpy(G(out + 4), state, 12);
+    pthread_mutex_unlock(&xinput_lock);
+    ret_stdcall(c, 0, 2);
+}
 API(GetFileVersionInfoSizeA) { if (ARG(c, 1)) wr32(ARG(c, 1), 0); ret_stdcall(c, 0, 2); }
 S(GetFileVersionInfoA, 0, 4)
 API(VerQueryValueA) {

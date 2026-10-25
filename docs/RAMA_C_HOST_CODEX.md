@@ -107,3 +107,31 @@ Compilación final: `python -I recomp/build_host.py` terminó con
 artifacts/host-gl-build.log y artifacts/host-api-tests.log. No se ejecutó el
 juego comercial ni se validó gameplay; la validación observada es del puente
 host y de su enlace.
+
+## Tarea 4: XInput por SDL_GameController
+
+XInputGetState ahora abre bajo demanda hasta cuatro mandos SDL, conserva sus
+slots mientras sigan conectados y rellena los 16 bytes del XINPUT_STATE x86 con
+escrituras explícitas. Mapea cruceta, Start/Back, L3/R3, LB/RB y A/B/X/Y a los bits
+estándar Xbox. Los gatillos se convierten de 0..32767 a 0..255; sticks X pasan
+como int16 y Y se invierte, saturando -32768 a +32767. No añade zonas muertas.
+El paquete aumenta sólo cuando cambia el estado visible, incluida la primera
+muestra/reconexión. La tabla se protege con mutex. Sin dispositivo devuelve 1167;
+un buffer NULL devuelve 87. No borra buffers al fallar y usa stdcall de dos args.
+La inicialización de SDL sigue a cargo del host de ventanas existente.
+
+Pruebas ejecutadas:
+- `python -I tests/host/run_tests.py stubs xinput`: OK, 80/80 imports de stubs,
+  XInput registrado y prueba con cuatro mandos virtuales SDL. Comprueba cada bit
+  Xbox, gatillos intermedio/extremos, sticks extremos, Y saturada, paquete estable
+  o actualizado, límites de escritura, slots independientes, desconexión,
+  reconexión y limpieza de pila stdcall.
+- `python -I recomp/build_host.py`: `built .../host/vagante_host.exe` (log local
+  artifacts/host-xinput-build-retry.log). El primer enlace informó file truncated;
+  repetir el enlace con los objetos ya compilados terminó correctamente.
+- No se probó un mando físico ni los controles en Vita. Los mandos virtuales
+  verifican el puente con SDL real sin depender del hardware conectado al equipo.
+
+Los cambios preexistentes de SteamInternal_ContextInit y DirectInput se conservan
+sin incorporarlos al commit de XInput. La prueba antigua de stubs admite ambos
+backends de DirectInput y usa mocks sólo para la asignación de su objeto COM.
