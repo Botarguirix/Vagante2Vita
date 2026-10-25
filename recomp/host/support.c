@@ -49,155 +49,234 @@ void trace_close(void) {
     }
 }
 
-/* -- guest heap -------------------------------------------------------------------------
- * Size-class free lists (16-byte classes up to 4 KiB) plus a first-fit list for large
- * blocks; a 16-byte header before every block holds the requested size. Large blocks are
- * split on allocation and coalesced with their free neighbours (the DAT loader churns
- * multi-MiB buffers; without it 96 MiB were exhausted during boot). */
-enum { HDR = 16, CLASS_STEP = 16, CLASSES = 256, MAGIC = 0x48454150u /* "HEAP" */ };
-static uint32_t heap_top = GUEST_HEAP_BASE, heap_committed = GUEST_HEAP_BASE;
-static uint32_t free_class[CLASSES + 1];
-static uint32_t free_large;
-static uint32_t heap_live;
+/* -- guest heap: 32-bit-offset TLSF -------------------------------------------------------
+ * Two-level segregated free lists: 32 SL bins per power of two, bitmap selection,
+ * immediate physical-neighbour coalescing. No free-list traversal on alloc/free.
+ * Header (16 bytes): requested size, allocation magic, capacity, previous header.
+ * Free blocks store two uint32 guest links in their unused payload. There are no
+ * host pointers in the arena, so PC x64 and Vita ARM use the identical layout.
+ * Only metadata/mapping is locked; zeroing and moving copies run after unlocking.
+ * TLSF bounds metadata work, not page commitment, memset, memcpy or diagnostics.
+ */
+enum { HDR=16, ALIGN=16, SL_BITS=5, SL_COUNT=32, FL_COUNT=24,
+       SMALL_LIMIT=ALIGN*SL_COUNT, MAGIC=0x48454150u, TOP_ALLOCATIONS=8 };
+_Static_assert((GUEST_HEAP_BASE & 15)==0 && (GUEST_HEAP_SIZE & 15)==0, "TLSF arena alignment");
+#define HEAP_END ((uint32_t)(GUEST_HEAP_BASE+GUEST_HEAP_SIZE))
+static uint32_t heap_committed=GUEST_HEAP_BASE;
+static uint32_t heap_fl_bitmap, heap_sl_bitmap[FL_COUNT], heap_heads[FL_COUNT][SL_COUNT];
+static uint32_t heap_live, heap_peak, heap_max_request;
+static unsigned heap_initialized, heap_map_failures;
+static uint64_t heap_alloc_calls, heap_free_calls, heap_realloc_calls;
+static pthread_mutex_t heap_lock=PTHREAD_MUTEX_INITIALIZER;
 
-static uint32_t round_up(uint32_t n) { return (n + CLASS_STEP - 1) & ~(uint32_t)(CLASS_STEP - 1); }
-
-static uint32_t block_capacity(uint32_t p) { return rd32(p - HDR + 8); }
-
-static uint32_t carve(uint32_t capacity) {
-    uint32_t block = heap_top;
-    if (capacity > GUEST_HEAP_BASE + GUEST_HEAP_SIZE - block - HDR) /* remaining space, no wrap */
-        return 0;
-    uint32_t end = block + HDR + capacity;
-    while (heap_committed < end) {
-        if (guest_map(heap_committed, 0x100000))
-            return 0;
-        heap_committed += 0x100000;
+static uint32_t block_capacity(uint32_t b) { return rd32(b+8); }
+static unsigned high_bit(uint32_t n) { return 31u-(unsigned)__builtin_clz(n); }
+static void heap_bin(uint32_t n,unsigned *fl,unsigned *sl) {
+    if(n<SMALL_LIMIT) { *fl=0; *sl=n/ALIGN; }
+    else {
+        unsigned bit=high_bit(n);
+        *fl=bit-8; *sl=(n>>(bit-SL_BITS))-SL_COUNT;
     }
-    heap_top = end;
-    wr32(block + 8, capacity);
-    return block + HDR;
 }
-
-static uint32_t heap_alloc_locked(uint32_t size, int zero) {
-    /* larger than the whole heap: refuse before round_up and carve can wrap around
-       (Codex T10 found both overflows) */
-    if (size > GUEST_HEAP_SIZE - HDR)
-        return 0;
-    uint32_t capacity = round_up(size ? size : 1), p = 0;
-    if (capacity / CLASS_STEP <= CLASSES) {
-        uint32_t k = capacity / CLASS_STEP;
-        if (free_class[k]) {
-            p = free_class[k];
-            free_class[k] = rd32(p);
-        }
-    } else {
-        /* first fit in the address-ordered list; the tail is split off when it can
-           still hold a large block */
-        uint32_t prev = 0;
-        for (uint32_t q = free_large; q; prev = q, q = rd32(q)) {
-            uint32_t have = block_capacity(q);
-            if (have < capacity)
-                continue;
-            uint32_t next = rd32(q);
-            if (have - capacity >= HDR + (CLASSES + 1) * CLASS_STEP) {
-                uint32_t rest = q + capacity + HDR;
-                wr32(rest - HDR + 8, have - capacity - HDR);
-                wr32(rest - HDR + 4, 0);
-                wr32(rest, next);
-                next = rest;
-                wr32(q - HDR + 8, capacity);
-            }
-            if (prev) wr32(prev, next); else free_large = next;
-            p = q;
-            break;
-        }
-    }
-    if (!p)
-        p = carve(capacity);
-    if (!p) {
-        trace("# heap exhausted: request %u bytes, live %u KiB", size, heap_live >> 10);
-        return 0;
-    }
-    heap_live += block_capacity(p);
-    wr32(p - HDR, size);
-    wr32(p - HDR + 4, MAGIC);
-    if (zero)
-        memset(G(p), 0, block_capacity(p));
-    return p;
+static void heap_insert(uint32_t b) {
+    unsigned fl,sl; heap_bin(block_capacity(b),&fl,&sl);
+    uint32_t head=heap_heads[fl][sl];
+    wr32(b+HDR,head); wr32(b+HDR+4,0);
+    if(head) wr32(head+HDR+4,b);
+    heap_heads[fl][sl]=b;
+    heap_sl_bitmap[fl]|=1u<<sl; heap_fl_bitmap|=1u<<fl;
 }
-
+static void heap_unlink(uint32_t b) {
+    unsigned fl,sl; heap_bin(block_capacity(b),&fl,&sl);
+    uint32_t next=rd32(b+HDR),previous=rd32(b+HDR+4);
+    if(previous) wr32(previous+HDR,next); else heap_heads[fl][sl]=next;
+    if(next) wr32(next+HDR+4,previous);
+    if(!heap_heads[fl][sl]) {
+        heap_sl_bitmap[fl]&=~(1u<<sl);
+        if(!heap_sl_bitmap[fl]) heap_fl_bitmap&=~(1u<<fl);
+    }
+}
+static uint32_t heap_find(uint32_t need) {
+    unsigned fl,sl; heap_bin(need,&fl,&sl);
+    /* A single head probe preserves exact fits at the top of an arena/bin.
+       Never scan the remainder of this bin. Otherwise round the search upward
+       so every block in the selected bin is guaranteed to fit. */
+    uint32_t b=heap_heads[fl][sl];
+    if(b && block_capacity(b)>=need) return b;
+    if(need>=SMALL_LIMIT) {
+        uint32_t round=(1u<<(high_bit(need)-SL_BITS))-1;
+        if(need>UINT32_MAX-round) return 0;
+        heap_bin(need+round,&fl,&sl);
+    }
+    if(fl>=FL_COUNT) return 0;
+    uint32_t slots=heap_sl_bitmap[fl] & (UINT32_MAX<<sl);
+    if(!slots) {
+        uint32_t levels=heap_fl_bitmap & (UINT32_MAX<<(fl+1));
+        if(!levels) return 0;
+        fl=(unsigned)__builtin_ctz(levels); slots=heap_sl_bitmap[fl];
+    }
+    sl=(unsigned)__builtin_ctz(slots);
+    return heap_heads[fl][sl];
+}
+static int heap_commit(uint32_t end) {
+    if(end<=heap_committed) return 1;
+    if(end>HEAP_END) return 0;
+    uint32_t limit=(end+0xfffffu)&~0xfffffu;
+    if(limit>HEAP_END) limit=HEAP_END;
+    if(guest_map(heap_committed,limit-heap_committed)) { ++heap_map_failures; return 0; }
+    heap_committed=limit; return 1;
+}
+static int heap_init(void) {
+    if(heap_initialized) return 1;
+    if(!heap_commit(GUEST_HEAP_BASE+HDR+ALIGN)) return 0;
+    uint32_t b=GUEST_HEAP_BASE;
+    wr32(b,0); wr32(b+4,0); wr32(b+8,GUEST_HEAP_SIZE-HDR); wr32(b+12,0);
+    heap_insert(b); heap_initialized=1; return 1;
+}
+static int heap_valid(uint32_t p) {
+    if(!heap_initialized || (p&15) || p<GUEST_HEAP_BASE+HDR || p>=heap_committed) return 0;
+    uint32_t b=p-HDR;
+    if(rd32(b+4)!=MAGIC) return 0;
+    uint32_t cap=block_capacity(b);
+    return cap>=ALIGN && !(cap&15) && cap<=HEAP_END-p && rd32(b)<=cap;
+}
+static void heap_fix_next(uint32_t b) {
+    uint32_t next=b+HDR+block_capacity(b);
+    if(next<HEAP_END) wr32(next+12,b);
+}
+/* b is not in a free list yet; its free successor, if any, is in one. */
+static void heap_join_next(uint32_t b) {
+    uint32_t next=b+HDR+block_capacity(b);
+    if(next<HEAP_END && rd32(next+4)==0) {
+        heap_unlink(next); wr32(b+8,block_capacity(b)+HDR+block_capacity(next));
+        heap_fix_next(b);
+    }
+}
+static void heap_split(uint32_t b,uint32_t need) {
+    uint32_t cap=block_capacity(b);
+    if(cap-need<HDR+ALIGN) return;
+    uint32_t tail=b+HDR+need;
+    wr32(b+8,need);
+    wr32(tail,0); wr32(tail+4,0); wr32(tail+8,cap-need-HDR); wr32(tail+12,b);
+    heap_fix_next(tail); heap_join_next(tail); heap_insert(tail);
+}
+static int heap_prepare(uint32_t b,uint32_t cap,uint32_t need) {
+    /* Commit all returned payload plus a split tail's header and free links. */
+    int split=cap-need>=HDR+ALIGN;
+    return heap_commit(b+HDR+(split?need:cap)+(split?HDR+ALIGN:0));
+}
+static uint32_t heap_alloc_locked(uint32_t size) {
+    if(size>GUEST_HEAP_SIZE-HDR) return 0;
+    uint32_t need=((size?size:1)+15u)&~15u;
+    if(!heap_init()) return 0;
+    uint32_t b=heap_find(need);
+    if(!b || !heap_prepare(b,block_capacity(b),need)) return 0;
+    heap_unlink(b); heap_split(b,need);
+    wr32(b,size); wr32(b+4,MAGIC);
+    heap_live+=block_capacity(b);
+    if(heap_live>heap_peak) heap_peak=heap_live;
+    return b+HDR;
+}
 static void heap_free_locked(uint32_t p) {
-    if (!p || rd32(p - HDR + 4) != MAGIC)
-        return;
-    wr32(p - HDR + 4, 0);
-    uint32_t capacity = block_capacity(p);
-    heap_live -= capacity;
-    if (capacity / CLASS_STEP <= CLASSES) {
-        wr32(p, free_class[capacity / CLASS_STEP]);
-        free_class[capacity / CLASS_STEP] = p;
-    } else {
-        /* address-ordered insert, merging with the neighbours that touch */
-        uint32_t prev = 0, q = free_large;
-        while (q && q < p) { prev = q; q = rd32(q); }
-        if (q && p + capacity + HDR == q) {
-            capacity += HDR + block_capacity(q);
-            q = rd32(q);
-        }
-        if (prev && prev + block_capacity(prev) + HDR == p) {
-            wr32(prev - HDR + 8, block_capacity(prev) + HDR + capacity);
-            wr32(prev, q);
-            return;
-        }
-        wr32(p - HDR + 8, capacity);
-        wr32(p, q);
-        if (prev) wr32(prev, p); else free_large = p;
+    if(!heap_valid(p)) return;
+    uint32_t b=p-HDR;
+    heap_live-=block_capacity(b); wr32(b,0); wr32(b+4,0);
+    uint32_t previous=rd32(b+12);
+    if(previous && rd32(previous+4)==0) {
+        heap_unlink(previous);
+        wr32(previous+8,block_capacity(previous)+HDR+block_capacity(b));
+        b=previous; heap_fix_next(b);
     }
+    heap_join_next(b); heap_insert(b);
 }
 
-uint32_t heap_size(uint32_t p) {
-    return p && rd32(p - HDR + 4) == MAGIC ? rd32(p - HDR) : 0xFFFFFFFFu;
-}
-
-static uint32_t heap_realloc_locked(uint32_t p, uint32_t size, int zero) {
-    if (!p)
-        return heap_alloc_locked(size, zero);
-    uint32_t old = heap_size(p);
-    if (size <= block_capacity(p)) {
-        if (zero && size > old)
-            memset(G(p + old), 0, size - old);
-        wr32(p - HDR, size);
-        return p;
-    }
-    uint32_t q = heap_alloc_locked(size, zero);
-    if (!q)
-        return 0;
-    memcpy(G(q), G(p), old);
-    heap_free_locked(p);
-    return q;
-}
-
-/* The guest heap is shared by all guest threads. */
-static pthread_mutex_t heap_lock = PTHREAD_MUTEX_INITIALIZER;
-uint32_t heap_alloc(uint32_t size, int zero) {
+/* Cold diagnostics only: exact largest free block and top live allocations.
+   Walk once under the lock, then release it before tracing/formatting. */
+static void heap_trace_stats(void) {
+    struct Allocation { uint32_t address,size,capacity; } top[TOP_ALLOCATIONS]={{0}};
+    uint32_t largest=GUEST_HEAP_SIZE-HDR,live,peak,committed,request;
+    unsigned maps;
+    uint64_t allocations,frees,reallocations;
     pthread_mutex_lock(&heap_lock);
-    uint32_t p = heap_alloc_locked(size, zero);
+    live=heap_live; peak=heap_peak; committed=heap_committed-GUEST_HEAP_BASE;
+    request=heap_max_request; maps=heap_map_failures;
+    allocations=heap_alloc_calls; frees=heap_free_calls; reallocations=heap_realloc_calls;
+    if(heap_initialized) {
+        largest=0;
+        for(uint32_t b=GUEST_HEAP_BASE;b<HEAP_END;) {
+            uint32_t cap=block_capacity(b);
+            if(cap<ALIGN || (cap&15) || cap>HEAP_END-b-HDR) break;
+            if(rd32(b+4)==0) { if(cap>largest) largest=cap; }
+            else if(rd32(b+4)==MAGIC) {
+                uint32_t n=rd32(b);
+                for(unsigned i=0;i<TOP_ALLOCATIONS;i++) if(!top[i].address || n>top[i].size) {
+                    for(unsigned j=TOP_ALLOCATIONS-1;j>i;j--) top[j]=top[j-1];
+                    top[i]=(struct Allocation){b+HDR,n,cap}; break;
+                }
+            }
+            b+=HDR+cap;
+        }
+    }
     pthread_mutex_unlock(&heap_lock);
+    trace("# heap TLSF: live %u KiB, peak %u KiB, committed %u KiB, largest free %u bytes, largest request %u bytes, map failures %u",
+          live>>10,peak>>10,committed>>10,largest,request,maps);
+    trace("# heap calls: alloc %llu free %llu realloc %llu; largest allocations (live, requested/capacity bytes):",
+          (unsigned long long)allocations,(unsigned long long)frees,(unsigned long long)reallocations);
+    for(unsigned i=0;i<TOP_ALLOCATIONS && top[i].address;i++)
+        trace("# heap allocation %u: %08x requested %u capacity %u",i+1,top[i].address,top[i].size,top[i].capacity);
+}
+uint32_t heap_alloc(uint32_t size,int zero) {
+    pthread_mutex_lock(&heap_lock); ++heap_alloc_calls;
+    if(size>heap_max_request) heap_max_request=size;
+    uint32_t p=heap_alloc_locked(size),cap=p?block_capacity(p-HDR):0;
+    pthread_mutex_unlock(&heap_lock);
+    if(p) { if(zero) memset(G(p),0,cap); }
+    else { trace("# heap allocation failed: request %u bytes",size); heap_trace_stats(); }
     return p;
 }
 void heap_free(uint32_t p) {
-    pthread_mutex_lock(&heap_lock);
-    heap_free_locked(p);
-    pthread_mutex_unlock(&heap_lock);
+    pthread_mutex_lock(&heap_lock); ++heap_free_calls; heap_free_locked(p); pthread_mutex_unlock(&heap_lock);
 }
-uint32_t heap_realloc(uint32_t p, uint32_t size, int zero) {
+uint32_t heap_size(uint32_t p) {
     pthread_mutex_lock(&heap_lock);
-    uint32_t q = heap_realloc_locked(p, size, zero);
-    pthread_mutex_unlock(&heap_lock);
-    return q;
+    uint32_t size=heap_valid(p)?rd32(p-HDR):UINT32_MAX;
+    pthread_mutex_unlock(&heap_lock); return size;
 }
-
-uint32_t heap_used(void) { return heap_top - GUEST_HEAP_BASE; }
+uint32_t heap_realloc(uint32_t p,uint32_t size,int zero) {
+    if(!p) return heap_alloc(size,zero);
+    pthread_mutex_lock(&heap_lock); ++heap_realloc_calls;
+    if(size>heap_max_request) heap_max_request=size;
+    if(!heap_valid(p) || size>GUEST_HEAP_SIZE-HDR) { pthread_mutex_unlock(&heap_lock); return 0; }
+    uint32_t b=p-HDR,old=rd32(b),cap=block_capacity(b),need=((size?size:1)+15u)&~15u;
+    int in_place=need<=cap;
+    if(!in_place) {
+        uint32_t next=b+HDR+cap;
+        if(next<HEAP_END && rd32(next+4)==0) {
+            uint32_t combined=cap+HDR+block_capacity(next);
+            if(combined>=need && heap_prepare(b,combined,need)) {
+                heap_unlink(next); wr32(b+8,combined); heap_fix_next(b); in_place=1;
+            }
+        }
+    }
+    if(in_place) {
+        heap_split(b,need); wr32(b,size);
+        heap_live=heap_live-cap+block_capacity(b);
+        if(heap_live>heap_peak) heap_peak=heap_live;
+        pthread_mutex_unlock(&heap_lock);
+        if(zero && size>old) memset(G(p+old),0,size-old);
+        return p;
+    }
+    uint32_t q=heap_alloc_locked(size),new_cap=q?block_capacity(q-HDR):0;
+    pthread_mutex_unlock(&heap_lock);
+    if(!q) { trace("# heap realloc failed: request %u bytes",size); heap_trace_stats(); return 0; }
+    /* The caller owns p throughout; unrelated allocations may proceed while copying. */
+    memcpy(G(q),G(p),old<size?old:size);
+    if(zero && new_cap>old) memset(G(q+old),0,new_cap-old);
+    heap_free(p); return q;
+}
+uint32_t heap_used(void) {
+    pthread_mutex_lock(&heap_lock); uint32_t live=heap_live; pthread_mutex_unlock(&heap_lock); return live;
+}
 
 uint32_t guest_strdup(const char *s) {
     uint32_t p = heap_alloc((uint32_t)strlen(s) + 1, 0);
@@ -303,6 +382,7 @@ static void api_dispatch(Cpu *c) {
 
 void trace_summary(void) {
     trace("# memory: heap %u KiB, VirtualAlloc %u KiB", heap_used() / 1024, virtual_used() / 1024);
+    heap_trace_stats();
     trace("# Win32 calls by function:");
     for (unsigned i = 0; i < fake_count; i++)
         if (fakes[i].calls)
