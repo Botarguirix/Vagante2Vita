@@ -338,7 +338,7 @@ static const char *ordinal_name(const char *dll, unsigned ordinal) {
 }
 
 static GuestFn lookup(const char *name) {
-    const ApiEntry *tables[] = {win32_threads, win32_kernel32, win32_user, win32_stubs, win32_openal};
+    const ApiEntry *tables[] = {win32_threads, win32_kernel32, win32_user, win32_stubs, win32_openal, win32_gl};
     for (unsigned t = 0; t < sizeof tables / sizeof tables[0]; t++)
         for (const ApiEntry *e = tables[t]; e->name; e++)
             if (!strcmp(e->name, name))

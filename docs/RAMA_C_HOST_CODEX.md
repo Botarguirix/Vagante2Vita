@@ -72,3 +72,38 @@ Compilación completa de esta tarea: `python -I recomp/build_host.py` terminó c
 Se agregó el propio script a las dependencias de los objetos host: cambiar sus
 flags debe recompilarlos, evitando reutilizar un openal.o construido para DLL al
 enlazar la biblioteca estática. No fuerza a regenerar el código del lifter.
+
+## Tarea 3: OpenGL
+
+`recomp/host/gl.c`: nueva tabla win32_gl, declarada en win32.h y registrada en
+lookup de support.c. Hay **32 gl*** en artifacts/imports.txt, no 33; sus 37
+imports OPENGL32 se dividen en esas 32 funciones y cinco wgl*. No se implementó
+ni modificó ninguna wgl*.
+
+Cada wrapper llama a OpenGL del host y usa ret_stdcall. Parámetros float32 se
+leen como tales; glOrtho recibe seis double64 en 12 palabras de la pila x86.
+Los datos de texturas, índices, matrices, arrays de vértices/color/UV y buffers
+de salida se traducen con G y los punteros nulos siguen siendo NULL. Los arrays
+cliente apuntan a la memoria guest estable y deben conservarse vivos hasta dibujar.
+Los GLuint son identificadores OpenGL, no direcciones, y pasan sin conversión.
+
+glGetString conserva una copia guest por enum mediante guest_strdup; llamadas
+posteriores devuelven la misma dirección. No se convierte ni trunca un puntero
+host de 64 bits. NULL (por contexto ausente o enum inválido) no se almacena. La
+caché tiene 16 entradas, suficientes para los enums de OpenGL 1.1 importado, y
+su asignación está protegida por mutex.
+
+Verificación reproducible: `python -I tests/host/run_tests.py`.
+Se observó cobertura 80/80 stubs, 28/28 OpenAL y 32/32 OpenGL. Las tres pruebas
+terminaron con código cero. La prueba GL crea una ventana SDL oculta y un contexto
+real (OpenGL 4.6.0 NVIDIA 591.59 en este equipo); verifica pila, double/float,
+caché de cadenas, viewport, enable/disable, matrices, arrays cliente, dibujo con
+índices guest, upload/readback de texturas y modificación por subimagen.
+No modifica el host de ventanas ni acredita ejecución del juego completo.
+
+
+Compilación final: `python -I recomp/build_host.py` terminó con
+`built .../host/vagante_host.exe` después de registrar win32_gl. Evidencia local:
+artifacts/host-gl-build.log y artifacts/host-api-tests.log. No se ejecutó el
+juego comercial ni se validó gameplay; la validación observada es del puente
+host y de su enlace.
