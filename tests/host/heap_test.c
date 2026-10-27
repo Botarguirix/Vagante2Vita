@@ -11,7 +11,7 @@
 uint8_t *guest_base;
 _Thread_local GuestThread guest_thread_state;
 uint32_t guest_image_base;
-const ApiEntry win32_threads[]={{NULL,NULL}}, win32_kernel32[]={{NULL,NULL}},
+const ApiEntry win32_fileio[]={{NULL,NULL}},win32_threads[]={{NULL,NULL}}, win32_kernel32[]={{NULL,NULL}},
     win32_user[]={{NULL,NULL}}, win32_stubs[]={{NULL,NULL}}, win32_openal[]={{NULL,NULL}},
     win32_gl[]={{NULL,NULL}}, win32_window[]={{NULL,NULL}};
 void guest_intercept(uint32_t address,GuestFn fn) { (void)address;(void)fn; abort(); }

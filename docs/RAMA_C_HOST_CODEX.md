@@ -135,3 +135,89 @@ Pruebas ejecutadas:
 Los cambios preexistentes de SteamInternal_ContextInit y DirectInput se conservan
 sin incorporarlos al commit de XInput. La prueba antigua de stubs admite ambos
 backends de DirectInput y usa mocks sólo para la asignación de su objeto COM.
+
+
+## Tarea 10: fflush del log (2026-10-26)
+
+Se añade recomp/host/fileio.c y se registra win32_fileio antes de las tablas
+originales. Delega CreateFileA/W, WriteFile y CloseHandle en sus implementaciones
+existentes. No se editan kernel32, threads, window, archive, lift ni runtime.
+Registra por handle y FILE el bit GENERIC_WRITE que selecciona r+b/w+b en las
+aperturas originales; cada WriteFile de esos streams termina con fflush(FILE).
+Los lectores conservan su caché/buffer, no se llama fflush(NULL) y los handles
+estándar no se vacían. El modo se limpia antes de CloseHandle y se registra de
+nuevo al reutilizar un slot. El mutex sólo protege el modo, no fwrite/fflush.
+Un error de fflush devuelve FALSE y ERROR_WRITE_FAULT (29), conservando el
+número de bytes que aceptó fwrite. Se preserva la limpieza de pila stdcall.
+fflush vacía stdio al sistema operativo; no es fsync ni garantía ante corte de
+energía. El objetivo es conservar la cola al matar/fallar el proceso.
+
+### Pruebas funcionales
+
+`python -I tests/host/run_fileio_tests.py` pasó: aperturas A/W, escritura visible
+sin CloseHandle, escritura de cero bytes, lectores reutilizados sin flush,
+reutilización de handles, stdout/handle inválido sin fflush(NULL), error de
+vaciado y ABI. El spy distingue el fflush(NULL) del CRT al salir, que no es una
+llamada del adaptador. Dos procesos hijos con stdio totalmente buffered escriben
+la misma línea y esperan; el padre termina únicamente esos hijos por PID sin
+fclose. El control pierde la cola y el adaptador conserva la línea completa.
+`python -I tests/host/run_heap_tests.py --stress-only` también pasó tras añadir
+la tabla vacía fileio a su fixture: 72.000 operaciones, sin corrupción/solapamiento
+y memoria viva final cero.
+
+### Carga real en PC y límite del 2 %
+
+Se construyeron dos ejecutables aislados con los mismos objetos x86→C ya
+compilados, runtime, archive y librerías. Sólo se reemplaza el lookup de support.o
+y se añade fileio.o en el candidato. Ambos incorporan la misma sonda exclusiva
+de pruebas: intercepta el final real de ResourceManager::finishInitialization
+(0x0073c6c0), llama al original y mide platform_ticks_us desde el inicio del host.
+Después termina su propio proceso mediante TerminateProcess, sin limpieza del
+CRT. La sonda no se incorpora al host de producción ni al VPK.
+
+Datos del usuario reales, todas las paletas, backend OpenAL null, misma copia
+congelada de config/custom y perfiles de prueba nuevos. data.vra se enlaza por
+hardlink a cada perfil. Una carga de calentamiento por ejecutable, excluida;
+siete pares medidos, orden alternado A/B y B/A. No se cerró la instancia del
+usuario que tenía vagante_host.exe abierto: se enlazó en otra carpeta porque
+Windows impedía reemplazar ese ejecutable. No se usó una prueba sintética de
+WriteFile para sustituir la carga del juego.
+
+| Mediana de 7 cargas | Segundos |
+|---|---:|
+| Antes | 8.566249 |
+| Con fflush | 7.834515 |
+
+Cambio observado de medianas: **-8.542 %**, dentro del límite
+solicitado de +2 %. Hay dispersión entre corridas; no se atribuye la aparente
+aceleración al fflush ni se garantiza ese porcentaje en cualquier equipo/carga.
+La compuerta automatizada rechaza resultados con aumento de mediana >2 %.
+
+Muestras antes (s): [8.768762, 8.268272, 10.34156, 7.765674, 8.141759, 8.608591, 8.566249].
+Muestras después (s): [8.416425, 9.831034, 7.834515, 7.099964, 8.527467, 7.755557, 7.331333].
+En los siete controles el log al terminar sin cerrar mide 4096 B; en los siete
+candidatos conserva 4400 B, incluidos los 304 B de cola que faltaban.
+
+SHA-256 del ejecutable de referencia con sonda:
+`a0fc035e466d1081928aa04bd4a82a7e87e0825703abdb9f7ed49cc192357845`.
+SHA-256 del candidato con sonda:
+`5b7c3365d6382be5ed01748cf90c019a4bdbec736dcfcb1b316269f57eb37adf`.
+SHA-256 de fileio.c medido:
+`8da74b6c1a01fa9472670bf0eb2a82365b987dedab81c3011315135a8f65458b`.
+
+Para repetir con los datos privados instalados y las unidades generadas:
+
+```powershell
+python -I tests/host/log_flush_load_bench.py --freeze-baseline
+python -I tests/host/log_flush_load_bench.py --candidate --run --pairs 7
+python -I tests/host/log_flush_load_bench.py --check-result
+```
+
+La referencia excluye fileio.o y reconstruye el lookup anterior incluso después
+de instalar este cambio. Los objetos/headers congelados y los perfiles se guardan
+en artifacts/fileio-load; resultados completos en results.json. Logs: artifacts/
+fileio-tests-final.log, fileio-load-results.log, fileio-load-gate.log y
+fileio-heap-regression.log. Los dos ejecutables PC enlazaron y completaron la
+carga. La compilación ARM de la capa host también terminó con
+"OK: host ARM compiled (no ELF/VPK requested)", mediante build_vita.py --host-only.
+No se generó un VPK nuevo en esta tarea ni se ejecutó/midió en Vita física.

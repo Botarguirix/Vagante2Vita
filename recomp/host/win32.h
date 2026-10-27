@@ -70,6 +70,7 @@ static inline void ret_cdecl(Cpu *c, uint32_t value) {
 /* -- registry ---------------------------------------------------------------------- */
 typedef struct { const char *name; GuestFn fn; } ApiEntry;
 extern const ApiEntry win32_threads[];
+extern const ApiEntry win32_fileio[]; /* fileio.c: flush writable streams after WriteFile */
 extern const ApiEntry win32_kernel32[];
 extern const ApiEntry win32_user[];   /* user.c: USER32, GDI32, WINMM, OLE, IMM, VERSION */
 extern const ApiEntry win32_gl[]; /* gl.c: OpenGL 1.1, guest stdcall */
