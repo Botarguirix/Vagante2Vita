@@ -67,6 +67,12 @@ API(WriteFile) {
     /* Never fflush(NULL), stdin/stdout, or a reused read-only stream. The mode
        lock is not held over fwrite/fflush; independent files stay independent.
        fflush transfers stdio buffers to the OS, not a disk/power-loss fsync. */
+    /* At most one flush per second: on the Vita memory card each fflush costs ~0.4 s (73 log
+       writes took 29 s), so the log is flushed close to real time without stalling the game. */
+    static uint64_t last_flush;
+    uint64_t now = platform_ticks_us();
+    if(writable && now - last_flush < 1000000u) writable=0;
+    else if(writable) last_flush=now;
     if(writable && fflush(stream)) {
         last_error=29; /* ERROR_WRITE_FAULT */
         c->eax.d=0;

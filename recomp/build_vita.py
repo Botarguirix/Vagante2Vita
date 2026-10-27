@@ -152,7 +152,7 @@ def main():
     parser.add_argument('--jobs',type=int,default=min(os.cpu_count() or 4,8))
     parser.add_argument('--opt',choices=['-Os','-O1','-O2'],default='-Os')
     parser.add_argument('--trace-calls',action='store_true')
-    parser.add_argument('--window-mib',type=int,default=288,help='guest memory window (the Vita had ~308 MiB free)')
+    parser.add_argument('--window-mib',type=int,default=280,help='guest memory window (the Vita had ~308 MiB free)')
     parser.add_argument('--host-only',action='store_true',help='compile ARM platform/host first, without linking')
     args=parser.parse_args()
     if args.jobs < 1: parser.error('--jobs must be positive')

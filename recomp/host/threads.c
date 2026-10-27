@@ -205,6 +205,9 @@ API(CreateThread) {
         wr32(ARG(c, 5), 0x1004 + 4 * index);
     pthread_attr_t attr;
     pthread_attr_init(&attr);
+    /* Nobody joins guest threads (their end is signalled through t->done): detached, an
+       exited thread gives its stack back. On the Vita the 7th thread failed with EAGAIN. */
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 #ifdef __vita__
     /* host stack for nested guest calls; 2 MiB each left too little for the 11th thread
        after vitaGL took its pools (EAGAIN on hardware) */
