@@ -30,8 +30,8 @@ platform_pc.c y se incluyen los archivos de recomp/vita. No se omitieron funcion
 del juego para reducir el tamaño.
 
 Compilación: GNU C11, Thumb/ARMv7 Cortex-A9, NEON hard-float, -Os, sin fast-math,
--ffp-contract=off, -frounding-math y -fno-strict-aliasing. GUEST_WINDOW se fija en
-0x10000000 (256 MiB). SDL2, OpenAL, vitaGL, sus dependencias y los stubs Vita se
+-ffp-contract=off, -frounding-math y -fno-strict-aliasing. GUEST_WINDOW predeterminado actual es
+0x12000000 (288 MiB); se puede cambiar con --window-mib. SDL2, OpenAL, vitaGL, sus dependencias y los stubs Vita se
 enlazan en grupo. El enlace usa response file para evitar el límite de longitud
 de comandos de Windows con rutas largas y espacios.
 
@@ -316,3 +316,14 @@ El VPK está en artifacts/recomp/<sha>/vita/Vagante-ramaC.vpk. No se lanzó Vita
 ni se ejecutó en Vita física. Queda pendiente instalarlo en el dispositivo y
 comparar el tiempo de carga, la espera del lock, la memoria y el gameplay con
 el mismo conjunto de datos de la medición original.
+
+## Paquete con fflush del log (2026-10-27)
+
+Build completo posterior a be032c6: 186 objetos reutilizados, enlace y VPK OK
+(32,8 s). Snapshot de 168 unidades: 7fb23c2072cad5c6f4febd2eacac37d4bd32e8b7690354c5eb04048553341ceb.
+.text ARM 23.118.634 B; eboot.bin 15.993.763 B; ventana guest actual 288 MiB.
+SHA-256 VPK: c77592597c665d79614a092a63561138ea824a9a885309bb3c808943ba9b73c5.
+check_vpk: siete entradas, cero errores y advertencias. Pruebas fileio repetidas:
+OK, incluyendo pérdida del tail en el control y conservación en el candidato.
+Checklist y rutas de logs: HARDWARE_TEST_RAMAC_FFLUSH_20261027.md.
+Sin ejecución en consola ni Vita3K; gameplay y coste en Vita siguen pendientes.
