@@ -16,10 +16,13 @@
 
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <zlib.h>
 
 enum { ARCHIVE_LOAD = 0x00739180u, MAP_INDEX = 0x0073b040u };
+void lazy_register_block(const char *name, uint32_t block); /* lazy.c */
+void lazy_report(void);
 
 typedef struct {
     FILE *f;
@@ -130,6 +133,7 @@ static void archive_load(Cpu *c) {
             heap_free(rd32(slot));
         }
         wr32(slot, block);
+        lazy_register_block(name, block);
         free_guest_string(key);
         total += size;
     }
@@ -183,7 +187,17 @@ static void get_memory_block(Cpu *c) {
               bytes_released / 1024, heap_used() / 1024);
 }
 
+/* Heap at the end of loading (and the lazy-image counters). */
+enum { FINISH_INITIALIZATION = 0x0073c6c0u };
+void f_0073c6c0(Cpu *c);
+static void finish_initialization(Cpu *c) {
+    trace("# finishInitialization: before, heap live %u KiB", heap_used() / 1024);
+    f_0073c6c0(c);
+    lazy_report();
+}
+
 void archive_init(void) {
+    guest_intercept(FINISH_INITIALIZATION, finish_initialization);
     guest_intercept(ARCHIVE_LOAD, archive_load);
     guest_intercept(GET_MEMORY_BLOCK, get_memory_block);
 }

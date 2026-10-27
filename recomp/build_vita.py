@@ -152,6 +152,7 @@ def main():
     parser.add_argument('--jobs',type=int,default=min(os.cpu_count() or 4,8))
     parser.add_argument('--opt',choices=['-Os','-O1','-O2'],default='-Os')
     parser.add_argument('--trace-calls',action='store_true')
+    parser.add_argument('--window-mib',type=int,default=288,help='guest memory window (the Vita had ~308 MiB free)')
     parser.add_argument('--host-only',action='store_true',help='compile ARM platform/host first, without linking')
     args=parser.parse_args()
     if args.jobs < 1: parser.error('--jobs must be positive')
@@ -164,10 +165,10 @@ def main():
         raise RuntimeError('missing generated C: finish recomp/lift_all.py first')
     objdir=OUT/('obj'+args.opt+('-trace' if args.trace_calls else ''))
     objdir.mkdir(parents=True,exist_ok=True)
-    print(f'SDK: {SDK}\n{run([cc,"--version"]).splitlines()[0]}\nGuest window: 256 MiB; {len(units)} generated units; {args.opt}',flush=True)
+    print(f'SDK: {SDK}\n{run([cc,"--version"]).splitlines()[0]}\nGuest window: {args.window_mib} MiB; {len(units)} generated units; {args.opt}',flush=True)
     common=['-std=gnu11',args.opt,'-mthumb','-mcpu=cortex-a9','-mfpu=neon','-mfloat-abi=hard',
             '-ffp-contract=off','-frounding-math','-fno-strict-aliasing','-ffunction-sections','-fdata-sections',
-            '-DGUEST_WINDOW=0x10000000u',f'-I{RUNTIME}',f'-I{VITA/"include"}']
+            f'-DGUEST_WINDOW={args.window_mib << 20:#x}u',f'-I{RUNTIME}',f'-I{VITA/"include"}']
     if args.trace_calls: common.append('-DT123_TRACE_CALLS')
     headers=sorted(RUNTIME.glob('*.h'))+sorted(HOST.glob('*.h'))+sorted(HOST.glob('*.inc'))+sorted(VITA.rglob('*.h'))+[SDK/'version_info.txt']
     host_flags=common+['-Wall','-Wno-unused-parameter','-DAL_LIBTYPE_STATIC',f'-I{HOST}']
@@ -200,7 +201,7 @@ def main():
     run([SDK/'bin/vita-make-fself.exe','-c',velf,eboot])
     run([SDK/'bin/vita-mksfoex.exe','-s','APP_VER=00.01','-s','TITLE_ID='+TITLE_ID,'-d','ATTRIBUTE2=12',TITLE,OUT/'param.sfo'])
     vpk=package(OUT,assets(OUT))
-    metrics={'sdk':str(SDK),'optimization':args.opt,'guest_window':0x10000000,'title_id':TITLE_ID,
+    metrics={'sdk':str(SDK),'optimization':args.opt,'guest_window':args.window_mib << 20,'title_id':TITLE_ID,
              'units':len(units),'objects':len(objects),'rebuilt':rebuilt,'seconds':round(time.monotonic()-started,1),
              'sections':sizes,'eboot_bytes':eboot.stat().st_size,'vpk_bytes':vpk.stat().st_size,
              'vpk_sha256':hashlib.sha256(vpk.read_bytes()).hexdigest(),

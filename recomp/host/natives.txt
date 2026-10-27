@@ -2,3 +2,11 @@
 # as guest_call so the intercept is used.
 00739180 ResourceArchive::load (archive.c)
 0073aa40 ResourceArchive::getMemoryBlock (archive.c, wraps the lifted original)
+0073c6c0 ResourceManager::finishInitialization (archive.c, report)
+0074fe60 ResourceManager::queueTask (lazy.c)
+0074ab70 ResourceManager::loadImage (lazy.c)
+0074cb20 ResourceManager::getTexture (lazy.c)
+0074cdf0 ResourceManager::getTextureMask (lazy.c)
+0074d0b0 ResourceManager::getTextureOutlineMask (lazy.c)
+0074d370 ResourceManager::getTextureAltPalette (lazy.c)
+00751930 ResourceManager::processPaletteSwap (lazy.c)
