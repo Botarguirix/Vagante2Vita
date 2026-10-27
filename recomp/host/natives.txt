@@ -1,0 +1,4 @@
+# Addresses with a native host replacement (crt_native.c): direct calls to them are lifted
+# as guest_call so the intercept is used.
+00739180 ResourceArchive::load (archive.c)
+0073aa40 ResourceArchive::getMemoryBlock (archive.c, wraps the lifted original)

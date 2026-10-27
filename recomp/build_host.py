@@ -66,7 +66,7 @@ def build(jobs: int, packed: bool = False) -> Path:
     link = subprocess.run([str(GCC), *[str(t[1]) for t in tasks], "-static", "-lSDL2", "-lopenal",
                            "-lopengl32", "-lsetupapi", "-limm32", "-lversion", "-lwinmm", "-lole32",
                            "-loleaut32", "-lgdi32", "-luuid", "-luser32", "-ladvapi32", "-lshell32",
-                           "-lcfgmgr32", "-lavrt", "-lstdc++", "-lm", "-lpthread", "-o", str(exe)],
+                           "-lcfgmgr32", "-lavrt", "-lstdc++", "-lz", "-lm", "-lpthread", "-o", str(exe)],
                           env=env(), capture_output=True, text=True)
     if link.returncode:
         raise SystemExit(link.stderr)

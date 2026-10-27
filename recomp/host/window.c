@@ -47,7 +47,9 @@ static void ensure_sdl(int w, int h) {
                                   h > 0 ? h : 360, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE);
     if (!sdl_window)
         trace("# SDL_CreateWindow failed: %s", SDL_GetError());
-    SDL_StartTextInput();
+#ifndef __vita__
+    SDL_StartTextInput(); /* on the Vita this opens the on-screen keyboard */
+#endif
 }
 
 static Window *window_of(uint32_t hwnd) {

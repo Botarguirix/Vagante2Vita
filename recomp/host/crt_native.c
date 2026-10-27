@@ -1,6 +1,8 @@
-/* Native replacements for statically linked MSVC CRT routines. An intercept takes
- * priority over the lifted function at the same address. None yet for vagante.exe:
- * candidates (memcpy, memset, strlen) come from the PDB once the boot runs. */
+/* Native replacements for functions of vagante.exe. An intercept takes priority over the
+ * lifted function at the same address:
+ *   0x739180  ResourceArchive::load: streaming data.vra loader (archive.c). */
 #include "win32.h"
 
-void crt_native_init(void) {}
+void archive_init(void);
+
+void crt_native_init(void) { archive_init(); }

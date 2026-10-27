@@ -182,7 +182,7 @@ def main():
     objects=[t[1] for t in gen_tasks+host_tasks]
     elf, velf, eboot=OUT/'vagante.elf',OUT/'vagante.velf',OUT/'eboot.bin'
     # Group archives to resolve SDL2/vitaGL/OpenAL and pthread mutual dependencies.
-    libs=['SDL2','openal','vitaGL','vitashark','SceShaccCgExt','mathneon','taihen_stub','SceShaccCg_stub',
+    libs=['SDL2','openal','z','vitaGL','vitashark','SceShaccCgExt','mathneon','taihen_stub','SceShaccCg_stub',
           'SceKernelDmacMgr_stub','SceGxm_stub','SceCommonDialog_stub','SceAppUtil_stub','SceSysmodule_stub',
           'SceIme_stub','SceAppMgr_stub','SceDisplay_stub','SceCtrl_stub','SceSysmem_stub','SceLibKernel_stub',
           'SceKernelThreadMgr_stub','SceProcessmgr_stub','SceAudio_stub','SceAudioIn_stub','SceIofilemgr_stub',
