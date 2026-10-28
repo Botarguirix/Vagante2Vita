@@ -16,6 +16,7 @@ const ApiEntry win32_fileio[]={{NULL,NULL}},win32_threads[]={{NULL,NULL}}, win32
     win32_gl[]={{NULL,NULL}}, win32_window[]={{NULL,NULL}};
 void guest_intercept(uint32_t address,GuestFn fn) { (void)address;(void)fn; abort(); }
 _Noreturn void host_exit(Cpu *c,uint32_t code,const char *why) { (void)c;(void)code;(void)why; abort(); }
+void heap_profile_images(void) {} /* standalone heap fixture has no SFML objects */
 void file_close(FILE *f) { fclose(f); }
 static int fail_map;
 static char messages[32768];

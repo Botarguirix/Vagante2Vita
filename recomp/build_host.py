@@ -14,7 +14,7 @@ import argparse
 import os
 import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,11 +38,45 @@ def compile_one(src: Path, obj: Path, flags: list[str], deps: list[Path]) -> str
     return f"{src.name}:\n{run.stderr}" if run.returncode else None
 
 
-def build(jobs: int, packed: bool = False) -> Path:
+def build(jobs: int, packed: bool = False, window_mib: int | None = None) -> Path:
     gen = ROOT / "artifacts/recomp" / SHA / "gen"
     # --packed-textures: the Vita's deflated texture storage, to test it on PC (own objects)
     out = ROOT / "artifacts/recomp" / SHA / ("host-packed" if packed else "host")
+    if window_mib is not None:
+        out = out.with_name(out.name + f"-{window_mib}mib")
     out.mkdir(parents=True, exist_ok=True)
+    if window_mib is not None:
+        # Freeze inputs while another local task regenerates lift output.
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("vita_snapshot", ROOT / "recomp/build_vita.py")
+        snapshot = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(snapshot)
+        source_gen = gen
+        gen = out / "gen-snapshot"
+        snapshot.snapshot_generated(source_gen, gen)
+        # An in-progress lift may have read the previous natives list. Route only
+        # this private snapshot's direct native calls through the normal dispatcher.
+        # Never edit gen/ or lift/runtime; source definitions and table stay intact.
+        import re, hashlib, json
+        natives = set(re.findall(r"^([0-9a-fA-F]{8})\s", (HOST / "natives.txt").read_text(), re.M))
+        routes = 0
+        for unit in sorted(gen.glob("unit_*.c")):
+            before = unit.read_text()
+            def route(match):
+                nonlocal routes
+                address = match[1]
+                if address not in natives:
+                    return match[0]
+                routes += 1
+                return f"guest_call(c, 0x{address}u)"
+            after = re.sub(r"\bf_([0-9a-fA-F]{8})\(c\)", route, before)
+            if after != before:
+                unit.write_text(after)
+        digest = hashlib.sha256()
+        for unit in sorted(gen.glob("unit_*.c")) + [gen / "table.c", gen / "lifted.h"]:
+            digest.update(unit.name.encode()); digest.update(unit.read_bytes())
+        (out / "profile-routing.json").write_text(json.dumps({"routes": routes, "sha256": digest.hexdigest()}, indent=2))
+        print(f"Private native routing: {routes} callsites; SHA-256 {digest.hexdigest()}", flush=True)
     if not (gen / "table.c").exists():
         raise SystemExit("run recomp/lift_all.py first")
     if not any(gen.glob("unit_*.c")):
@@ -54,12 +88,25 @@ def build(jobs: int, packed: bool = False) -> Path:
                   "-Wno-unused-parameter", "-DAL_LIBTYPE_STATIC", f"-I{RUNTIME}", f"-I{HOST}"]
     if packed:
         host_flags.append("-DT123_PACKED_TEXTURES")
-    tasks = [(src, gen / (src.stem + ".o"), gen_flags, header + [gen / "lifted.h"])
+    if window_mib is not None:
+        define = f"-DGUEST_WINDOW={window_mib << 20:#x}u"
+        gen_flags.append(define)
+        host_flags.append(define)
+    gen_obj = out / "generated" if window_mib is not None else gen
+    gen_obj.mkdir(parents=True, exist_ok=True)
+    tasks = [(src, gen_obj / (src.stem + ".o"), gen_flags, header + [gen / "lifted.h"])
              for src in sorted(gen.glob("unit_*.c")) + [gen / "table.c"]]
-    tasks += [(src, out / (src.stem + ".o"), host_flags, header + [HOST / "win32.h", Path(__file__)])
+    tasks += [(src, out / (src.stem + ".o"), host_flags, header + [HOST / "win32.h", Path(__file__), *HOST.glob("*.inc")])
               for src in sorted(HOST.glob("*.c")) + [RUNTIME / "guest.c"]]
     with ThreadPoolExecutor(max_workers=jobs) as pool:
-        errors = [e for e in pool.map(lambda t: compile_one(*t), tasks) if e]
+        pending = [pool.submit(compile_one, *task) for task in tasks]
+        errors = []
+        for finished, future in enumerate(as_completed(pending), 1):
+            error = future.result()
+            if error:
+                errors.append(error)
+            if window_mib is not None and (finished % 16 == 0 or finished == len(tasks)):
+                print(f"PC {window_mib} MiB: {finished}/{len(tasks)} units checked", flush=True)
     if errors:
         raise SystemExit("\n".join(errors))
     exe = out / "vagante_host.exe"
@@ -78,8 +125,11 @@ def main() -> None:
     parser.add_argument("--run", action="store_true")
     parser.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
     parser.add_argument("--packed-textures", action="store_true", help="store textures deflated, as on the Vita")
+    parser.add_argument("--window-mib", type=int, help="isolated build with this guest window, e.g. 280")
     args = parser.parse_args()
-    exe = build(args.jobs, args.packed_textures)
+    if args.window_mib is not None and not 40 <= args.window_mib <= 1024:
+        parser.error("--window-mib must be between 40 and 1024")
+    exe = build(args.jobs, args.packed_textures, args.window_mib)
     print(f"built {exe}")
     if args.run:
         workdir = ROOT / "artifacts/recomp" / SHA / "run"

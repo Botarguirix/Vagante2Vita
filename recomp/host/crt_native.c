@@ -10,4 +10,5 @@ void lazy_init(void);
 void crt_native_init(void) {
     archive_init();
     lazy_init();
+    heap_profile_init();
 }

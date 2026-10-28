@@ -106,6 +106,7 @@ static void load_image(Cpu *c) {
     pthread_mutex_unlock(&table_lock);
     if (!defer) {
         f_0074ab70(c);
+        heap_profile_decoded(decoding!=0,c->eax.d!=0);
         return;
     }
     if (rd32(path + 20) >= 16) heap_free(rd32(path)); /* the callee destroys its by-value string */

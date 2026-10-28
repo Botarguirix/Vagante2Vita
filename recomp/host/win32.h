@@ -35,6 +35,14 @@ enum {
 _Static_assert(GUEST_VIRTUAL_BASE + GUEST_VIRTUAL_SIZE <= GUEST_WINDOW, "guest map exceeds the window");
 
 uint32_t heap_used(void);
+/* Optional host-side diagnostics: no bytes are added to guest block headers. */
+int heap_profile_mode(void);
+uint32_t heap_profile_scope(uint32_t origin);
+void heap_profile_dump(const char *reason);
+void heap_profile_init(void);
+void heap_profile_images(void);
+int heap_profile_backed(uint32_t p,uint32_t bytes);
+void heap_profile_decoded(int on_demand,int success);
 /* Implicit TLS (__declspec(thread), MSVC thread-safe statics): fs:[0x2C] points to an array
    at TIB+0xF10 whose slot *AddressOfIndex holds this thread's copy of the .tls template.
    The TlsAlloc slots stay at TIB+0xE10, as in a real TEB. */

@@ -93,6 +93,7 @@ static int read_name(Inflater *s, char *name, uint32_t cap, uint32_t *len) {
 }
 
 static void archive_load(Cpu *c) {
+    uint32_t profile_saved=heap_profile_scope(ARCHIVE_LOAD);
     uint32_t self = c->ecx.d;
     char path[1200];
     snprintf(path, sizeof path, "%s/data.vra", host_data_dir);
@@ -102,7 +103,7 @@ static void archive_load(Cpu *c) {
     s.f = fopen(path, "rb");
     if (!s.f) {
         trace("# ResourceArchive::load (native): cannot open %s", path);
-        ret_cdecl(c, 0);
+        heap_profile_scope(profile_saved); ret_cdecl(c, 0);
         return;
     }
     setvbuf(s.f, NULL, _IOFBF, 256 * 1024);
@@ -153,7 +154,7 @@ static void archive_load(Cpu *c) {
     trace("# ResourceArchive::load (native): %s, %u records, %u KiB, %llu ms, heap live %u KiB",
           ok ? "loaded" : "truncated data.vra", count, total / 1024,
           (unsigned long long)((platform_ticks_us() - t0) / 1000u), heap_used() / 1024);
-    ret_cdecl(c, 0); /* thiscall without arguments: pop the return address */
+    heap_profile_scope(profile_saved); ret_cdecl(c, 0); /* thiscall without arguments: pop the return address */
 }
 
 /* ResourceArchive::getMemoryBlock (0x73aa40) wrapper. The original frees the unmanaged blocks
@@ -194,6 +195,7 @@ static void finish_initialization(Cpu *c) {
     trace("# finishInitialization: before, heap live %u KiB", heap_used() / 1024);
     f_0073c6c0(c);
     lazy_report();
+    heap_profile_dump("finishInitialization");
 }
 
 void archive_init(void) {

@@ -21,6 +21,8 @@ void trace(const char *fmt, ...) {
     static pthread_mutex_t trace_lock = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_lock(&trace_lock);
     if (!trace_file) {
+        if(heap_profile_mode() && !strcmp(trace_path,"host-trace.log"))
+            snprintf(trace_path,sizeof trace_path,"recomp-trace.log");
         trace_file = fopen(trace_path, "w");
         if (trace_file)
             setvbuf(trace_file, NULL, _IOFBF, 64 * 1024);
@@ -68,6 +70,8 @@ static uint32_t heap_live, heap_peak, heap_max_request;
 static unsigned heap_initialized, heap_map_failures;
 static uint64_t heap_alloc_calls, heap_free_calls, heap_realloc_calls;
 static pthread_mutex_t heap_lock=PTHREAD_MUTEX_INITIALIZER;
+
+#include "heap_profile.inc"
 
 static uint32_t block_capacity(uint32_t b) { return rd32(b+8); }
 static unsigned high_bit(uint32_t n) { return 31u-(unsigned)__builtin_clz(n); }
@@ -174,12 +178,14 @@ static uint32_t heap_alloc_locked(uint32_t size) {
     heap_unlink(b); heap_split(b,need);
     wr32(b,size); wr32(b+4,MAGIC);
     heap_live+=block_capacity(b);
+    profile_put(b+HDR);
     if(heap_live>heap_peak) heap_peak=heap_live;
     return b+HDR;
 }
 static void heap_free_locked(uint32_t p) {
     if(!heap_valid(p)) return;
     uint32_t b=p-HDR;
+    profile_remove(p);
     heap_live-=block_capacity(b); wr32(b,0); wr32(b+4,0);
     uint32_t previous=rd32(b+12);
     if(previous && rd32(previous+4)==0) {
@@ -231,7 +237,7 @@ uint32_t heap_alloc(uint32_t size,int zero) {
     uint32_t p=heap_alloc_locked(size),cap=p?block_capacity(p-HDR):0;
     pthread_mutex_unlock(&heap_lock);
     if(p) { if(zero) memset(G(p),0,cap); }
-    else { trace("# heap allocation failed: request %u bytes",size); heap_trace_stats(); }
+    else { trace("# heap allocation failed: request %u bytes",size); heap_trace_stats(); heap_profile_dump("allocation-failed"); }
     return p;
 }
 void heap_free(uint32_t p) {
@@ -260,6 +266,7 @@ uint32_t heap_realloc(uint32_t p,uint32_t size,int zero) {
     }
     if(in_place) {
         heap_split(b,need); wr32(b,size);
+        profile_put(p);
         heap_live=heap_live-cap+block_capacity(b);
         if(heap_live>heap_peak) heap_peak=heap_live;
         pthread_mutex_unlock(&heap_lock);
@@ -268,7 +275,7 @@ uint32_t heap_realloc(uint32_t p,uint32_t size,int zero) {
     }
     uint32_t q=heap_alloc_locked(size),new_cap=q?block_capacity(q-HDR):0;
     pthread_mutex_unlock(&heap_lock);
-    if(!q) { trace("# heap realloc failed: request %u bytes",size); heap_trace_stats(); return 0; }
+    if(!q) { trace("# heap realloc failed: request %u bytes",size); heap_trace_stats(); heap_profile_dump("reallocation-failed"); return 0; }
     /* The caller owns p throughout; unrelated allocations may proceed while copying. */
     memcpy(G(q),G(p),old<size?old:size);
     if(zero && new_cap>old) memset(G(q+old),0,new_cap-old);
@@ -376,7 +383,13 @@ static void api_dispatch(Cpu *c) {
     import_calls++;
     recent[recent_pos++ % 64] = i;
     uint64_t t0 = platform_ticks_us();
+    uint32_t saved_origin=profile_origin, saved_caller=profile_caller;
+    if(heap_profile_mode()) {
+        profile_caller=rd32(c->esp.d);
+        if(!profile_origin) profile_origin=profile_caller;
+    }
     fakes[i].fn(c);
+    profile_origin=saved_origin; profile_caller=saved_caller;
     fakes[i].us += platform_ticks_us() - t0;
 }
 
