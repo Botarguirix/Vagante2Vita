@@ -9,4 +9,28 @@
 0074cdf0 ResourceManager::getTextureMask (lazy.c)
 0074d0b0 ResourceManager::getTextureOutlineMask (lazy.c)
 0074d370 ResourceManager::getTextureAltPalette (lazy.c)
-00751930 ResourceManager::processPaletteSwap (lazy.c)
+00751930 ResourceManager::processPaletteSwap (lazy.c)008d5ec2 _JumpToContinuation (seh.c, longjmp to the catching function)
+
+# Optional measurement wrappers (heap_profile.c); originals run unchanged when disabled.
+008ccfa2 heap_profile measurement
+008d9f35 heap_profile measurement
+009a92b6 heap_profile measurement
+008cd56c heap_profile measurement
+008e27a9 heap_profile measurement
+008e279e heap_profile measurement
+008ef765 heap_profile measurement
+00817e90 heap_profile measurement
+0074b350 heap_profile measurement
+008181f0 heap_profile measurement
+00818340 heap_profile measurement
+008184e0 heap_profile measurement
+00818500 heap_profile measurement
+00817ec0 heap_profile measurement
+008169e0 heap_profile measurement
+00550190 heap_profile measurement
+005c1570 heap_profile measurement
+00550a00 heap_profile measurement
+005c23b0 heap_profile measurement
+005c9840 heap_profile measurement
+006a6810 heap_profile measurement
+00707e50 heap_profile measurement

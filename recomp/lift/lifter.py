@@ -80,6 +80,10 @@ class Lifter:
         self.lifted: set[int] = set()
         self.traps: set[int] = set()
         self.sse = Sse(self)
+        # C++ catch continuations (analysis/eh.py): the functions containing them get a setjmp
+        # resume point that _JumpToContinuation (host/seh.c) longjmps to.
+        self.resume_points: set[int] = set()
+        self.resume_map: list[tuple[int, int]] = []
 
     # -- operands -------------------------------------------------------------------------
     def reg(self, ins, reg_id) -> str:
@@ -512,6 +516,13 @@ class Lifter:
         if fn.entry not in fn.insns:
             lines.append(f"    guest_fault(c, 0x{fn.entry:08x}u, \"entry does not decode\");")
         addresses = sorted(fn.insns)
+        resumes = sorted(self.resume_points & fn.insns)
+        if resumes:
+            self.resume_map += [(t, fn.entry) for t in resumes]
+            cases = " ".join(f"case 0x{t:08x}u: goto L_{t:08x};" for t in resumes)
+            lines += ["    jmp_buf seh_jb;", f"    seh_resume_push(c, 0x{fn.entry:08x}u, &seh_jb);",
+                      f"    if (setjmp(seh_jb)) switch (seh_resume_target) {{ {cases} "
+                      f"default: guest_fault(c, seh_resume_target, \"no catch continuation label\"); }}"]
         lines.append(f"    goto L_{fn.entry:08x};")
         for i, va in enumerate(addresses):
             ins = self.d._decode_detail(va)
@@ -545,11 +556,15 @@ class Lifter:
         "",
     ]
 
-    @staticmethod
-    def table_source(entries: list[int]) -> list[str]:
+    def table_source(self, entries: list[int]) -> list[str]:
         table = ["", "const GuestEntry t123_lifted[] = {"]
         table += [f"    {{0x{e:08x}u, {fn_name(e)}}}," for e in sorted(entries)]
         table += ["};", f"const unsigned t123_lifted_count = {len(entries)};", ""]
+        pairs = sorted(set(self.resume_map))
+        table += ["/* (catch continuation, function containing it) */",
+                  "const uint32_t seh_resume_map[][2] = {"]
+        table += [f"    {{0x{t:08x}u, 0x{f:08x}u}}," for t, f in pairs] or ["    {0, 0},"]
+        table += ["};", f"const unsigned seh_resume_count = {len(pairs)};", ""]
         return table
 
     def lift(self, entries: list[int]) -> LiftResult:

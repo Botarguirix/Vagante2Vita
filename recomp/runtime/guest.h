@@ -66,8 +66,16 @@ typedef void (*GuestFn)(Cpu *c);
    crash can be placed in the original code. */
 /* Per-thread runtime state. VitaSDK's _Thread_local gives every thread the same
    address (measured in Vita3K), so the Vita keeps it behind a pthread key. */
+/* C++ catch continuations: a lifted function that contains one records its host frame on
+   entry (guest esp, function); _JumpToContinuation (host/seh.c) longjmps back there with the
+   target address in seh_resume_target. Records of returned functions are dropped lazily. */
+typedef struct { uint32_t fn, esp; jmp_buf *jb; } SehResume;
+#define SEH_RESUME_MAX 256
 typedef struct {
     uint32_t current_target;   /* address of the call being dispatched */
+    uint32_t resume_target;
+    unsigned resume_n;
+    SehResume resumes[SEH_RESUME_MAX];
     uint32_t trace_ring[64];
     unsigned trace_pos;
     jmp_buf *fault_trap;
@@ -84,6 +92,8 @@ extern _Thread_local GuestThread guest_thread_state;
 #define guest_current_target (guest_thread()->current_target)
 #define guest_fault_trap (guest_thread()->fault_trap)
 #define guest_fault_text (guest_thread()->fault_text)
+#define seh_resume_target (guest_thread()->resume_target)
+void seh_resume_push(Cpu *c, uint32_t fn, jmp_buf *jb);
 #ifdef T123_TRACE_CALLS
 #define T123_ENTER(a) (guest_trace_ring[guest_trace_pos++ & 63] = (a))
 #else

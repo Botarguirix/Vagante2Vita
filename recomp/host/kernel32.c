@@ -512,7 +512,9 @@ API(GetConsoleCP) { ret_stdcall(c, 437, 0); }
 API(GetConsoleOutputCP) { ret_stdcall(c, 437, 0); }
 API(GetConsoleMode) { ret_stdcall(c, 0, 2); }
 
-/* -- exceptions: C++ throw/unwind are not supported yet -------------------------------- */
+/* -- exceptions: dispatch and unwind are in seh.c --------------------------------------- */
+void seh_raise(Cpu *c);
+void seh_rtl_unwind(Cpu *c);
 /* The CRT reaches this on a fatal error (stack cookie, invalid parameter, abort):
    report the thread and its last guest functions, then stop. */
 API(UnhandledExceptionFilter) {
@@ -531,9 +533,9 @@ API(RaiseException) {
         ret_stdcall(c, 0, 4);
         return;
     }
-    trace("RaiseException(code=%08x, flags=%u, args=%u)", ARG(c, 0), ARG(c, 1), ARG(c, 2));
-    host_exit(c, 0xE06D7363u, "RaiseException (C++ throw): SEH unwinding is not implemented");
+    seh_raise(c);
 }
+API(RtlUnwind) { seh_rtl_unwind(c); }
 
 /* Wide-character, locale and newer APIs vagante.exe imports (they share the helpers above). */
 #include "kernel32_w.inc"
@@ -564,7 +566,7 @@ const ApiEntry win32_kernel32[] = {
     E(WriteFile), E(SetFilePointer), E(GetFileSize), E(FlushFileBuffers), E(GetFileAttributesA),
     E(CreateDirectoryA), E(DeleteFileA), E(SetCurrentDirectoryA), E(GetCurrentDirectoryA), E(lstrlenA),
     E(GetPrivateProfileIntA), E(GetPrivateProfileStringA),
-    E(GetConsoleCP), E(GetConsoleOutputCP), E(GetConsoleMode), E(RaiseException), E(UnhandledExceptionFilter),
+    E(GetConsoleCP), E(GetConsoleOutputCP), E(GetConsoleMode), E(RaiseException), E(RtlUnwind), E(UnhandledExceptionFilter),
     KERNEL32_W_ENTRIES
     {NULL, NULL},
 };

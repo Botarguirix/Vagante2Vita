@@ -6,6 +6,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if defined(__vita__)
 #include <psp2/kernel/sysmem.h>
@@ -187,6 +188,20 @@ void guest_call_import(Cpu *c, uint32_t iat_slot) {
         return;
     }
     guest_call(c, rd32(iat_slot));
+}
+
+/* Records at the same or a deeper guest esp belong to functions that already returned. */
+void seh_resume_push(Cpu *c, uint32_t fn, jmp_buf *jb) {
+    GuestThread *t = guest_thread();
+    uint32_t esp = c->esp.d;
+    unsigned n = 0;
+    for (unsigned i = 0; i < t->resume_n; i++)
+        if (t->resumes[i].esp > esp) t->resumes[n++] = t->resumes[i];
+    if (n == SEH_RESUME_MAX) {
+        memmove(t->resumes, t->resumes + 1, --n * sizeof t->resumes[0]); /* drop the oldest */
+    }
+    t->resumes[n++] = (SehResume){fn, esp, jb};
+    t->resume_n = n;
 }
 
 uint32_t guest_invoke(Cpu *c, uint32_t target, unsigned argc, const uint32_t *argv) {

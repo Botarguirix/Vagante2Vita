@@ -23,6 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from recomp.analysis import eh  # noqa: E402
 from recomp.analysis.discover import Discovery  # noqa: E402
 from recomp.analysis.image import Image  # noqa: E402
 from recomp.lift.lifter import Lifter  # noqa: E402
@@ -104,8 +105,11 @@ def main() -> None:
     seeds = ROOT / "artifacts/pdb_seeds.txt"
     if seeds.exists():
         entries |= {int(line, 16) for line in seeds.read_text().split() if line}
+    # C++ EH: the handler stubs (only pushed as fs:[0] handlers) and the table funclets.
+    tables = eh.scan(image)
+    entries |= tables.stubs | tables.funclets
     entries = sorted(entries)
-    gen = ROOT / "artifacts/recomp" / image.sha256 / "gen"
+    gen =ROOT / "artifacts/recomp" / image.sha256 / "gen"
     gen.mkdir(parents=True, exist_ok=True)
     if args.compile_only:
         coverage = json.loads((gen / "coverage.json").read_text(encoding="utf-8"))
@@ -118,6 +122,7 @@ def main() -> None:
 
     started = time.monotonic()
     lifter = Lifter(Discovery(image), set(entries))
+    lifter.resume_points = eh.continuations(lifter.d, tables.catch_funclets, set(entries))
     files, result = lifter.lift_units(
         entries, progress=lambda i, n: print(f"  lifting {i}/{n}", flush=True))
     for name, text in files.items():
