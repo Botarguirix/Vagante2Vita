@@ -7,6 +7,7 @@
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/threadmgr.h>
+#include <psp2/power.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +19,14 @@ enum { W = 960, H = 544, LINES = 32, COLS = 104, CELL_W = 12, CELL_H = 16, ADVAN
    Vita3K is more permissive). The guest block is separate from this bounded
    host heap used by SDL, audio, loading buffers and diagnostic text. */
 int _newlib_heap_size_user = 32 * 1024 * 1024;
+
+/* The recompiled x86 is CPU bound: run at the highest clocks an application may request. */
+__attribute__((constructor)) static void max_clocks(void) {
+    scePowerSetArmClockFrequency(444);
+    scePowerSetBusClockFrequency(222);
+    scePowerSetGpuClockFrequency(222);
+    scePowerSetGpuXbarClockFrequency(166);
+}
 
 void platform_memory_report(char *out, size_t size) {
     SceKernelFreeMemorySizeInfo info = {sizeof info};

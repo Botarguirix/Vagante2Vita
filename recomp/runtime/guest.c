@@ -107,24 +107,14 @@ static const GuestEntry *lifted;
 static unsigned lifted_count;
 static GuestEntry intercepts[2048]; /* kept sorted by address */
 static unsigned intercept_count;
+static GuestEntry *fast; /* dispatch hash, see find() */
+static unsigned fast_mask;
+static int fast_dirty = 1;
 
 void guest_register(const GuestEntry *table, unsigned count) {
     lifted = table;
     lifted_count = count;
-}
-
-static GuestFn search(const GuestEntry *table, unsigned count, uint32_t target) {
-    unsigned lo = 0, hi = count;
-    while (lo < hi) {
-        unsigned mid = (lo + hi) / 2;
-        if (table[mid].address == target)
-            return table[mid].fn;
-        if (table[mid].address < target)
-            lo = mid + 1;
-        else
-            hi = mid;
-    }
-    return NULL;
+    fast_dirty = 1;
 }
 
 void guest_intercept(uint32_t address, GuestFn fn) {
@@ -133,6 +123,7 @@ void guest_intercept(uint32_t address, GuestFn fn) {
         i++;
     if (i < intercept_count && intercepts[i].address == address) {
         intercepts[i].fn = fn; /* replace */
+        fast_dirty = 1;
         return;
     }
     if (intercept_count == sizeof intercepts / sizeof intercepts[0]) {
@@ -142,11 +133,33 @@ void guest_intercept(uint32_t address, GuestFn fn) {
     memmove(&intercepts[i + 1], &intercepts[i], (intercept_count - i) * sizeof intercepts[0]);
     intercepts[i] = (GuestEntry){address, fn};
     intercept_count++;
+    fast_dirty = 1;
+}
+
+/* Every indirect call (C++ virtual calls, imports) dispatches through find(): an open-addressing
+   hash of the lifted table and the intercepts (which win), rebuilt when either changes. Both
+   are only changed while starting up, before the guest creates threads. */
+static void fast_put(uint32_t address, GuestFn fn) {
+    unsigned i = (address * 2654435761u) >> 8 & fast_mask;
+    while (fast[i].address && fast[i].address != address) i = (i + 1) & fast_mask;
+    fast[i] = (GuestEntry){address, fn};
+}
+static void fast_build(void) {
+    unsigned size = 1024;
+    while (size < 2 * (lifted_count + intercept_count)) size *= 2;
+    free(fast);
+    fast = calloc(size, sizeof *fast);
+    fast_mask = size - 1;
+    for (unsigned i = 0; i < lifted_count; i++) fast_put(lifted[i].address, lifted[i].fn);
+    for (unsigned i = 0; i < intercept_count; i++) fast_put(intercepts[i].address, intercepts[i].fn);
+    fast_dirty = 0;
 }
 
 static GuestFn find(uint32_t target) {
-    GuestFn fn = intercept_count ? search(intercepts, intercept_count, target) : NULL;
-    return fn ? fn : search(lifted, lifted_count, target);
+    if (fast_dirty) fast_build();
+    for (unsigned i = (target * 2654435761u) >> 8 & fast_mask; fast[i].address; i = (i + 1) & fast_mask)
+        if (fast[i].address == target) return fast[i].fn;
+    return NULL;
 }
 
 #ifdef __vita__
@@ -172,7 +185,8 @@ void guest_call(Cpu *c, uint32_t target) {
     GuestFn fn = find(target);
     if (!fn)
         guest_fault(c, target, "call to a function that is neither lifted nor intercepted");
-    guest_current_target = target;
+    /* only the host's import implementations read it (a per-thread lookup on the Vita) */
+    if (target >= 0x7F000000u) guest_current_target = target;
     fn(c);
 }
 
