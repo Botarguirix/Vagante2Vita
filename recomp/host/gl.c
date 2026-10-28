@@ -17,8 +17,9 @@ API(glColorPointer) { glColorPointer(I(0), ARG(c, 1), I(2), P(3)); DONE(4); }
 API(glCopyTexSubImage2D) { glCopyTexSubImage2D(ARG(c, 0), I(1), I(2), I(3), I(4), I(5), I(6), I(7)); DONE(8); }
 API(glDeleteTextures) { glDeleteTextures(I(0), P(1)); DONE(2); }
 API(glDisable) { glDisable(ARG(c, 0)); DONE(1); }
-API(glDrawArrays) { glDrawArrays(ARG(c, 0), I(1), I(2)); DONE(3); }
-API(glDrawElements) { glDrawElements(ARG(c, 0), I(1), ARG(c, 2), P(3)); DONE(4); }
+void profile_draw(void);
+API(glDrawArrays) { profile_draw(); glDrawArrays(ARG(c, 0), I(1), I(2)); DONE(3); }
+API(glDrawElements) { profile_draw(); glDrawElements(ARG(c, 0), I(1), ARG(c, 2), P(3)); DONE(4); }
 API(glEnable) { glEnable(ARG(c, 0)); DONE(1); }
 API(glEnableClientState) { glEnableClientState(ARG(c, 0)); DONE(1); }
 API(glFlush) { glFlush(); DONE(0); }

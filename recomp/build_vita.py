@@ -152,6 +152,7 @@ def main():
     parser.add_argument('--jobs',type=int,default=min(os.cpu_count() or 4,8))
     parser.add_argument('--opt',choices=['-Os','-O1','-O2'],default='-Os')
     parser.add_argument('--trace-calls',action='store_true')
+    parser.add_argument('--profile',action='store_true',help='sample the last guest function entered (host/profile.c)')
     parser.add_argument('--window-mib',type=int,default=280,help='guest memory window (the Vita had ~308 MiB free)')
     parser.add_argument('--host-only',action='store_true',help='compile ARM platform/host first, without linking')
     args=parser.parse_args()
@@ -163,13 +164,14 @@ def main():
     units=sorted(gen.glob('unit_*.c'))
     if not units or not (gen/'table.c').exists():
         raise RuntimeError('missing generated C: finish recomp/lift_all.py first')
-    objdir=OUT/('obj'+args.opt+('-trace' if args.trace_calls else ''))
+    objdir=OUT/('obj'+args.opt+('-trace' if args.trace_calls else '')+('-prof' if args.profile else ''))
     objdir.mkdir(parents=True,exist_ok=True)
     print(f'SDK: {SDK}\n{run([cc,"--version"]).splitlines()[0]}\nGuest window: {args.window_mib} MiB; {len(units)} generated units; {args.opt}',flush=True)
     common=['-std=gnu11',args.opt,'-mthumb','-mcpu=cortex-a9','-mfpu=neon','-mfloat-abi=hard',
             '-ffp-contract=off','-frounding-math','-fno-strict-aliasing','-ffunction-sections','-fdata-sections',
             f'-DGUEST_WINDOW={args.window_mib << 20:#x}u',f'-I{RUNTIME}',f'-I{VITA/"include"}']
     if args.trace_calls: common.append('-DT123_TRACE_CALLS')
+    elif args.profile: common.append('-DT123_PROFILE')
     headers=sorted(RUNTIME.glob('*.h'))+sorted(HOST.glob('*.h'))+sorted(HOST.glob('*.inc'))+sorted(VITA.rglob('*.h'))+[SDK/'version_info.txt']
     host_flags=common+['-Wall','-Wno-unused-parameter','-DAL_LIBTYPE_STATIC',f'-I{HOST}']
     sources=[s for s in sorted(HOST.glob('*.c')) if s.name != 'platform_pc.c']+sorted(VITA.glob('*.c'))+[RUNTIME/'guest.c']

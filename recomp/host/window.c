@@ -477,8 +477,11 @@ API(DescribePixelFormat) {
     }
     ret_stdcall(c, 1, 4);
 }
+void profile_swap(uint64_t swap_start, uint64_t swap_end);
 API(SwapBuffers) {
+    uint64_t start = platform_ticks_us();
     if (sdl_window) SDL_GL_SwapWindow(sdl_window);
+    profile_swap(start, platform_ticks_us());
     ret_stdcall(c, 1, 1);
 }
 

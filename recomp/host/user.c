@@ -21,7 +21,8 @@ API(timeGetTime) { ret_stdcall(c, (uint32_t)(platform_ticks_us() / 1000u), 0); }
 API(MessageBoxA) {
     trace("MessageBoxA(title=\"%s\"): %s", ARG(c, 2) ? STR(ARG(c, 2)) : "",
           ARG(c, 1) ? STR(ARG(c, 1)) : "");
-    ret_stdcall(c, 1 /* IDOK */, 4);
+    /* MB_YESNO (the hang watchdog's "Stop the application early?"): answer No and keep going */
+    ret_stdcall(c, (ARG(c, 3) & 0xF) == 4 ? 7 /* IDNO */ : 1 /* IDOK */, 4);
 }
 
 /* wsprintfA(buffer, format, ...): cdecl with guest varargs. Supports the conversions

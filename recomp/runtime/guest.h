@@ -96,6 +96,10 @@ extern _Thread_local GuestThread guest_thread_state;
 void seh_resume_push(Cpu *c, uint32_t fn, jmp_buf *jb);
 #ifdef T123_TRACE_CALLS
 #define T123_ENTER(a) (guest_trace_ring[guest_trace_pos++ & 63] = (a))
+#elif defined(T123_PROFILE)
+/* Profile builds: the last guest function entered, sampled by host/profile.c. */
+extern volatile uint32_t guest_prof_last;
+#define T123_ENTER(a) (guest_prof_last = (a))
 #else
 #define T123_ENTER(a) ((void)0)
 #endif
