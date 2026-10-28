@@ -82,6 +82,8 @@ TESTS.update({
     "punpckldq": ins("660f62c1"), "punpckhdq": ins("660f6ac1"), "punpcklbw": ins("660f60c1"),
     "punpcklwd": ins("660f61c1"), "punpcklqdq": ins("660f6cc1"), "punpckhbw": ins("660f68c1"),
     "pmaddwd": ins("660ff5c1"), "pmulhw": ins("660fe5c1"), "pmullw": ins("660fd5c1"),
+    "pmaxsw": ins("660feec1"), "pminsw": ins("660feac1"), "pmaxub": ins("660fdec1"),
+    "pminub": ins("660fdac1"),
     "packssdw": ins("660f6bc1"), "packuswb": ins("660f67c1"),
     "pcmpeqd": ins("660f76c1"), "pcmpgtd": ins("660f66c1"), "pcmpeqb": ins("660f74c1"),
     "psrad 5": ins("660f72e005"), "psrld 5": ins("660f72d005"), "pslld 5": ins("660f72f005"),

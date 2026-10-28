@@ -403,6 +403,17 @@ class Sse:
         body = " ".join(f"{d}.w[{k}] = (uint16_t)((int32_t){d}.sw[{k}] * s.sw[{k}]);" for k in range(8))
         return self.block(self.load(ins, ops[1], 16), body)
 
+    def minmax(self, ins, ops, lane: str, count: int, sym: str) -> str:
+        d = self.dst(ins, ops[0])
+        body = " ".join(f"if (s.{lane}[{k}] {sym} {d}.{lane}[{k}]) {d}.{lane}[{k}] = s.{lane}[{k}];"
+                        for k in range(count))
+        return self.block(self.load(ins, ops[1], 16), body)
+
+    def op_pmaxsw(self, ins, ops): return self.minmax(ins, ops, "sw", 8, ">")
+    def op_pminsw(self, ins, ops): return self.minmax(ins, ops, "sw", 8, "<")
+    def op_pmaxub(self, ins, ops): return self.minmax(ins, ops, "b", 16, ">")
+    def op_pminub(self, ins, ops): return self.minmax(ins, ops, "b", 16, "<")
+
     def op_packssdw(self, ins, ops):
         d = self.dst(ins, ops[0])
         body = [f"r.sw[{k}] = sse_sat16(a.i[{k}]);" for k in range(4)]

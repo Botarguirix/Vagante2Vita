@@ -92,6 +92,61 @@ static int read_name(Inflater *s, char *name, uint32_t cap, uint32_t *len) {
     return 1;
 }
 
+/* -- spilled images ----------------------------------------------------------------------------
+ * The compressed PNGs ("gfx/...") are not kept in guest memory: with on-demand decoding most of
+ * them would wait there for the whole game (~70 MiB). They go to a cache file next to data.vra
+ * (rewritten only when data.vra changes) and their ResourceBlock keeps data = NULL until
+ * getMemoryBlock hands the block out; then the bytes are read back into the guest heap. */
+typedef struct { uint32_t block, size; uint64_t offset; } Spill;
+enum { SPILL_SLOTS = 16384, SPILL_MIN = 1024 };
+static Spill spills[SPILL_SLOTS];
+static FILE *spill_file;
+static pthread_mutex_t spill_lock = PTHREAD_MUTEX_INITIALIZER;
+static Spill *spill_slot(uint32_t block) {
+    for (unsigned i = (block >> 2) * 2654435761u & (SPILL_SLOTS - 1);; i = (i + 1) & (SPILL_SLOTS - 1))
+        if (!spills[i].block || spills[i].block == block) return &spills[i];
+}
+static unsigned spill_count;
+
+/* Opens the cache: reused when its header matches data.vra, else recreated. *writing = 1 when
+   the records must be written to it during this load. */
+static FILE *spill_open(uint64_t vra_size, int *writing) {
+    char path[1200];
+    snprintf(path, sizeof path, "%s/recomp-gfx.cache", host_data_dir);
+    uint64_t header[2] = {0x31786667706d6372ull /* "rcmpgfx1" */, vra_size}, seen[2] = {0, 0};
+    FILE *f = fopen(path, "rb");
+    if (f && fread(seen, 1, sizeof seen, f) == sizeof seen && !memcmp(seen, header, sizeof header)) {
+        *writing = 0;
+        return f;
+    }
+    if (f) fclose(f);
+    f = fopen(path, "w+b");
+    if (!f) return NULL;
+    setvbuf(f, NULL, _IOFBF, 256 * 1024);
+    fwrite(header, 1, sizeof header, f);
+    *writing = 1;
+    return f;
+}
+
+/* Reads a spilled block back into the guest heap (before getMemoryBlock returns it). */
+static void spill_fill(uint32_t block) {
+    if (!block || !spill_file || rd32(block)) return;
+    pthread_mutex_lock(&spill_lock);
+    Spill *s = spill_slot(block);
+    if (s->block == block && s->size && !rd32(block)) {
+        uint32_t data = heap_alloc(s->size, 0);
+        if (data && fseek(spill_file, (long)s->offset, SEEK_SET) == 0 &&
+            fread(G(data), 1, s->size, spill_file) == s->size) {
+            wr32(block, data);
+            wr32(block + 4, s->size);
+        } else {
+            trace("# spilled image block %08x: cannot read %u bytes back", block, s->size);
+            if (data) heap_free(data);
+        }
+    }
+    pthread_mutex_unlock(&spill_lock);
+}
+
 static void archive_load(Cpu *c) {
     uint32_t profile_saved=heap_profile_scope(ARCHIVE_LOAD);
     uint32_t self = c->ecx.d;
@@ -112,6 +167,16 @@ static void archive_load(Cpu *c) {
     s.raw = first != 0x78; /* zlib header; otherwise the records are stored as they are */
     if (!s.raw) inflateInit(&s.z);
 
+    fseek(s.f, 0, SEEK_END);
+    uint64_t vra_size = (uint64_t)ftell(s.f);
+    fseek(s.f, 0, SEEK_SET);
+    int writing = 0;
+    if (spill_file) fclose(spill_file);
+    spill_file = getenv("RECOMP_NO_SPILL") ? NULL : spill_open(vra_size, &writing);
+    uint64_t spill_offset = 16, spilled = 0;
+    unsigned char *spill_buf = NULL;
+    uint32_t spill_cap = 0;
+
     uint64_t t0 = platform_ticks_us();
     uint32_t version = 0, count = 0, total = 0, ok = 1;
     uint16_t count16 = 0;
@@ -121,16 +186,37 @@ static void archive_load(Cpu *c) {
     uint32_t len, size;
     for (uint32_t i = 0; ok && i < count; i++) {
         if (!read_name(&s, name, sizeof name, &len) || !read_u32(&s, &size)) { ok = 0; break; }
-        uint32_t data = size ? heap_alloc(size, 0) : heap_alloc(1, 0);
-        if (!data || (size && !read_exact(&s, G(data), size))) { ok = 0; break; }
+        uint32_t data = 0;
+        int spill = spill_file && size >= SPILL_MIN && !strncmp(name, "gfx/", 4) && spill_count < SPILL_SLOTS / 2;
+        if (spill) {
+            if (size > spill_cap) {
+                free(spill_buf);
+                spill_buf = malloc(spill_cap = size);
+                if (!spill_buf) { spill_cap = 0; ok = 0; break; }
+            }
+            if (!read_exact(&s, spill_buf, size)) { ok = 0; break; }
+            if (writing && fwrite(spill_buf, 1, size, spill_file) != size) { ok = 0; break; }
+        } else {
+            data = size ? heap_alloc(size, 0) : heap_alloc(1, 0);
+            if (!data || (size && !read_exact(&s, G(data), size))) { ok = 0; break; }
+        }
         uint32_t block = heap_alloc(12, 1);
+        if (spill) {
+            Spill *sp = spill_slot(block);
+            *sp = (Spill){block, size, spill_offset};
+            spill_offset += size;
+            spilled += size;
+            spill_count++;
+        }
         wr32(block, data);
         wr32(block + 4, size);
         wr8(block + 8, 0);
         uint32_t key = guest_string(name, len);
         uint32_t slot = map_index(c, self + 8, key);
         if (rd32(slot)) { /* the last occurrence of a path wins, as with operator[] = */
-            heap_free(rd32(rd32(slot)));
+            if (rd32(rd32(slot))) heap_free(rd32(rd32(slot)));
+            Spill *old = spill_slot(rd32(slot));
+            if (old->block == rd32(slot)) old->size = 0; /* the address may be reused */
             heap_free(rd32(slot));
         }
         wr32(slot, block);
@@ -150,6 +236,11 @@ static void archive_load(Cpu *c) {
     }
     if (!s.raw) inflateEnd(&s.z);
     fclose(s.f);
+    free(spill_buf);
+    if (spill_file && writing) fflush(spill_file);
+    if (spill_file)
+        trace("# gfx cache: %u images, %llu KiB outside guest memory (%s)", spill_count,
+              (unsigned long long)(spilled / 1024), writing ? "written" : "reused");
     wr8(self, (uint8_t)ok);
     trace("# ResourceArchive::load (native): %s, %u records, %u KiB, %llu ms, heap live %u KiB",
           ok ? "loaded" : "truncated data.vra", count, total / 1024,
@@ -182,6 +273,7 @@ static void get_memory_block(Cpu *c) {
     }
     f_0073aa40(c); /* thiscall(name by value): the lifted original pops its own arguments */
     uint32_t block = c->eax.d;
+    spill_fill(block);
     pthread_setspecific(handed_key, (void *)(uintptr_t)(block && !rd8(block + 8) ? block : 0));
     if (blocks_released && blocks_released % 500 == 0)
         trace("# getMemoryBlock: %llu blocks released after use (%llu KiB), heap live %u KiB", blocks_released,

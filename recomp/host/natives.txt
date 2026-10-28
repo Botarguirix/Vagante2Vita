@@ -34,3 +34,4 @@
 005c9840 heap_profile measurement
 006a6810 heap_profile measurement
 00707e50 heap_profile measurement
+00839b50 sf::SoundBuffer::initialize (sound.c, releases the sample copy)
