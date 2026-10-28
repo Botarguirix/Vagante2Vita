@@ -142,10 +142,6 @@ API(ResumeThread) { ret_stdcall(c, 1, 1); }
 API(SetThreadStackGuarantee) { ret_stdcall(c, 1, 1); }
 API(SetThreadExecutionState) { ret_stdcall(c, 1, 1); }
 API(InitializeCriticalSectionEx) { ret_stdcall(c, 1, 3); }
-API(WaitForSingleObjectEx) { ret_stdcall(c, 0, 3); }
-API(WaitForMultipleObjects) { ret_stdcall(c, 0, 4); }
-API(CreateEventW) { ret_stdcall(c, handle_new(H_EVENT, NULL, ARG(c, 2)), 4); }
-API(ResetEvent) { ret_stdcall(c, 1, 1); }
 
 /* SRW locks: the lock word is 0 (free) or 1 (held); exclusive mode only. */
 API(InitializeSRWLock) { wr32(ARG(c, 0), 0); ret_stdcall(c, 0, 1); }
@@ -511,8 +507,7 @@ API(SystemFunction036) {
     E(SetEnvironmentVariableW), E(ExpandEnvironmentStringsA), E(LocalFree), E(GetConsoleWindow), \
     E(PeekNamedPipe), E(ReadConsoleW), E(WriteConsoleW), E(ReadProcessMemory), E(DeviceIoControl), \
     E(GetThreadContext), E(SuspendThread), E(ResumeThread), E(SetThreadStackGuarantee), \
-    E(SetThreadExecutionState), E(InitializeCriticalSectionEx), E(WaitForSingleObjectEx), \
-    E(WaitForMultipleObjects), E(CreateEventW), E(ResetEvent), E(InitializeSRWLock), \
+    E(SetThreadExecutionState), E(InitializeCriticalSectionEx), E(InitializeSRWLock), \
     E(AcquireSRWLockExclusive), E(ReleaseSRWLockExclusive), E(InitializeSListHead), \
     E(InterlockedPushEntrySList), E(GetLocaleInfoA), E(GetLocaleInfoW), E(GetLocaleInfoEx), \
     E(IsValidLocale), E(EnumSystemLocalesA), E(EnumSystemLocalesW), E(GetUserGeoID), E(GetGeoInfoA), \

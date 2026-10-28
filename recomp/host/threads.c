@@ -127,6 +127,50 @@ API(WaitForSingleObject) {
     }
     ret_stdcall(c, r, 2);
 }
+/* CreateEventW(attr, manual, initial, name): previously a fake handle whose waits returned
+   at once, so every guest thread that waited on one spun at 100% CPU. */
+API(CreateEventW) {
+    Event *e = malloc(sizeof *e);
+    event_init(e, (int)ARG(c, 1), (int)ARG(c, 2));
+    ret_stdcall(c, handle_new(H_EVENT, e, 0), 4);
+}
+API(ResetEvent) {
+    Event *e = handle_get(ARG(c, 0), H_EVENT);
+    if (e) { pthread_mutex_lock(&e->m); e->signaled = 0; pthread_mutex_unlock(&e->m); }
+    ret_stdcall(c, e != NULL, 1);
+}
+static uint32_t wait_handle(uint32_t h, uint32_t ms) {
+    Event *e = handle_get(h, H_EVENT);
+    Thread *t = handle_get(h, H_THREAD);
+    if (e) return event_wait(e, ms);
+    if (t) {
+        uint32_t r = event_wait(&t->done, ms);
+        if (!r) event_set(&t->done);
+        return r;
+    }
+    return 0;
+}
+API(WaitForSingleObjectEx) { ret_stdcall(c, wait_handle(ARG(c, 0), ARG(c, 1)), 3); }
+/* (count, handles, wait_all, ms): polls the handles at 1 ms steps */
+API(WaitForMultipleObjects) {
+    uint32_t n = ARG(c, 0), list = ARG(c, 1), all = ARG(c, 2), ms = ARG(c, 3);
+    uint64_t end = platform_ticks_us() + (uint64_t)ms * 1000u;
+    unsigned done[64] = {0};
+    if (n > 64) n = 64;
+    for (;;) {
+        unsigned count = 0;
+        for (uint32_t i = 0; i < n; i++) {
+            if (!done[i] && wait_handle(rd32(list + 4 * i), 0) == 0) done[i] = 1;
+            if (done[i]) {
+                if (!all) { ret_stdcall(c, i, 4); return; }
+                count++;
+            }
+        }
+        if (all && count == n) { ret_stdcall(c, 0, 4); return; }
+        if (ms != 0xFFFFFFFFu && platform_ticks_us() >= end) { ret_stdcall(c, 0x102, 4); return; }
+        platform_sleep_ms(1);
+    }
+}
 API(CreateMutexA) {
     trace("CreateMutexA(%s)", ARG(c, 2) ? STR(ARG(c, 2)) : "NULL");
     last_error = 0;
@@ -256,6 +300,7 @@ const ApiEntry win32_threads[] = {
     E(InitializeCriticalSection), E(InitializeCriticalSectionAndSpinCount), E(DeleteCriticalSection),
     E(EnterCriticalSection), E(LeaveCriticalSection), E(TryEnterCriticalSection),
     E(CreateEventA), E(SetEvent), E(WaitForSingleObject), E(CreateMutexA),
+    E(CreateEventW), E(ResetEvent), E(WaitForSingleObjectEx), E(WaitForMultipleObjects),
     E(CreateThread), E(ExitThread), E(FreeLibraryAndExitThread), E(GetExitCodeThread), E(SetThreadPriority), E(GetCurrentThreadId), E(Sleep),
     {NULL, NULL},
 };
