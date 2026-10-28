@@ -5,17 +5,30 @@ typedef struct { uint32_t p,origin,caller; } ProfileBlock;
 static ProfileBlock *profile_blocks;
 static size_t profile_slots,profile_live,profile_occupied;
 static uint64_t profile_lost;
-static __thread uint32_t profile_origin,profile_caller;
+typedef struct { uint32_t origin,caller; } ProfileContext;
+static pthread_key_t profile_context_key;
+static int profile_context_key_valid;
 static pthread_once_t profile_once=PTHREAD_ONCE_INIT;
 static int profile_mode;
 static void profile_configure(void) {
     const char *v=getenv("RECOMP_HEAP_PROFILE");
     profile_mode=v && (!strcmp(v,"1") || !strcmp(v,"2")) ? v[0]-'0':0;
+    if(profile_mode) profile_context_key_valid=!pthread_key_create(&profile_context_key,free);
 }
 int heap_profile_mode(void) { pthread_once(&profile_once,profile_configure); return profile_mode; }
+static ProfileContext *profile_context(void) {
+    if(!heap_profile_mode() || !profile_context_key_valid) return NULL;
+    ProfileContext *context=pthread_getspecific(profile_context_key);
+    if(!context) {
+        context=calloc(1,sizeof *context);
+        if(context && pthread_setspecific(profile_context_key,context)) {free(context);context=NULL;}
+    }
+    return context;
+}
 uint32_t heap_profile_scope(uint32_t origin) {
-    uint32_t old=profile_origin;
-    if(heap_profile_mode()) profile_origin=origin;
+    ProfileContext *context=profile_context();
+    uint32_t old=context?context->origin:0;
+    if(context) context->origin=origin;
     return old;
 }
 static size_t profile_hash(uint32_t p,size_t n) { return ((p>>4)*2654435761u)&(n-1); }
@@ -42,9 +55,12 @@ static int profile_grow(void) {
 }
 static void profile_put(uint32_t p) {
     if(!heap_profile_mode()) return;
+    ProfileContext *context=profile_context();
+    uint32_t origin=context?context->origin:0,caller=context?context->caller:0;
+    if(!context) ++profile_lost;
     ProfileBlock *old=profile_find(p);
     if(old) { /* in-place realloc: attribute the resized block to its current caller */
-        old->origin=profile_origin;old->caller=profile_caller;return;
+        old->origin=origin;old->caller=caller;return;
     }
     if((profile_occupied+1)*2>=profile_slots && !profile_grow()) return;
     size_t i=profile_hash(p,profile_slots),tomb=SIZE_MAX;
@@ -53,7 +69,7 @@ static void profile_put(uint32_t p) {
         i=(i+1)&(profile_slots-1);
     }
     if(tomb!=SIZE_MAX) i=tomb; else profile_occupied++;
-    profile_blocks[i]=(ProfileBlock){p,profile_origin,profile_caller};profile_live++;
+    profile_blocks[i]=(ProfileBlock){p,origin,caller};profile_live++;
 }
 static void profile_remove(uint32_t p) {
     if(!heap_profile_mode()) return;

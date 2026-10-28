@@ -18,6 +18,7 @@ public static class VaganteHeapProfileInput {
  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h,int n);
  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+ [DllImport("user32.dll")] public static extern uint MapVirtualKey(uint key,uint type);
  [DllImport("user32.dll")] public static extern void keybd_event(byte key,byte scan,uint flags,UIntPtr extra);
 }
 "@
@@ -28,10 +29,12 @@ if($gameWindow -eq [IntPtr]::Zero) {throw 'Test process has no main window'}
 [VaganteHeapProfileInput]::SetForegroundWindow($gameWindow) | Out-Null
 Start-Sleep -Milliseconds 300
 if([VaganteHeapProfileInput]::GetForegroundWindow() -ne $gameWindow) {throw 'Test window did not get focus; no key sent'}
+$scanCode=[byte][VaganteHeapProfileInput]::MapVirtualKey([uint32]$VirtualKey,0)
+$extendedFlag=if($VirtualKey -in @(33,34,35,36,37,38,39,40,45,46)) {[uint32]1} else {[uint32]0}
 try {
-    [VaganteHeapProfileInput]::keybd_event([byte]$VirtualKey,0,0,[UIntPtr]::Zero)
+    [VaganteHeapProfileInput]::keybd_event([byte]$VirtualKey,$scanCode,$extendedFlag,[UIntPtr]::Zero)
     Start-Sleep -Milliseconds $HoldMs
 } finally {
-    [VaganteHeapProfileInput]::keybd_event([byte]$VirtualKey,0,2,[UIntPtr]::Zero)
+    [VaganteHeapProfileInput]::keybd_event([byte]$VirtualKey,$scanCode,($extendedFlag -bor 2),[UIntPtr]::Zero)
 }
 "keybd_event PID=$GameProcessId VK=$VirtualKey hold=$HoldMs ms"

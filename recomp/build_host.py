@@ -52,15 +52,21 @@ def build(jobs: int, packed: bool = False, window_mib: int | None = None) -> Pat
         snapshot = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(snapshot)
         source_gen = gen
+        raw_gen = out / "gen-source-snapshot"
+        snapshot.snapshot_generated(source_gen, raw_gen)
         gen = out / "gen-snapshot"
-        snapshot.snapshot_generated(source_gen, gen)
+        gen.mkdir(parents=True, exist_ok=True)
         # An in-progress lift may have read the previous natives list. Route only
         # this private snapshot's direct native calls through the normal dispatcher.
         # Never edit gen/ or lift/runtime; source definitions and table stay intact.
         import re, hashlib, json
         natives = set(re.findall(r"^([0-9a-fA-F]{8})\s", (HOST / "natives.txt").read_text(), re.M))
+        # Measurement-only copy constructors may be inlined at the sf::Image level.
+        # Keep these private routes out of the shared natives/lifter files.
+        natives.update(re.findall(r"^IMAGE_HOOK\(([0-9a-fA-F]{8})\)", (HOST / "heap_profile.c").read_text(encoding="utf-8"), re.M))
         routes = 0
-        for unit in sorted(gen.glob("unit_*.c")):
+        paths = sorted(raw_gen.glob("unit_*.c")) + [raw_gen / "table.c", raw_gen / "lifted.h"]
+        for unit in paths:
             before = unit.read_text()
             def route(match):
                 nonlocal routes
@@ -70,12 +76,18 @@ def build(jobs: int, packed: bool = False, window_mib: int | None = None) -> Pat
                 routes += 1
                 return f"guest_call(c, 0x{address}u)"
             after = re.sub(r"\bf_([0-9a-fA-F]{8})\(c\)", route, before)
-            if after != before:
-                unit.write_text(after)
+            destination = gen / unit.name
+            if not destination.exists() or destination.read_text() != after:
+                destination.write_text(after)
+        expected = {unit.name for unit in paths}
+        for old in gen.glob("unit_*.c"):
+            if old.name not in expected:
+                old.unlink()
+        (gen / "snapshot.json").write_bytes((raw_gen / "snapshot.json").read_bytes())
         digest = hashlib.sha256()
         for unit in sorted(gen.glob("unit_*.c")) + [gen / "table.c", gen / "lifted.h"]:
             digest.update(unit.name.encode()); digest.update(unit.read_bytes())
-        (out / "profile-routing.json").write_text(json.dumps({"routes": routes, "sha256": digest.hexdigest()}, indent=2))
+        (out / "profile-routing.json").write_text(json.dumps({"routes": routes, "sha256": digest.hexdigest(), "source": json.loads((raw_gen / "snapshot.json").read_text())}, indent=2))
         print(f"Private native routing: {routes} callsites; SHA-256 {digest.hexdigest()}", flush=True)
     if not (gen / "table.c").exists():
         raise SystemExit("run recomp/lift_all.py first")

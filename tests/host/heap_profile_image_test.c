@@ -5,10 +5,11 @@
 #undef guest_intercept
 #undef heap_profile_images
 #undef main
-static GuestFn image_create,image_destroy;
+static GuestFn image_create,image_destroy,image_copy;
 static uint32_t active_object;
 void guest_intercept(uint32_t a,GuestFn fn) {
     if(a==0x8181f0) image_create=fn;
+    if(a==0x74b2c0) image_copy=fn;
     if(a==0x817ec0) image_destroy=fn;
 }
 #define NOOP(a) void f_##a(Cpu *c) {(void)c;}
@@ -26,17 +27,20 @@ void f_008181f0(Cpu *c) {
     c->ecx.d=0xdeadbeef; /* wrapper must save this before delegation */
     c->eax.d=0x12345678;
 }
+void f_0074b2c0(Cpu *c) {f_008181f0(c);}
 void f_00817ec0(Cpu *c) {heap_free(rd32(c->ecx.d+8));wr32(c->ecx.d+8,0);}
 int main(void) {
     guest_base=calloc(1,GUEST_WINDOW);assert(guest_base);
-    heap_profile_init();assert(image_create&&image_destroy);
+    heap_profile_init();assert(image_create&&image_destroy&&image_copy);
     active_object=heap_alloc(32,1);
     Cpu c={0};c.ecx.d=active_object;image_create(&c);assert(c.eax.d==0x12345678);
     heap_profile_decoded(0,1);heap_profile_decoded(1,1);heap_profile_decoded(1,0);
+    uint32_t copy=heap_alloc(32,1);c.ecx.d=copy;image_copy(&c);
     heap_profile_dump("image-live");
-    assert(strstr(messages,"rgba_bytes=16384 vector_capacity=16384 images=1"));
+    assert(strstr(messages,"rgba_bytes=32768 vector_capacity=32768 images=2"));
     assert(strstr(messages,"eager_decodes=1 demand_decodes=1"));
     c.ecx.d=active_object;image_destroy(&c);
+    c.ecx.d=copy;image_destroy(&c);heap_free(copy);
     message_length=0;messages[0]=0;
     heap_profile_dump("image-destroyed");
     assert(strstr(messages,"rgba_bytes=0 vector_capacity=0 images=0"));

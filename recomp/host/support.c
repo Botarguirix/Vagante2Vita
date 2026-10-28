@@ -383,13 +383,14 @@ static void api_dispatch(Cpu *c) {
     import_calls++;
     recent[recent_pos++ % 64] = i;
     uint64_t t0 = platform_ticks_us();
-    uint32_t saved_origin=profile_origin, saved_caller=profile_caller;
-    if(heap_profile_mode()) {
-        profile_caller=rd32(c->esp.d);
-        if(!profile_origin) profile_origin=profile_caller;
+    ProfileContext *context=profile_context();
+    uint32_t saved_origin=context?context->origin:0, saved_caller=context?context->caller:0;
+    if(context) {
+        context->caller=rd32(c->esp.d);
+        if(!context->origin) context->origin=context->caller;
     }
     fakes[i].fn(c);
-    profile_origin=saved_origin; profile_caller=saved_caller;
+    if(context) {context->origin=saved_origin;context->caller=saved_caller;}
     fakes[i].us += platform_ticks_us() - t0;
 }
 

@@ -72,6 +72,7 @@ void heap_profile_images(void) {
     static void image_##addr(Cpu *c) {uint32_t o=c->ecx.d;f_##addr(c);image_observe(o,0);}
 IMAGE_HOOK(00817e90) /* constructor */
 IMAGE_HOOK(0074b350) /* assignment */
+IMAGE_HOOK(0074b2c0) /* ImageResource copy: inlined sf::Image copy, masks/outline */
 IMAGE_HOOK(008181f0) /* create(color) */
 IMAGE_HOOK(00818340) /* create(pixels) */
 IMAGE_HOOK(008184e0) /* loadFromFile */
@@ -81,10 +82,19 @@ static void image_destruct(Cpu *c) {image_observe(c->ecx.d,1);f_00817ec0(c);}
 void f_008169e0(Cpu *c);
 static void image_from_texture(Cpu *c) {f_008169e0(c);image_observe(c->eax.d,0);}
 
+static float profile_float(uint32_t a) {uint32_t bits=rd32(a);float v;memcpy(&v,&bits,4);return v;}
+static void profile_world_state(uint32_t o,const char *stage) {
+    uint32_t level=rd32(o+0x870);
+    trace("# HEAP_PROFILE WORLD stage=%s engine=%08x floor=%u intro=%u introLeft=%u level=%08x levelIntro=%u levelFloor=%u",
+        stage,o,rd32(o+0x3c0),rd8(o+0x3c8),rd8(o+0x3c9),level,level?rd8(level+6):0,level?rd32(level+0xa4):0);
+}
 #define WORLD_HOOK(addr,reason) \
     void f_##addr(Cpu *c); \
     static void world_##addr(Cpu *c) { \
+        uint32_t o=c->ecx.d; \
+        if(!strncmp(reason,"GameEngine",10)) profile_world_state(o,reason "-before"); \
         heap_profile_dump(reason "-before");f_##addr(c);heap_profile_dump(reason "-after"); \
+        if(!strncmp(reason,"GameEngine",10)) profile_world_state(o,reason "-after"); \
     }
 WORLD_HOOK(00550190,"Client-newGame")
 WORLD_HOOK(005c1570,"GameEngine-newGame")
@@ -102,7 +112,18 @@ void f_00707e50(Cpu *c);
 static void profile_customize_step(Cpu *c) {
     uint32_t o=c->ecx.d;
     f_00707e50(c);
-    static uint64_t last=UINT64_MAX;
+    static uint64_t last=UINT64_MAX,last_nav;
+    uint64_t now=platform_ticks_us();
+    uint32_t guis=rd32(o+0x34),begin=guis?rd32(guis):0,end=guis?rd32(guis+4):0;
+    if(now-last_nav>2000000) {
+        last_nav=now;
+        for(uint32_t slot=begin;slot && slot<end && slot<begin+32;slot+=8) {
+            uint32_t menu=rd32(slot);if(!menu) continue;
+            uint32_t player=rd32(menu+0x20);
+            trace("# HEAP_PROFILE PLAYER index=%u menu=%08x inClassArea=%u choosing=%u chosen=%u menuOpen=%u class=%u cursor=%u,%u player=%08x x=%.2f y=%.2f",
+                (slot-begin)/8,menu,rd8(menu+0x3359),rd8(menu+0x335a),rd8(menu+0x335b),rd8(menu+0x335d),rd32(menu+0x33c8),rd32(menu+0x2e74),rd32(menu+0x2e78),player,player?profile_float(player+0xac):0.0,player?profile_float(player+0xb0):0.0);
+        }
+    }
     uint64_t state=rd8(o)|((uint64_t)rd8(o+1)<<8)|((uint64_t)rd8(o+2)<<16)|((uint64_t)rd8(o+0x18)<<24)|((uint64_t)rd8(o+0x28)<<32)|((uint64_t)rd32(o+0x2c)<<40);
     if(state!=last) {
         last=state;
@@ -120,7 +141,7 @@ void heap_profile_init(void) {
     A(008ccfa2);A(008d9f35);A(009a92b6);A(008cd56c);A(008e27a9);A(008e279e);A(008ef765);
 #undef A
 #define I(addr) guest_intercept(0x##addr##u,image_##addr)
-    I(00817e90);I(0074b350);I(008181f0);I(00818340);I(008184e0);I(00818500);
+    I(00817e90);I(0074b350);I(0074b2c0);I(008181f0);I(00818340);I(008184e0);I(00818500);
 #undef I
     guest_intercept(0x00817ec0u,image_destruct);
     guest_intercept(0x008169e0u,image_from_texture);
