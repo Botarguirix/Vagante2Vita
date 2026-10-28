@@ -304,8 +304,42 @@ static uint32_t scancode_to_vk(SDL_Scancode s) {
         if (vk_to_scancode(vk) == s) return vk;
     return 0;
 }
+/* The game starts player 1 on the keyboard ("!usingJoystick, selecting keyboard") and only
+   switches to a pad through its XInput polling thread, so on a console the buttons also act
+   as the keys of Vagante's default keyboard profile (Input.cpp, profile 0): arrows move,
+   S jump, D melee, F range, A skill, W swap, E interact, Escape pause, Space menu. */
+static int pad_key(uint32_t vk) {
+    static SDL_GameController *pad;
+    if (!pad) {
+        for (int i = 0; i < SDL_NumJoysticks() && !pad; i++)
+            if (SDL_IsGameController(i)) pad = SDL_GameControllerOpen(i);
+        if (!pad) return 0;
+    }
+    const int dead = 12000;
+    int x = SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_LEFTX);
+    int y = SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_LEFTY);
+#define B(button) SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_##button)
+    switch (vk) {
+    case 0x25: return B(DPAD_LEFT) || x < -dead;
+    case 0x27: return B(DPAD_RIGHT) || x > dead;
+    case 0x26: return B(DPAD_UP) || y < -dead;
+    case 0x28: return B(DPAD_DOWN) || y > dead;
+    case 'S': return B(A);              /* cross */
+    case 'D': return B(X);              /* square */
+    case 'F': return B(B);              /* circle */
+    case 'A': return B(Y);              /* triangle */
+    case 'W': return B(LEFTSHOULDER);
+    case 'E': return B(RIGHTSHOULDER);
+    case 0x1B: return B(START);
+    case 0x20: return B(BACK);          /* select */
+    default: return 0;
+    }
+#undef B
+}
+
 API(GetAsyncKeyState) {
     uint32_t vk = ARG(c, 0);
+    if (pad_key(vk)) { ret_stdcall(c, 0x8000u, 1); return; }
     const Uint8 *keys = SDL_GetKeyboardState(NULL);
     int down = 0;
     if (vk == 0x10) down = keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT];
